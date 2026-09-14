@@ -1,0 +1,138 @@
+#version 330
+
+// Mode 0: solid prop. Mode 1: procedural ground. Mode 2: reservoir water.
+
+in vec3 v_WorldPos;
+in vec3 v_Normal;
+
+uniform vec3  u_BaseColor;
+uniform float u_Emissive;
+uniform int   u_Mode;
+
+uniform vec3  u_SunDir;      // direction TOWARD the sun
+uniform vec3  u_SunColor;
+uniform vec3  u_SkyColor;    // ambient from above
+uniform vec3  u_GroundColor; // ambient bounce from below
+uniform vec3  u_FogColor;
+uniform float u_FogDensity;
+uniform float u_Saturation;
+uniform float u_Time;
+uniform vec3  u_CamPos;
+
+layout(location = 0) out vec4 FragColor;
+
+float hash21(vec2 p)
+{
+	p = fract(p * vec2(123.34, 456.21));
+	p += dot(p, p + 45.32);
+	return fract(p.x * p.y);
+}
+
+float valueNoise(vec2 p)
+{
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = hash21(i);
+	float b = hash21(i + vec2(1.0, 0.0));
+	float c = hash21(i + vec2(0.0, 1.0));
+	float d = hash21(i + vec2(1.0, 1.0));
+	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+float fbm(vec2 p)
+{
+	float v = 0.0;
+	float amp = 0.5;
+	for (int i = 0; i < 4; ++i)
+	{
+		v += amp * valueNoise(p);
+		p *= 2.03;
+		amp *= 0.5;
+	}
+	return v;
+}
+
+// The dirt road winds gently along +Z. Used by the ground shader and echoed
+// by the world layout in Game.cpp.
+float roadCenter(float z)
+{
+	return sin(z * 0.05) * 3.0;
+}
+
+void main()
+{
+	vec3 n = normalize(v_Normal);
+	vec3 base = u_BaseColor;
+	float emissive = u_Emissive;
+	float gloss = 0.0;
+
+	if (u_Mode == 1)
+	{
+		// Ground: naturalisation stage 0 to 1. Concrete and dirt giving way to moss.
+		vec2 p = v_WorldPos.xz;
+		float grain = fbm(p * 0.35);
+		float patchMask = fbm(p * 0.09 + 17.0);
+
+		vec3 concrete = vec3(0.34, 0.35, 0.33);
+		vec3 dirt     = vec3(0.30, 0.26, 0.21);
+		vec3 moss     = vec3(0.20, 0.31, 0.20);
+		vec3 grass    = vec3(0.24, 0.34, 0.24);
+
+		float road = 1.0 - smoothstep(1.9, 3.2, abs(p.x - roadCenter(p.y)));
+		vec3 soil = mix(grass, moss, smoothstep(0.35, 0.75, patchMask));
+		vec3 track = mix(dirt, concrete, smoothstep(0.4, 0.7, grain));
+
+		base = mix(soil, track, road * 0.85);
+		// Moss creeping over the road: the village is already turning.
+		base = mix(base, moss, road * smoothstep(0.55, 0.85, patchMask) * 0.55);
+		base *= 0.85 + 0.30 * grain;
+
+		// Damp low ground near the reservoir reads darker.
+		float damp = 1.0 - smoothstep(6.0, 26.0, length(p - vec2(-15.0, -14.0)));
+		base = mix(base, base * vec3(0.78, 0.86, 0.92), damp * 0.5);
+	}
+	else if (u_Mode == 2)
+	{
+		// Reservoir. Ripple normals only, no reflection pass.
+		vec2 p = v_WorldPos.xz;
+		float w1 = sin(p.x * 1.30 + u_Time * 0.75);
+		float w2 = sin(p.y * 1.70 - u_Time * 0.55);
+		float w3 = sin((p.x + p.y) * 0.65 + u_Time * 0.35);
+		n = normalize(vec3(w1 * 0.05 + w3 * 0.03, 1.0, w2 * 0.05 + w3 * 0.03));
+
+		float fres = pow(1.0 - clamp(dot(n, normalize(u_CamPos - v_WorldPos)), 0.0, 1.0), 3.0);
+		base = mix(vec3(0.08, 0.15, 0.17), u_SkyColor * 0.9, 0.35 + fres * 0.55);
+		gloss = 1.0;
+	}
+
+	// Wrapped diffuse keeps the shadow side readable and soft.
+	float ndl = dot(n, u_SunDir);
+	float wrap = clamp(ndl * 0.5 + 0.5, 0.0, 1.0);
+	wrap *= wrap;
+
+	vec3 ambient = mix(u_GroundColor, u_SkyColor, n.y * 0.5 + 0.5);
+	vec3 color = base * (ambient + u_SunColor * wrap);
+
+	if (gloss > 0.0)
+	{
+		vec3 viewDir = normalize(u_CamPos - v_WorldPos);
+		vec3 halfDir = normalize(viewDir + u_SunDir);
+		float spec = pow(max(dot(n, halfDir), 0.0), 90.0);
+		color += u_SunColor * spec * 0.9;
+	}
+
+	color += base * emissive;
+
+	// Muted palette: only spores and light are allowed to be saturated.
+	float luma = dot(color, vec3(0.299, 0.587, 0.114));
+	color = mix(vec3(luma), color, u_Saturation);
+
+	// Height-attenuated exponential fog. Mist pools in the village hollow.
+	float dist = length(v_WorldPos - u_CamPos);
+	float heightFade = exp(-max(v_WorldPos.y, 0.0) * 0.13);
+	float fog = 1.0 - exp(-dist * u_FogDensity * heightFade);
+	color = mix(color, u_FogColor, clamp(fog, 0.0, 1.0));
+
+	FragColor = vec4(color, 1.0);
+}
