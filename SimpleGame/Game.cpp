@@ -403,71 +403,10 @@ void Game::ShowMessage(const char* text, float seconds)
 	messageTimer = seconds;
 }
 
-Vec3 Game::SkyColorNow() const
-{
-	return MakeEnv().fogColor;
-}
-
-float Game::SporeDensityNow() const
-{
-	float a = (timeOfDay - 0.25f) * 2.0f * kPi;
-	float day = Saturatef(sinf(a));
-	return 0.72f + 0.28f * (1.0f - day);
-}
-
-SceneEnv Game::MakeEnv() const
-{
-	struct Anchor
-	{
-		Vec3 sun, sky, ground, fog;
-		float density, sat;
-	};
-
-	// midnight -> dawn (violet) -> noon (pale green) -> dusk (orange) -> midnight
-	static const Anchor kAnchors[5] =
-	{
-		{ Vec3(0.17f, 0.20f, 0.36f), Vec3(0.07f, 0.09f, 0.16f), Vec3(0.02f, 0.03f, 0.05f), Vec3(0.05f, 0.07f, 0.13f), 0.028f, 0.60f },
-		{ Vec3(0.64f, 0.49f, 0.70f), Vec3(0.30f, 0.27f, 0.41f), Vec3(0.06f, 0.06f, 0.10f), Vec3(0.50f, 0.45f, 0.58f), 0.032f, 0.70f },
-		{ Vec3(0.98f, 1.00f, 0.90f), Vec3(0.40f, 0.46f, 0.42f), Vec3(0.09f, 0.12f, 0.09f), Vec3(0.63f, 0.70f, 0.65f), 0.012f, 0.80f },
-		{ Vec3(1.00f, 0.64f, 0.36f), Vec3(0.38f, 0.32f, 0.30f), Vec3(0.07f, 0.06f, 0.06f), Vec3(0.60f, 0.46f, 0.38f), 0.019f, 0.76f },
-		{ Vec3(0.17f, 0.20f, 0.36f), Vec3(0.07f, 0.09f, 0.16f), Vec3(0.02f, 0.03f, 0.05f), Vec3(0.05f, 0.07f, 0.13f), 0.028f, 0.60f },
-	};
-
-	float t = timeOfDay * 4.0f;
-	int i = (int)t;
-	if (i < 0) i = 0;
-	if (i > 3) i = 3;
-	float f = t - (float)i;
-	f = f * f * (3.0f - 2.0f * f);
-
-	const Anchor& a = kAnchors[i];
-	const Anchor& b = kAnchors[i + 1];
-
-	SceneEnv env;
-	env.sunColor = LerpV(a.sun, b.sun, f);
-	env.skyColor = LerpV(a.sky, b.sky, f);
-	env.groundColor = LerpV(a.ground, b.ground, f);
-	env.fogColor = LerpV(a.fog, b.fog, f);
-	env.fogDensity = Lerpf(a.density, b.density, f);
-	env.saturation = Lerpf(a.sat, b.sat, f);
-
-	// The sun rises at 0.25 and sets at 0.75. A floor keeps night readable.
-	float ang = (timeOfDay - 0.25f) * 2.0f * kPi;
-	float elev = sinf(ang);
-	env.sunDir = Normalize(Vec3(cosf(ang) * 0.75f, Maxf(elev, -0.15f) * 0.9f + 0.18f, 0.42f));
-
-	env.fogOrigin = camTarget;
-	env.fogDensity += sporeExposure * 0.010f;
-
-	return env;
-}
-
 void Game::Render()
 {
-	SceneEnv env = MakeEnv();
-
-	renderer->BeginFrame(env.fogColor);
-	renderer->SetEnv(env, time);
+	renderer->BeginFrame();
+	renderer->SetFrame(timeOfDay, sporeExposure, camTarget, time);
 
 	Vec3 dir(cosf(camPitch) * sinf(camYaw), sinf(camPitch), cosf(camPitch) * cosf(camYaw));
 	Vec3 eye = camTarget + dir * camDistance;
@@ -487,12 +426,8 @@ void Game::Render()
 	DrawPlayer();
 
 	// Spores last: additive, and they should sit over everything.
-	Vec3 sporeColor(0.55f, 0.95f, 0.80f);
-	renderer->DrawSpores(Vec3(camTarget.x, 0.0f, camTarget.z),
-						 Vec3(70.0f, 16.0f, 70.0f),
-						 sporeColor,
-						 SporeDensityNow() * 0.55f,
-						 0.13f);
+	renderer->DrawSpores(Vec3(camTarget.x, 0.0f, camTarget.z), Vec3(70.0f, 16.0f, 70.0f),
+						 Vec3(0.55f, 0.95f, 0.80f), 0.55f, 0.13f);
 
 	renderer->BeginUI();
 
@@ -550,10 +485,7 @@ void Game::DrawSleepers()
 
 void Game::DrawPlayer()
 {
-	float bob = (rollTimer > 0.0f) ? 0.0f : fabsf(sinf(walkPhase)) * 0.05f;
-
-	Mat4 base = Mul(MatTranslate(Vec3(playerPos.x, playerPos.y + bob, playerPos.z)),
-					MatRotateY(playerYaw));
+	Mat4 base = Mul(MatTranslate(playerPos), MatRotateY(playerYaw));
 
 	// Roll pivots around the waist so the tumble reads from a quarter view.
 	const float pivot = 0.62f;
@@ -565,8 +497,12 @@ void Game::DrawPlayer()
 		root = Mul(base, spin);
 	}
 
+	// Lit.vs turns the walk phase into the bob; a roll holds it still.
+	DrawParams params;
+	params.phase = (rollTimer > 0.0f) ? 0.0f : walkPhase;
+
 	renderer->DrawShadow(playerPos, 0.45f);
-	renderer->DrawModel(MODEL_PLAYER, root, DrawParams());
+	renderer->DrawModel(MODEL_PLAYER, root, params);
 }
 
 const char* Game::ObjectiveText() const
@@ -602,14 +538,9 @@ void Game::DrawHUD()
 		renderer->DrawTexts(w - tw - 32, 42, buf, fragments >= fragmentGoal ? accent : ink, false);
 	}
 
-	{
-		float bx = 24.0f, by = (float)h - 54.0f, bw = 220.0f, bh = 12.0f;
-		renderer->DrawTexts(24, h - 62, "SPORE EXPOSURE", dim, false);
-		renderer->DrawRectPx(bx, by, bw, bh, Vec3(0.05f, 0.07f, 0.07f), 0.55f);
-		renderer->DrawRectPx(bx, by, bw * sporeExposure, bh,
-							 LerpV(Vec3(0.35f, 0.70f, 0.60f), Vec3(0.75f, 0.95f, 0.55f), sporeExposure),
-							 0.85f);
-	}
+	renderer->DrawTexts(24, h - 62, "SPORE EXPOSURE", dim, false);
+	renderer->DrawBarPx(24.0f, (float)h - 54.0f, 220.0f, 12.0f, sporeExposure,
+						Vec3(0.35f, 0.70f, 0.60f), Vec3(0.75f, 0.95f, 0.55f));
 
 	{
 		const char* help = "WASD move    SPACE roll    E interact    T time    ESC quit";

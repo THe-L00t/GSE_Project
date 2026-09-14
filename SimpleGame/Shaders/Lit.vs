@@ -24,6 +24,7 @@ const int ANIM_SWAY = 2;
 const int ANIM_PULSE = 4;
 const int ANIM_HOVER = 8;
 const int ANIM_SPIN = 16;
+const int ANIM_BOB = 32;
 
 void main()
 {
@@ -34,6 +35,12 @@ void main()
 	if ((anim & ANIM_BREATHE) != 0)
 	{
 		p.y *= 1.0 + 0.06 * sin(u_Time * 0.7 + u_Phase);
+	}
+
+	// Walk bob: the phase carries the walk cycle instead of an ambient offset.
+	if ((anim & ANIM_BOB) != 0)
+	{
+		p.y += abs(sin(u_Phase)) * 0.05;
 	}
 
 	if ((anim & ANIM_SPIN) != 0)

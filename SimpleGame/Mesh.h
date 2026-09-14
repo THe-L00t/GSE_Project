@@ -23,7 +23,8 @@ enum AnimFlag
 	ANIM_SWAY = 2,
 	ANIM_PULSE = 4,
 	ANIM_HOVER = 8,
-	ANIM_SPIN = 16
+	ANIM_SPIN = 16,
+	ANIM_BOB = 32     // walk bob driven by DrawParams::phase
 };
 
 struct MeshVertex

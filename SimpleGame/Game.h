@@ -62,10 +62,6 @@ private:
 
 	void TryInteract();
 
-	SceneEnv MakeEnv() const;
-	Vec3 SkyColorNow() const;
-	float SporeDensityNow() const;
-
 	void DrawWorld();
 	void DrawPlayer();
 	void DrawSleepers();

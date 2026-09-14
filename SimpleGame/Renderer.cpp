@@ -34,7 +34,7 @@ void Renderer::Initialize(int sizeX, int sizeY)
 	overlayShader   = CompileShaders("Shaders/Overlay.vs",   "Shaders/Overlay.fs");
 
 	CreateVertexBufferObjects();
-	CacheLitLocations();
+	CacheUniformLocations();
 	LoadModels();
 
 	glEnable(GL_DEPTH_TEST);
@@ -104,7 +104,7 @@ void Renderer::CreateVertexBufferObjects()
 	glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(spores.size() * sizeof(float)), &spores[0], GL_STATIC_DRAW);
 }
 
-void Renderer::CacheLitLocations()
+void Renderer::CacheUniformLocations()
 {
 	lit.viewProj = glGetUniformLocation(litShader, "u_ViewProj");
 	lit.model = glGetUniformLocation(litShader, "u_Model");
@@ -114,16 +114,36 @@ void Renderer::CacheLitLocations()
 	lit.phase = glGetUniformLocation(litShader, "u_Phase");
 	lit.flash = glGetUniformLocation(litShader, "u_Flash");
 	lit.mode = glGetUniformLocation(litShader, "u_Mode");
-	lit.sunDir = glGetUniformLocation(litShader, "u_SunDir");
-	lit.sunColor = glGetUniformLocation(litShader, "u_SunColor");
-	lit.skyColor = glGetUniformLocation(litShader, "u_SkyColor");
-	lit.groundColor = glGetUniformLocation(litShader, "u_GroundColor");
-	lit.fogColor = glGetUniformLocation(litShader, "u_FogColor");
-	lit.fogDensity = glGetUniformLocation(litShader, "u_FogDensity");
+	lit.timeOfDay = glGetUniformLocation(litShader, "u_TimeOfDay");
+	lit.sporeExposure = glGetUniformLocation(litShader, "u_SporeExposure");
 	lit.fogOrigin = glGetUniformLocation(litShader, "u_FogOrigin");
-	lit.saturation = glGetUniformLocation(litShader, "u_Saturation");
 	lit.time = glGetUniformLocation(litShader, "u_Time");
 	lit.camPos = glGetUniformLocation(litShader, "u_CamPos");
+
+	overlay.rect = glGetUniformLocation(overlayShader, "u_Rect");
+	overlay.mode = glGetUniformLocation(overlayShader, "u_Mode");
+	overlay.color = glGetUniformLocation(overlayShader, "u_Color");
+	overlay.color2 = glGetUniformLocation(overlayShader, "u_Color2");
+	overlay.fill = glGetUniformLocation(overlayShader, "u_Fill");
+	overlay.vignette = glGetUniformLocation(overlayShader, "u_Vignette");
+	overlay.haze = glGetUniformLocation(overlayShader, "u_Haze");
+	overlay.hazeColor = glGetUniformLocation(overlayShader, "u_HazeColor");
+	overlay.time = glGetUniformLocation(overlayShader, "u_Time");
+	overlay.timeOfDay = glGetUniformLocation(overlayShader, "u_TimeOfDay");
+	overlay.sporeExposure = glGetUniformLocation(overlayShader, "u_SporeExposure");
+	overlay.positionAttrib = glGetAttribLocation(overlayShader, "a_Position");
+
+	particle.viewProj = glGetUniformLocation(particleShader, "u_ViewProj");
+	particle.center = glGetUniformLocation(particleShader, "u_Center");
+	particle.field = glGetUniformLocation(particleShader, "u_Field");
+	particle.time = glGetUniformLocation(particleShader, "u_Time");
+	particle.pixelsPerUnit = glGetUniformLocation(particleShader, "u_PixelsPerUnit");
+	particle.size = glGetUniformLocation(particleShader, "u_Size");
+	particle.color = glGetUniformLocation(particleShader, "u_Color");
+	particle.densityScale = glGetUniformLocation(particleShader, "u_DensityScale");
+	particle.timeOfDay = glGetUniformLocation(particleShader, "u_TimeOfDay");
+	particle.seedAttrib = glGetAttribLocation(particleShader, "a_Seed");
+	particle.randAttrib = glGetAttribLocation(particleShader, "a_Rand");
 }
 
 void Renderer::LoadModels()
@@ -181,6 +201,7 @@ bool Renderer::ReadFile(const char* filename, std::string* target)
 	// The working directory differs between running from Visual Studio and
 	// running the built exe, so try the usual spots.
 	const char* prefixes[] = { "", "./", "../SimpleGame/", "./SimpleGame/", "../../SimpleGame/" };
+	const std::string includeDirective = "#include \"";
 
 	for (int i = 0; i < 5; ++i)
 	{
@@ -195,7 +216,17 @@ bool Renderer::ReadFile(const char* filename, std::string* target)
 		std::string line;
 		while (getline(file, line))
 		{
-			target->append(line.c_str());
+			// GLSL has no includes; a line like #include "Env.glsl" splices in a file from Shaders/.
+			if (line.compare(0, includeDirective.size(), includeDirective) == 0)
+			{
+				size_t close = line.find('"', includeDirective.size());
+				std::string name = line.substr(includeDirective.size(), close == std::string::npos ? std::string::npos : close - includeDirective.size());
+				if (!ReadFile((std::string("Shaders/") + name).c_str(), target))
+					std::cout << "Shader include " << name << " not found.\n";
+				continue;
+			}
+
+			target->append(line);
 			target->append("\n");
 		}
 		file.close();
@@ -259,9 +290,10 @@ GLuint Renderer::CompileShaders(const char* filenameVS, const char* filenameFS)
 	return program;
 }
 
-void Renderer::BeginFrame(const Vec3& clearColor)
+void Renderer::BeginFrame()
 {
-	glClearColor(clearColor.x, clearColor.y, clearColor.z, 1.0f);
+	// The ground plane always fills the orthographic view, so the clear colour never shows.
+	glClearColor(0.05f, 0.06f, 0.07f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glEnable(GL_DEPTH_TEST);
@@ -277,9 +309,11 @@ void Renderer::SetCamera(const Mat4& view, const Mat4& proj, const Vec3& eye, fl
 	pixelsPerUnit = pxPerUnit;
 }
 
-void Renderer::SetEnv(const SceneEnv& sceneEnv, float seconds)
+void Renderer::SetFrame(float dayTime, float exposure, const Vec3& fogCenter, float seconds)
 {
-	env = sceneEnv;
+	timeOfDay = dayTime;
+	sporeExposure = exposure;
+	fogOrigin = fogCenter;
 	time = seconds;
 }
 
@@ -300,15 +334,9 @@ void Renderer::BindLit(const Mat4& model, const DrawParams& params, int mode)
 	glUniform1f(lit.flash, params.flash);
 	glUniform1i(lit.mode, mode);
 
-	Vec3 sd = Normalize(env.sunDir);
-	glUniform3f(lit.sunDir, sd.x, sd.y, sd.z);
-	glUniform3f(lit.sunColor, env.sunColor.x, env.sunColor.y, env.sunColor.z);
-	glUniform3f(lit.skyColor, env.skyColor.x, env.skyColor.y, env.skyColor.z);
-	glUniform3f(lit.groundColor, env.groundColor.x, env.groundColor.y, env.groundColor.z);
-	glUniform3f(lit.fogColor, env.fogColor.x, env.fogColor.y, env.fogColor.z);
-	glUniform1f(lit.fogDensity, env.fogDensity);
-	glUniform3f(lit.fogOrigin, env.fogOrigin.x, env.fogOrigin.y, env.fogOrigin.z);
-	glUniform1f(lit.saturation, env.saturation);
+	glUniform1f(lit.timeOfDay, timeOfDay);
+	glUniform1f(lit.sporeExposure, sporeExposure);
+	glUniform3f(lit.fogOrigin, fogOrigin.x, fogOrigin.y, fogOrigin.z);
 	glUniform1f(lit.time, time);
 	glUniform3f(lit.camPos, camPos.x, camPos.y, camPos.z);
 }
@@ -373,31 +401,29 @@ void Renderer::DrawWater(const Vec3& center, float sizeX, float sizeZ)
 	DrawMesh(MODEL_GROUND);
 }
 
-void Renderer::DrawSpores(const Vec3& center, const Vec3& field, const Vec3& color, float density, float size)
+void Renderer::DrawSpores(const Vec3& center, const Vec3& field, const Vec3& color, float densityScale, float size)
 {
-	if (density <= 0.001f) return;
+	if (densityScale <= 0.001f) return;
 
 	glUseProgram(particleShader);
 
-	glUniformMatrix4fv(glGetUniformLocation(particleShader, "u_ViewProj"), 1, GL_FALSE, viewProj.m);
-	glUniform3f(glGetUniformLocation(particleShader, "u_Center"), center.x, center.y, center.z);
-	glUniform3f(glGetUniformLocation(particleShader, "u_Field"), field.x, field.y, field.z);
-	glUniform1f(glGetUniformLocation(particleShader, "u_Time"), time);
-	glUniform1f(glGetUniformLocation(particleShader, "u_PixelsPerUnit"), pixelsPerUnit);
-	glUniform1f(glGetUniformLocation(particleShader, "u_Size"), size);
-	glUniform3f(glGetUniformLocation(particleShader, "u_Color"), color.x, color.y, color.z);
-	glUniform1f(glGetUniformLocation(particleShader, "u_Density"), density);
-
-	int seedLoc = glGetAttribLocation(particleShader, "a_Seed");
-	int randLoc = glGetAttribLocation(particleShader, "a_Rand");
+	glUniformMatrix4fv(particle.viewProj, 1, GL_FALSE, viewProj.m);
+	glUniform3f(particle.center, center.x, center.y, center.z);
+	glUniform3f(particle.field, field.x, field.y, field.z);
+	glUniform1f(particle.time, time);
+	glUniform1f(particle.pixelsPerUnit, pixelsPerUnit);
+	glUniform1f(particle.size, size);
+	glUniform3f(particle.color, color.x, color.y, color.z);
+	glUniform1f(particle.densityScale, densityScale);
+	glUniform1f(particle.timeOfDay, timeOfDay);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vboSpores);
-	glEnableVertexAttribArray(seedLoc);
-	glVertexAttribPointer(seedLoc, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, 0);
-	if (randLoc >= 0)
+	glEnableVertexAttribArray(particle.seedAttrib);
+	glVertexAttribPointer(particle.seedAttrib, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, 0);
+	if (particle.randAttrib >= 0)
 	{
-		glEnableVertexAttribArray(randLoc);
-		glVertexAttribPointer(randLoc, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, (void*)(sizeof(float) * 3));
+		glEnableVertexAttribArray(particle.randAttrib);
+		glVertexAttribPointer(particle.randAttrib, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, (void*)(sizeof(float) * 3));
 	}
 
 	// Spores glow: additive, and they must not occlude one another.
@@ -409,8 +435,8 @@ void Renderer::DrawSpores(const Vec3& center, const Vec3& field, const Vec3& col
 	glDepthMask(GL_TRUE);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	glDisableVertexAttribArray(seedLoc);
-	if (randLoc >= 0) glDisableVertexAttribArray(randLoc);
+	glDisableVertexAttribArray(particle.seedAttrib);
+	if (particle.randAttrib >= 0) glDisableVertexAttribArray(particle.randAttrib);
 }
 
 void Renderer::BeginUI()
@@ -427,31 +453,32 @@ void Renderer::EndUI()
 	glDepthMask(GL_TRUE);
 }
 
-void Renderer::DrawOverlayQuad(int mode, float rx, float ry, float rw, float rh,
-							   const Vec3& color, float alpha,
-							   float vignette, float haze, const Vec3& hazeColor)
+void Renderer::DrawOverlayQuad(float rx, float ry, float rw, float rh, const OverlayParams& params)
 {
 	glUseProgram(overlayShader);
 
-	glUniform4f(glGetUniformLocation(overlayShader, "u_Rect"), rx, ry, rw, rh);
-	glUniform1i(glGetUniformLocation(overlayShader, "u_Mode"), mode);
-	glUniform4f(glGetUniformLocation(overlayShader, "u_Color"), color.x, color.y, color.z, alpha);
-	glUniform1f(glGetUniformLocation(overlayShader, "u_Vignette"), vignette);
-	glUniform1f(glGetUniformLocation(overlayShader, "u_Haze"), haze);
-	glUniform3f(glGetUniformLocation(overlayShader, "u_HazeColor"), hazeColor.x, hazeColor.y, hazeColor.z);
-	glUniform1f(glGetUniformLocation(overlayShader, "u_Time"), time);
+	glUniform4f(overlay.rect, rx, ry, rw, rh);
+	glUniform1i(overlay.mode, params.mode);
+	glUniform4f(overlay.color, params.color.x, params.color.y, params.color.z, params.alpha);
+	glUniform3f(overlay.color2, params.color2.x, params.color2.y, params.color2.z);
+	glUniform1f(overlay.fill, params.fill);
+	glUniform1f(overlay.vignette, params.vignette);
+	glUniform1f(overlay.haze, params.haze);
+	glUniform3f(overlay.hazeColor, params.hazeColor.x, params.hazeColor.y, params.hazeColor.z);
+	glUniform1f(overlay.time, time);
+	glUniform1f(overlay.timeOfDay, timeOfDay);
+	glUniform1f(overlay.sporeExposure, sporeExposure);
 
-	int posLoc = glGetAttribLocation(overlayShader, "a_Position");
 	glBindBuffer(GL_ARRAY_BUFFER, vboScreen);
-	glEnableVertexAttribArray(posLoc);
-	glVertexAttribPointer(posLoc, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, 0);
+	glEnableVertexAttribArray(overlay.positionAttrib);
+	glVertexAttribPointer(overlay.positionAttrib, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, 0);
 
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 
-	glDisableVertexAttribArray(posLoc);
+	glDisableVertexAttribArray(overlay.positionAttrib);
 }
 
-void Renderer::DrawRectPx(float x, float y, float w, float h, const Vec3& color, float alpha)
+void Renderer::DrawPixelQuad(float x, float y, float w, float h, const OverlayParams& params)
 {
 	// Pixel coordinates with the origin at the top-left, converted to NDC.
 	float ndcX = (x / (float)windowSizeX) * 2.0f - 1.0f;
@@ -459,18 +486,45 @@ void Renderer::DrawRectPx(float x, float y, float w, float h, const Vec3& color,
 	float ndcW = (w / (float)windowSizeX) * 2.0f;
 	float ndcH = (h / (float)windowSizeY) * 2.0f;
 
-	DrawOverlayQuad(0, ndcX, ndcY, ndcW, ndcH, color, alpha, 0.0f, 0.0f, Vec3());
+	DrawOverlayQuad(ndcX, ndcY, ndcW, ndcH, params);
+}
+
+void Renderer::DrawRectPx(float x, float y, float w, float h, const Vec3& color, float alpha)
+{
+	OverlayParams params;
+	params.color = color;
+	params.alpha = alpha;
+	DrawPixelQuad(x, y, w, h, params);
+}
+
+void Renderer::DrawBarPx(float x, float y, float w, float h, float fill, const Vec3& low, const Vec3& high)
+{
+	OverlayParams params;
+	params.mode = 2;
+	params.color = low;
+	params.color2 = high;
+	params.fill = fill;
+	DrawPixelQuad(x, y, w, h, params);
 }
 
 void Renderer::DrawAtmosphere(float vignette, float haze, const Vec3& hazeColor)
 {
-	DrawOverlayQuad(1, -1.0f, -1.0f, 2.0f, 2.0f, Vec3(), 1.0f, vignette, haze, hazeColor);
+	OverlayParams params;
+	params.mode = 1;
+	params.vignette = vignette;
+	params.haze = haze;
+	params.hazeColor = hazeColor;
+	DrawOverlayQuad(-1.0f, -1.0f, 2.0f, 2.0f, params);
 }
 
 void Renderer::DrawFade(const Vec3& color, float alpha)
 {
 	if (alpha <= 0.001f) return;
-	DrawOverlayQuad(0, -1.0f, -1.0f, 2.0f, 2.0f, color, alpha, 0.0f, 0.0f, Vec3());
+
+	OverlayParams params;
+	params.color = color;
+	params.alpha = alpha;
+	DrawOverlayQuad(-1.0f, -1.0f, 2.0f, 2.0f, params);
 }
 
 void Renderer::DrawTexts(int x, int y, const char* text, const Vec3& color, bool large)

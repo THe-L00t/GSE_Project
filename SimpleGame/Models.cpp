@@ -70,10 +70,10 @@ ModelRecipe BuildRecipe(int id)
 	switch (id)
 	{
 	case MODEL_PLAYER:
-		r.Add(SHAPE_BOX, Vec3(0.0f, 0.56f, 0.0f), Vec3(0.55f, 1.12f, 0.42f), Vec3(0.30f, 0.36f, 0.36f));
-		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 1.32f, 0.0f), Vec3(0.40f, 0.42f, 0.40f), skin);
-		r.Add(SHAPE_BOX, Vec3(0.0f, 0.71f, -0.26f), Vec3(0.44f, 0.46f, 0.24f), Vec3(0.34f, 0.30f, 0.24f));
-		r.Add(SHAPE_CYLINDER, Vec3(0.0f, 1.08f, 0.0f), Vec3(0.46f, 0.10f, 0.40f), Vec3(0.42f, 0.52f, 0.46f));
+		r.Add(SHAPE_BOX, Vec3(0.0f, 0.56f, 0.0f), Vec3(0.55f, 1.12f, 0.42f), Vec3(0.30f, 0.36f, 0.36f), ANIM_BOB);
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 1.32f, 0.0f), Vec3(0.40f, 0.42f, 0.40f), skin, ANIM_BOB);
+		r.Add(SHAPE_BOX, Vec3(0.0f, 0.71f, -0.26f), Vec3(0.44f, 0.46f, 0.24f), Vec3(0.34f, 0.30f, 0.24f), ANIM_BOB);
+		r.Add(SHAPE_CYLINDER, Vec3(0.0f, 1.08f, 0.0f), Vec3(0.46f, 0.10f, 0.40f), Vec3(0.42f, 0.52f, 0.46f), ANIM_BOB);
 		break;
 
 	case MODEL_PIPE:

@@ -178,6 +178,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="Shaders\Env.glsl" />
     <None Include="Shaders\Lit.fs" />
     <None Include="Shaders\Lit.vs" />
     <None Include="Shaders\Overlay.fs" />

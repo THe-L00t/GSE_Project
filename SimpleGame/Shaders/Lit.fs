@@ -2,6 +2,8 @@
 
 // Mode 0: model. Mode 1: procedural ground. Mode 2: reservoir water. Mode 3: blob shadow.
 
+#include "Env.glsl"
+
 in vec3  v_WorldPos;
 in vec3  v_Normal;
 in vec3  v_Color;
@@ -12,15 +14,7 @@ uniform vec3  u_Tint;
 uniform float u_Emissive;
 uniform float u_Flash;
 uniform int   u_Mode;
-
-uniform vec3  u_SunDir;      // direction TOWARD the sun
-uniform vec3  u_SunColor;
-uniform vec3  u_SkyColor;    // ambient from above
-uniform vec3  u_GroundColor; // ambient bounce from below
-uniform vec3  u_FogColor;
-uniform float u_FogDensity;
 uniform vec3  u_FogOrigin;   // camera target; fog thickens away from it
-uniform float u_Saturation;
 uniform float u_Time;
 uniform vec3  u_CamPos;
 
@@ -67,11 +61,13 @@ float roadCenter(float z)
 
 void main()
 {
+	Env env = EnvAt(u_TimeOfDay);
+
 	// Distance runs from the camera target, not the eye: the orthographic eye
 	// sits 55 units back, which would bury the whole screen in fog.
 	float dist = length(v_WorldPos - u_FogOrigin);
 	float heightFade = exp(-max(v_WorldPos.y, 0.0) * 0.13);
-	float fog = clamp(1.0 - exp(-dist * u_FogDensity * heightFade), 0.0, 1.0);
+	float fog = clamp(1.0 - exp(-dist * env.fogDensity * heightFade), 0.0, 1.0);
 
 	if (u_Mode == 3)
 	{
@@ -122,25 +118,25 @@ void main()
 		n = normalize(vec3(w1 * 0.05 + w3 * 0.03, 1.0, w2 * 0.05 + w3 * 0.03));
 
 		float fres = pow(1.0 - clamp(dot(n, normalize(u_CamPos - v_WorldPos)), 0.0, 1.0), 3.0);
-		base = mix(vec3(0.08, 0.15, 0.17), u_SkyColor * 0.9, 0.35 + fres * 0.55);
+		base = mix(vec3(0.08, 0.15, 0.17), env.skyColor * 0.9, 0.35 + fres * 0.55);
 		gloss = 1.0;
 		emissive = 0.0;
 	}
 
 	// Wrapped diffuse keeps the shadow side readable and soft.
-	float ndl = dot(n, u_SunDir);
+	float ndl = dot(n, env.sunDir);
 	float wrap = clamp(ndl * 0.5 + 0.5, 0.0, 1.0);
 	wrap *= wrap;
 
-	vec3 ambient = mix(u_GroundColor, u_SkyColor, n.y * 0.5 + 0.5);
-	vec3 color = base * (ambient + u_SunColor * wrap);
+	vec3 ambient = mix(env.groundColor, env.skyColor, n.y * 0.5 + 0.5);
+	vec3 color = base * (ambient + env.sunColor * wrap);
 
 	if (gloss > 0.0)
 	{
 		vec3 viewDir = normalize(u_CamPos - v_WorldPos);
-		vec3 halfDir = normalize(viewDir + u_SunDir);
+		vec3 halfDir = normalize(viewDir + env.sunDir);
 		float spec = pow(max(dot(n, halfDir), 0.0), 90.0);
-		color += u_SunColor * spec * 0.9;
+		color += env.sunColor * spec * 0.9;
 	}
 
 	color += base * emissive;
@@ -148,9 +144,9 @@ void main()
 
 	// Muted palette: only spores and light are allowed to be saturated.
 	float luma = dot(color, vec3(0.299, 0.587, 0.114));
-	color = mix(vec3(luma), color, u_Saturation);
+	color = mix(vec3(luma), color, env.saturation);
 
-	color = mix(color, u_FogColor, fog);
+	color = mix(color, env.fogColor, fog);
 
 	FragColor = vec4(color, 1.0);
 }
