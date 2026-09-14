@@ -8,12 +8,13 @@
 
 struct Prop
 {
+	int   model = 0;
 	Vec3  pos;              // base centre, sitting on the ground
-	Vec3  size;
+	Vec3  scale{ 1.0f, 1.0f, 1.0f };
 	float yaw = 0.0f;
-	Vec3  color;
 	float emissive = 0.0f;
-	bool  solid = true;     // takes part in collision
+	float halfX = 0.0f;     // collision footprint; zero takes no part in collision
+	float halfZ = 0.0f;
 };
 
 struct Sleeper
@@ -48,8 +49,8 @@ public:
 
 private:
 	void BuildWorld();
-	void AddHouse(const Vec3& pos, float w, float h, float d, float yaw,
-				  const Vec3& wall, const Vec3& roof);
+	void AddProp(int model, const Vec3& pos, const Vec3& scale, float yaw, float halfX, float halfZ);
+	void AddHouse(const Vec3& pos, float w, float h, float d, float yaw, int model);
 	void AddTree(const Vec3& pos, float scale);
 	void AddFence(const Vec3& from, const Vec3& to);
 

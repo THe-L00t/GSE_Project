@@ -6,6 +6,8 @@
 #include <cstring>
 #include <vector>
 
+#include "Models.h"
+
 // ASCII only: the original template's CP949 comments turned into mojibake in UTF-8 tools.
 
 Renderer::Renderer(int sizeX, int sizeY)
@@ -32,6 +34,8 @@ void Renderer::Initialize(int sizeX, int sizeY)
 	overlayShader   = CompileShaders("Shaders/Overlay.vs",   "Shaders/Overlay.fs");
 
 	CreateVertexBufferObjects();
+	CacheLitLocations();
+	LoadModels();
 
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LEQUAL);
@@ -41,7 +45,7 @@ void Renderer::Initialize(int sizeX, int sizeY)
 	glEnable(GL_PROGRAM_POINT_SIZE);
 
 	if (solidRectShader > 0 && litShader > 0 && particleShader > 0 &&
-		overlayShader > 0 && vboRect > 0 && vboBox > 0)
+		overlayShader > 0 && vboRect > 0 && !meshes.empty())
 	{
 		initialized = true;
 	}
@@ -71,43 +75,6 @@ void Renderer::CreateVertexBufferObjects()
 	glBindBuffer(GL_ARRAY_BUFFER, vboRect);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(rect), rect, GL_STATIC_DRAW);
 
-	const float h = 0.5f;
-	float box[] =
-	{
-		// +Z
-		-h, 0.f,  h, 0.f, 0.f, 1.f,   h, 0.f,  h, 0.f, 0.f, 1.f,   h, 1.f,  h, 0.f, 0.f, 1.f,
-		-h, 0.f,  h, 0.f, 0.f, 1.f,   h, 1.f,  h, 0.f, 0.f, 1.f,  -h, 1.f,  h, 0.f, 0.f, 1.f,
-		// -Z
-		 h, 0.f, -h, 0.f, 0.f,-1.f,  -h, 0.f, -h, 0.f, 0.f,-1.f,  -h, 1.f, -h, 0.f, 0.f,-1.f,
-		 h, 0.f, -h, 0.f, 0.f,-1.f,  -h, 1.f, -h, 0.f, 0.f,-1.f,   h, 1.f, -h, 0.f, 0.f,-1.f,
-		// +X
-		 h, 0.f,  h, 1.f, 0.f, 0.f,   h, 0.f, -h, 1.f, 0.f, 0.f,   h, 1.f, -h, 1.f, 0.f, 0.f,
-		 h, 0.f,  h, 1.f, 0.f, 0.f,   h, 1.f, -h, 1.f, 0.f, 0.f,   h, 1.f,  h, 1.f, 0.f, 0.f,
-		// -X
-		-h, 0.f, -h,-1.f, 0.f, 0.f,  -h, 0.f,  h,-1.f, 0.f, 0.f,  -h, 1.f,  h,-1.f, 0.f, 0.f,
-		-h, 0.f, -h,-1.f, 0.f, 0.f,  -h, 1.f,  h,-1.f, 0.f, 0.f,  -h, 1.f, -h,-1.f, 0.f, 0.f,
-		// +Y
-		-h, 1.f,  h, 0.f, 1.f, 0.f,   h, 1.f,  h, 0.f, 1.f, 0.f,   h, 1.f, -h, 0.f, 1.f, 0.f,
-		-h, 1.f,  h, 0.f, 1.f, 0.f,   h, 1.f, -h, 0.f, 1.f, 0.f,  -h, 1.f, -h, 0.f, 1.f, 0.f,
-		// -Y
-		-h, 0.f, -h, 0.f,-1.f, 0.f,   h, 0.f, -h, 0.f,-1.f, 0.f,   h, 0.f,  h, 0.f,-1.f, 0.f,
-		-h, 0.f, -h, 0.f,-1.f, 0.f,   h, 0.f,  h, 0.f,-1.f, 0.f,  -h, 0.f,  h, 0.f,-1.f, 0.f,
-	};
-
-	glGenBuffers(1, &vboBox);
-	glBindBuffer(GL_ARRAY_BUFFER, vboBox);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(box), box, GL_STATIC_DRAW);
-
-	float quad[] =
-	{
-		-h, 0.f, -h, 0.f, 1.f, 0.f,   h, 0.f, -h, 0.f, 1.f, 0.f,   h, 0.f,  h, 0.f, 1.f, 0.f,
-		-h, 0.f, -h, 0.f, 1.f, 0.f,   h, 0.f,  h, 0.f, 1.f, 0.f,  -h, 0.f,  h, 0.f, 1.f, 0.f,
-	};
-
-	glGenBuffers(1, &vboQuad);
-	glBindBuffer(GL_ARRAY_BUFFER, vboQuad);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
-
 	float screen[] =
 	{
 		0.f, 0.f, 0.f,  1.f, 0.f, 0.f,  1.f, 1.f, 0.f,
@@ -135,6 +102,49 @@ void Renderer::CreateVertexBufferObjects()
 	glGenBuffers(1, &vboSpores);
 	glBindBuffer(GL_ARRAY_BUFFER, vboSpores);
 	glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(spores.size() * sizeof(float)), &spores[0], GL_STATIC_DRAW);
+}
+
+void Renderer::CacheLitLocations()
+{
+	lit.viewProj = glGetUniformLocation(litShader, "u_ViewProj");
+	lit.model = glGetUniformLocation(litShader, "u_Model");
+	lit.normalMat = glGetUniformLocation(litShader, "u_NormalMat");
+	lit.tint = glGetUniformLocation(litShader, "u_Tint");
+	lit.emissive = glGetUniformLocation(litShader, "u_Emissive");
+	lit.phase = glGetUniformLocation(litShader, "u_Phase");
+	lit.flash = glGetUniformLocation(litShader, "u_Flash");
+	lit.mode = glGetUniformLocation(litShader, "u_Mode");
+	lit.sunDir = glGetUniformLocation(litShader, "u_SunDir");
+	lit.sunColor = glGetUniformLocation(litShader, "u_SunColor");
+	lit.skyColor = glGetUniformLocation(litShader, "u_SkyColor");
+	lit.groundColor = glGetUniformLocation(litShader, "u_GroundColor");
+	lit.fogColor = glGetUniformLocation(litShader, "u_FogColor");
+	lit.fogDensity = glGetUniformLocation(litShader, "u_FogDensity");
+	lit.fogOrigin = glGetUniformLocation(litShader, "u_FogOrigin");
+	lit.saturation = glGetUniformLocation(litShader, "u_Saturation");
+	lit.time = glGetUniformLocation(litShader, "u_Time");
+	lit.camPos = glGetUniformLocation(litShader, "u_CamPos");
+}
+
+void Renderer::LoadModels()
+{
+	std::vector<MeshData> meshData;
+	int built = 0;
+	LoadModelMeshes(meshData, built);
+
+	meshes.resize(meshData.size());
+	for (size_t i = 0; i < meshData.size(); ++i)
+	{
+		const std::vector<MeshVertex>& vertices = meshData[i].vertices;
+		if (vertices.empty()) continue;
+
+		glGenBuffers(1, &meshes[i].vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, meshes[i].vbo);
+		glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(vertices.size() * sizeof(MeshVertex)), &vertices[0], GL_STATIC_DRAW);
+		meshes[i].count = (int)vertices.size();
+	}
+
+	std::cout << "Models: " << ((int)meshData.size() - built) << " loaded from Cache/Models, " << built << " built.\n";
 }
 
 void Renderer::AddShader(GLuint program, const char* shaderText, GLenum shaderType)
@@ -273,106 +283,94 @@ void Renderer::SetEnv(const SceneEnv& sceneEnv, float seconds)
 	time = seconds;
 }
 
-void Renderer::BindLit(const Mat4& model, const Vec3& color, float emissive, int mode)
+void Renderer::BindLit(const Mat4& model, const DrawParams& params, int mode)
 {
 	glUseProgram(litShader);
 
 	float normalMat[9];
 	MatNormal3x3(model, normalMat);
 
-	glUniformMatrix4fv(glGetUniformLocation(litShader, "u_ViewProj"), 1, GL_FALSE, viewProj.m);
-	glUniformMatrix4fv(glGetUniformLocation(litShader, "u_Model"), 1, GL_FALSE, model.m);
-	glUniformMatrix3fv(glGetUniformLocation(litShader, "u_NormalMat"), 1, GL_FALSE, normalMat);
+	glUniformMatrix4fv(lit.viewProj, 1, GL_FALSE, viewProj.m);
+	glUniformMatrix4fv(lit.model, 1, GL_FALSE, model.m);
+	glUniformMatrix3fv(lit.normalMat, 1, GL_FALSE, normalMat);
 
-	glUniform3f(glGetUniformLocation(litShader, "u_BaseColor"), color.x, color.y, color.z);
-	glUniform1f(glGetUniformLocation(litShader, "u_Emissive"), emissive);
-	glUniform1i(glGetUniformLocation(litShader, "u_Mode"), mode);
+	glUniform3f(lit.tint, params.tint.x, params.tint.y, params.tint.z);
+	glUniform1f(lit.emissive, params.emissive);
+	glUniform1f(lit.phase, params.phase);
+	glUniform1f(lit.flash, params.flash);
+	glUniform1i(lit.mode, mode);
 
 	Vec3 sd = Normalize(env.sunDir);
-	glUniform3f(glGetUniformLocation(litShader, "u_SunDir"), sd.x, sd.y, sd.z);
-	glUniform3f(glGetUniformLocation(litShader, "u_SunColor"), env.sunColor.x, env.sunColor.y, env.sunColor.z);
-	glUniform3f(glGetUniformLocation(litShader, "u_SkyColor"), env.skyColor.x, env.skyColor.y, env.skyColor.z);
-	glUniform3f(glGetUniformLocation(litShader, "u_GroundColor"), env.groundColor.x, env.groundColor.y, env.groundColor.z);
-	glUniform3f(glGetUniformLocation(litShader, "u_FogColor"), env.fogColor.x, env.fogColor.y, env.fogColor.z);
-	glUniform1f(glGetUniformLocation(litShader, "u_FogDensity"), env.fogDensity);
-	glUniform3f(glGetUniformLocation(litShader, "u_FogOrigin"), env.fogOrigin.x, env.fogOrigin.y, env.fogOrigin.z);
-	glUniform1f(glGetUniformLocation(litShader, "u_Saturation"), env.saturation);
-	glUniform1f(glGetUniformLocation(litShader, "u_Time"), time);
-	glUniform3f(glGetUniformLocation(litShader, "u_CamPos"), camPos.x, camPos.y, camPos.z);
+	glUniform3f(lit.sunDir, sd.x, sd.y, sd.z);
+	glUniform3f(lit.sunColor, env.sunColor.x, env.sunColor.y, env.sunColor.z);
+	glUniform3f(lit.skyColor, env.skyColor.x, env.skyColor.y, env.skyColor.z);
+	glUniform3f(lit.groundColor, env.groundColor.x, env.groundColor.y, env.groundColor.z);
+	glUniform3f(lit.fogColor, env.fogColor.x, env.fogColor.y, env.fogColor.z);
+	glUniform1f(lit.fogDensity, env.fogDensity);
+	glUniform3f(lit.fogOrigin, env.fogOrigin.x, env.fogOrigin.y, env.fogOrigin.z);
+	glUniform1f(lit.saturation, env.saturation);
+	glUniform1f(lit.time, time);
+	glUniform3f(lit.camPos, camPos.x, camPos.y, camPos.z);
 }
 
-void Renderer::DrawBox(const Mat4& model, const Vec3& color, float emissive)
+void Renderer::DrawMesh(int id)
 {
-	BindLit(model, color, emissive, 0);
+	if (id < 0 || id >= (int)meshes.size() || meshes[id].count == 0) return;
 
-	int posLoc = glGetAttribLocation(litShader, "a_Position");
-	int nrmLoc = glGetAttribLocation(litShader, "a_Normal");
+	// Attribute locations are fixed by layout qualifiers in Lit.vs.
+	const GLsizei stride = (GLsizei)sizeof(MeshVertex);
+	glBindBuffer(GL_ARRAY_BUFFER, meshes[id].vbo);
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
+	glEnableVertexAttribArray(2);
+	glEnableVertexAttribArray(3);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(sizeof(float) * 3));
+	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, stride, (void*)(sizeof(float) * 6));
+	glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, stride, (void*)(sizeof(float) * 9));
 
-	glBindBuffer(GL_ARRAY_BUFFER, vboBox);
-	glEnableVertexAttribArray(posLoc);
-	glVertexAttribPointer(posLoc, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, 0);
-	if (nrmLoc >= 0)
-	{
-		glEnableVertexAttribArray(nrmLoc);
-		glVertexAttribPointer(nrmLoc, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, (void*)(sizeof(float) * 3));
-	}
+	glDrawArrays(GL_TRIANGLES, 0, meshes[id].count);
 
-	glDrawArrays(GL_TRIANGLES, 0, 36);
-
-	glDisableVertexAttribArray(posLoc);
-	if (nrmLoc >= 0) glDisableVertexAttribArray(nrmLoc);
+	glDisableVertexAttribArray(0);
+	glDisableVertexAttribArray(1);
+	glDisableVertexAttribArray(2);
+	glDisableVertexAttribArray(3);
 }
 
-void Renderer::DrawBox(const Vec3& pos, const Vec3& size, float yaw, const Vec3& color, float emissive)
+void Renderer::DrawModel(int id, const Mat4& model, const DrawParams& params)
 {
-	Mat4 model = Mul(Mul(MatTranslate(pos), MatRotateY(yaw)), MatScale(size));
-	DrawBox(model, color, emissive);
+	BindLit(model, params, 0);
+	DrawMesh(id);
+}
+
+void Renderer::DrawModel(int id, const Vec3& pos, float yaw, const Vec3& scale, const DrawParams& params)
+{
+	Mat4 model = Mul(Mul(MatTranslate(pos), MatRotateY(yaw)), MatScale(scale));
+	DrawModel(id, model, params);
+}
+
+void Renderer::DrawShadow(const Vec3& pos, float radius)
+{
+	Mat4 model = Mul(MatTranslate(Vec3(pos.x, 0.0f, pos.z)), MatScale(Vec3(radius * 2.0f, 1.0f, radius * 2.0f)));
+
+	glDepthMask(GL_FALSE);
+	BindLit(model, DrawParams(), 3);
+	DrawMesh(MODEL_SHADOW);
+	glDepthMask(GL_TRUE);
 }
 
 void Renderer::DrawGround(const Vec3& center, float extent)
 {
 	Mat4 model = Mul(MatTranslate(Vec3(center.x, 0.0f, center.z)), MatScale(Vec3(extent, 1.0f, extent)));
-	BindLit(model, Vec3(1.0f, 1.0f, 1.0f), 0.0f, 1);
-
-	int posLoc = glGetAttribLocation(litShader, "a_Position");
-	int nrmLoc = glGetAttribLocation(litShader, "a_Normal");
-
-	glBindBuffer(GL_ARRAY_BUFFER, vboQuad);
-	glEnableVertexAttribArray(posLoc);
-	glVertexAttribPointer(posLoc, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, 0);
-	if (nrmLoc >= 0)
-	{
-		glEnableVertexAttribArray(nrmLoc);
-		glVertexAttribPointer(nrmLoc, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, (void*)(sizeof(float) * 3));
-	}
-
-	glDrawArrays(GL_TRIANGLES, 0, 6);
-
-	glDisableVertexAttribArray(posLoc);
-	if (nrmLoc >= 0) glDisableVertexAttribArray(nrmLoc);
+	BindLit(model, DrawParams(), 1);
+	DrawMesh(MODEL_GROUND);
 }
 
 void Renderer::DrawWater(const Vec3& center, float sizeX, float sizeZ)
 {
-	Mat4 model = Mul(MatTranslate(Vec3(center.x, center.y, center.z)), MatScale(Vec3(sizeX, 1.0f, sizeZ)));
-	BindLit(model, Vec3(1.0f, 1.0f, 1.0f), 0.0f, 2);
-
-	int posLoc = glGetAttribLocation(litShader, "a_Position");
-	int nrmLoc = glGetAttribLocation(litShader, "a_Normal");
-
-	glBindBuffer(GL_ARRAY_BUFFER, vboQuad);
-	glEnableVertexAttribArray(posLoc);
-	glVertexAttribPointer(posLoc, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, 0);
-	if (nrmLoc >= 0)
-	{
-		glEnableVertexAttribArray(nrmLoc);
-		glVertexAttribPointer(nrmLoc, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, (void*)(sizeof(float) * 3));
-	}
-
-	glDrawArrays(GL_TRIANGLES, 0, 6);
-
-	glDisableVertexAttribArray(posLoc);
-	if (nrmLoc >= 0) glDisableVertexAttribArray(nrmLoc);
+	Mat4 model = Mul(MatTranslate(center), MatScale(Vec3(sizeX, 1.0f, sizeZ)));
+	BindLit(model, DrawParams(), 2);
+	DrawMesh(MODEL_GROUND);
 }
 
 void Renderer::DrawSpores(const Vec3& center, const Vec3& field, const Vec3& color, float density, float size)

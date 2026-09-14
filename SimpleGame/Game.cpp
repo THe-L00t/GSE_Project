@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <cstring>
 
+#include "Models.h"
+
 // On-screen text stays ASCII: the bitmap fonts freeglut ships cannot draw Hangul.
 
 namespace
@@ -19,6 +21,8 @@ namespace
 	const float kInteractRange = 2.3f;
 
 	const float kExitZ = 26.0f;
+
+	const Vec3 kUnitScale(1.0f, 1.0f, 1.0f);
 }
 
 Game::Game(Renderer* r)
@@ -28,61 +32,26 @@ Game::Game(Renderer* r)
 	BuildWorld();
 }
 
-void Game::AddHouse(const Vec3& pos, float w, float h, float d, float yaw,
-					const Vec3& wall, const Vec3& roof)
+void Game::AddProp(int model, const Vec3& pos, const Vec3& scale, float yaw, float halfX, float halfZ)
 {
-	Prop body;
-	body.pos = pos;
-	body.size = Vec3(w, h, d);
-	body.yaw = yaw;
-	body.color = wall;
-	body.solid = true;
-	props.push_back(body);
+	Prop p;
+	p.model = model;
+	p.pos = pos;
+	p.scale = scale;
+	p.yaw = yaw;
+	p.halfX = halfX;
+	p.halfZ = halfZ;
+	props.push_back(p);
+}
 
-	Prop cap;
-	cap.pos = Vec3(pos.x, pos.y + h, pos.z);
-	cap.size = Vec3(w + 0.7f, 0.45f, d + 0.7f);
-	cap.yaw = yaw;
-	cap.color = roof;
-	cap.solid = false;
-	props.push_back(cap);
-
-	Prop ridge;
-	ridge.pos = Vec3(pos.x, pos.y + h + 0.45f, pos.z);
-	ridge.size = Vec3(w * 0.62f, 0.40f, d * 0.62f);
-	ridge.yaw = yaw;
-	ridge.color = roof * 0.88f;
-	ridge.solid = false;
-	props.push_back(ridge);
+void Game::AddHouse(const Vec3& pos, float w, float h, float d, float yaw, int model)
+{
+	AddProp(model, pos, Vec3(w, h, d), yaw, w * 0.5f, d * 0.5f);
 }
 
 void Game::AddTree(const Vec3& pos, float scale)
 {
-	Prop trunk;
-	trunk.pos = pos;
-	trunk.size = Vec3(0.45f * scale, 2.6f * scale, 0.45f * scale);
-	trunk.color = Vec3(0.22f, 0.19f, 0.16f);
-	trunk.solid = true;
-	props.push_back(trunk);
-
-	const float foliage[3][4] =
-	{
-		{ 2.5f, 1.5f, 2.5f, 0.0f },
-		{ 2.0f, 1.3f, 2.0f, 0.7f },
-		{ 1.4f, 1.1f, 1.4f, 1.4f },
-	};
-	float y = pos.y + 2.2f * scale;
-	for (int i = 0; i < 3; ++i)
-	{
-		Prop leaf;
-		leaf.pos = Vec3(pos.x, y, pos.z);
-		leaf.size = Vec3(foliage[i][0] * scale, foliage[i][1] * scale, foliage[i][2] * scale);
-		leaf.yaw = foliage[i][3];
-		leaf.color = Vec3(0.17f + 0.03f * i, 0.28f + 0.03f * i, 0.19f);
-		leaf.solid = false;
-		props.push_back(leaf);
-		y += foliage[i][1] * scale * 0.72f;
-	}
+	AddProp(MODEL_TREE, pos, Vec3(scale, scale, scale), 0.0f, 0.225f * scale, 0.225f * scale);
 }
 
 void Game::AddFence(const Vec3& from, const Vec3& to)
@@ -93,71 +62,23 @@ void Game::AddFence(const Vec3& from, const Vec3& to)
 	for (int i = 0; i <= posts; ++i)
 	{
 		float t = (float)i / (float)posts;
-		Prop p;
-		p.pos = LerpV(from, to, t);
-		p.size = Vec3(0.14f, 1.0f, 0.14f);
-		p.color = Vec3(0.26f, 0.24f, 0.20f);
-		p.solid = false;
-		props.push_back(p);
+		AddProp(MODEL_FENCE_POST, LerpV(from, to, t), kUnitScale, 0.0f, 0.0f, 0.0f);
 	}
 
-	Prop rail;
-	rail.pos = LerpV(from, to, 0.5f);
-	rail.pos.y = 0.62f;
-	rail.yaw = atan2f(d.x, d.z);
-	rail.size = Vec3(0.08f, 0.12f, len);
-	rail.color = Vec3(0.24f, 0.22f, 0.19f);
-	rail.solid = false;
-	props.push_back(rail);
+	Vec3 mid = LerpV(from, to, 0.5f);
+	AddProp(MODEL_FENCE_RAIL, Vec3(mid.x, 0.62f, mid.z), Vec3(0.08f, 0.12f, len), atan2f(d.x, d.z), 0.0f, 0.0f);
 }
 
 void Game::BuildWorld()
 {
-	const Vec3 wallA(0.44f, 0.42f, 0.38f);
-	const Vec3 wallB(0.38f, 0.38f, 0.36f);
-	const Vec3 roofA(0.21f, 0.21f, 0.20f);
-	const Vec3 roofB(0.24f, 0.22f, 0.19f);
-
 	// Grandmother's house
-	AddHouse(Vec3(-2.0f, 0.0f, -10.0f), 7.0f, 3.6f, 6.0f, 0.0f, wallA, roofA);
-	AddHouse(Vec3(9.5f, 0.0f, -7.0f), 5.5f, 3.2f, 5.0f, 0.12f, wallB, roofB);
-	AddHouse(Vec3(-10.5f, 0.0f, 3.0f), 5.0f, 3.0f, 4.6f, -0.15f, wallA, roofB);
-	AddHouse(Vec3(9.0f, 0.0f, 8.5f), 5.0f, 3.1f, 5.0f, 0.05f, wallB, roofA);
-	AddHouse(Vec3(-7.0f, 0.0f, 16.5f), 4.6f, 2.9f, 4.4f, 0.20f, wallA, roofB);
+	AddHouse(Vec3(-2.0f, 0.0f, -10.0f), 7.0f, 3.6f, 6.0f, 0.0f, MODEL_HOUSE_A);
+	AddHouse(Vec3(9.5f, 0.0f, -7.0f), 5.5f, 3.2f, 5.0f, 0.12f, MODEL_HOUSE_B);
+	AddHouse(Vec3(-10.5f, 0.0f, 3.0f), 5.0f, 3.0f, 4.6f, -0.15f, MODEL_HOUSE_A);
+	AddHouse(Vec3(9.0f, 0.0f, 8.5f), 5.0f, 3.1f, 5.0f, 0.05f, MODEL_HOUSE_B);
+	AddHouse(Vec3(-7.0f, 0.0f, 16.5f), 4.6f, 2.9f, 4.4f, 0.20f, MODEL_HOUSE_A);
 
-	// Well
-	{
-		Prop ring;
-		ring.pos = Vec3(2.5f, 0.0f, -2.0f);
-		ring.size = Vec3(1.9f, 0.85f, 1.9f);
-		ring.color = Vec3(0.33f, 0.33f, 0.31f);
-		ring.solid = true;
-		props.push_back(ring);
-
-		Prop water;
-		water.pos = Vec3(2.5f, 0.85f, -2.0f);
-		water.size = Vec3(1.5f, 0.04f, 1.5f);
-		water.color = Vec3(0.10f, 0.16f, 0.18f);
-		water.solid = false;
-		props.push_back(water);
-
-		for (int i = 0; i < 2; ++i)
-		{
-			Prop post;
-			post.pos = Vec3(2.5f + (i == 0 ? -0.85f : 0.85f), 0.0f, -2.0f);
-			post.size = Vec3(0.16f, 2.4f, 0.16f);
-			post.color = Vec3(0.25f, 0.23f, 0.19f);
-			post.solid = false;
-			props.push_back(post);
-		}
-
-		Prop roof;
-		roof.pos = Vec3(2.5f, 2.4f, -2.0f);
-		roof.size = Vec3(2.6f, 0.28f, 2.2f);
-		roof.color = Vec3(0.22f, 0.21f, 0.18f);
-		roof.solid = false;
-		props.push_back(roof);
-	}
+	AddProp(MODEL_WELL, Vec3(2.5f, 0.0f, -2.0f), kUnitScale, 0.0f, 0.95f, 0.95f);
 
 	// Trees stay clear of the road painted by Lit.fs.
 	AddTree(Vec3(-6.5f, 0.0f, -17.0f), 1.15f);
@@ -174,54 +95,12 @@ void Game::BuildWorld()
 	AddFence(Vec3(-6.0f, 0.0f, 1.5f), Vec3(-1.0f, 0.0f, 1.5f));
 	AddFence(Vec3(12.5f, 0.0f, 4.0f), Vec3(12.5f, 0.0f, 12.0f));
 
-	// Abandoned truck
-	{
-		Prop bed;
-		bed.pos = Vec3(11.5f, 0.0f, 15.0f);
-		bed.size = Vec3(2.1f, 1.1f, 4.4f);
-		bed.yaw = 0.30f;
-		bed.color = Vec3(0.30f, 0.27f, 0.23f);
-		bed.solid = true;
-		props.push_back(bed);
-
-		Prop cab;
-		cab.pos = Vec3(11.9f, 1.1f, 13.6f);
-		cab.size = Vec3(1.9f, 1.1f, 1.7f);
-		cab.yaw = 0.30f;
-		cab.color = Vec3(0.26f, 0.25f, 0.22f);
-		cab.solid = false;
-		props.push_back(cab);
-
-		Prop moss;
-		moss.pos = Vec3(11.5f, 1.1f, 15.6f);
-		moss.size = Vec3(2.0f, 0.22f, 2.6f);
-		moss.yaw = 0.30f;
-		moss.color = Vec3(0.20f, 0.33f, 0.20f);
-		moss.solid = false;
-		props.push_back(moss);
-	}
+	AddProp(MODEL_TRUCK, Vec3(11.5f, 0.0f, 15.0f), kUnitScale, 0.30f, 1.05f, 2.2f);
 
 	// Road sign toward Route 32
-	{
-		const float signZ = 24.5f;
-		const float signX = RoadCenter(signZ) + 3.2f;
-
-		Prop post;
-		post.pos = Vec3(signX, 0.0f, signZ);
-		post.size = Vec3(0.16f, 2.3f, 0.16f);
-		post.color = Vec3(0.27f, 0.25f, 0.21f);
-		post.solid = false;
-		props.push_back(post);
-
-		Prop board;
-		board.pos = Vec3(signX, 1.7f, signZ);
-		board.size = Vec3(1.9f, 0.75f, 0.10f);
-		board.yaw = -0.5f;
-		board.color = Vec3(0.42f, 0.44f, 0.40f);
-		board.emissive = 0.10f;
-		board.solid = false;
-		props.push_back(board);
-	}
+	const float signZ = 24.5f;
+	AddProp(MODEL_SIGN, Vec3(RoadCenter(signZ) + 3.2f, 0.0f, signZ), kUnitScale, 0.0f, 0.0f, 0.0f);
+	props.back().emissive = 0.10f;
 
 	Sleeper grandma;
 	grandma.pos = Vec3(-2.0f, 0.0f, -6.2f);
@@ -328,10 +207,10 @@ void Game::ResolveCollisions()
 	for (size_t i = 0; i < props.size(); ++i)
 	{
 		const Prop& p = props[i];
-		if (!p.solid) continue;
+		if (p.halfX <= 0.0f || p.halfZ <= 0.0f) continue;
 
-		float hx = p.size.x * 0.5f + kPlayerRadius;
-		float hz = p.size.z * 0.5f + kPlayerRadius;
+		float hx = p.halfX + kPlayerRadius;
+		float hz = p.halfZ + kPlayerRadius;
 		float dx = playerPos.x - p.pos.x;
 		float dz = playerPos.z - p.pos.z;
 
@@ -636,14 +515,17 @@ void Game::DrawWorld()
 	for (size_t i = 0; i < props.size(); ++i)
 	{
 		const Prop& p = props[i];
-		renderer->DrawBox(p.pos, p.size, p.yaw, p.color, p.emissive);
+		DrawParams params;
+		params.emissive = p.emissive;
+		params.phase = p.pos.x * 0.37f + p.pos.z * 0.21f;
+		renderer->DrawModel(p.model, p.pos, p.yaw, p.scale, params);
 	}
 
 	if (letterFound && stage == QUEST_READ_LETTER)
 	{
-		float glow = 0.25f + 0.15f * sinf(time * 2.0f);
-		renderer->DrawBox(letterPos, Vec3(0.42f, 0.03f, 0.30f), 0.4f,
-						  Vec3(0.86f, 0.84f, 0.76f), glow);
+		DrawParams params;
+		params.emissive = 0.3f;
+		renderer->DrawModel(MODEL_LETTER, letterPos, 0.4f, kUnitScale, params);
 	}
 }
 
@@ -652,31 +534,16 @@ void Game::DrawSleepers()
 	for (size_t i = 0; i < sleepers.size(); ++i)
 	{
 		const Sleeper& s = sleepers[i];
-
 		Mat4 root = Mul(MatTranslate(s.pos), MatRotateY(s.yaw));
 
-		float breath = 1.0f + 0.06f * sinf(time * 0.7f + s.phase);
-
-		Vec3 cloth = s.isGrandma ? Vec3(0.40f, 0.36f, 0.34f) : Vec3(0.33f, 0.33f, 0.32f);
-		Mat4 body = Mul(root, MatScale(Vec3(0.58f, 0.38f * breath, 1.75f)));
-		renderer->DrawBox(body, cloth, 0.0f);
-
-		Mat4 head = Mul(Mul(root, MatTranslate(Vec3(0.0f, 0.0f, 0.98f))),
-						MatScale(Vec3(0.34f, 0.34f, 0.34f)));
-		renderer->DrawBox(head, Vec3(0.46f, 0.42f, 0.38f), 0.0f);
-
-		float pulse = 0.10f + 0.08f * sinf(time * 0.9f + s.phase);
-		float mossLen = s.isGrandma ? 1.30f : 0.95f;
-		Mat4 moss = Mul(Mul(root, MatTranslate(Vec3(0.0f, 0.38f * breath, -0.15f))),
-						MatScale(Vec3(0.52f, 0.07f, mossLen)));
-		renderer->DrawBox(moss, Vec3(0.26f, 0.46f, 0.30f), pulse);
+		DrawParams params;
+		params.phase = s.phase;
+		renderer->DrawModel(s.isGrandma ? MODEL_SLEEPER_ELDER : MODEL_SLEEPER, root, params);
 
 		if (!s.isGrandma && !s.visited)
 		{
-			float h = 1.05f + 0.06f * sinf(time * 1.3f + s.phase);
-			Mat4 mote = Mul(Mul(root, MatTranslate(Vec3(0.0f, h, 0.2f))),
-							MatScale(Vec3(0.10f, 0.10f, 0.10f)));
-			renderer->DrawBox(mote, Vec3(0.60f, 0.95f, 0.82f), 0.85f);
+			params.emissive = 0.6f;
+			renderer->DrawModel(MODEL_DREAM_MOTE, root, params);
 		}
 	}
 }
@@ -698,16 +565,8 @@ void Game::DrawPlayer()
 		root = Mul(base, spin);
 	}
 
-	Mat4 body = Mul(root, MatScale(Vec3(0.55f, 1.12f, 0.42f)));
-	renderer->DrawBox(body, Vec3(0.30f, 0.36f, 0.36f), 0.0f);
-
-	Mat4 head = Mul(Mul(root, MatTranslate(Vec3(0.0f, 1.12f, 0.0f))),
-					MatScale(Vec3(0.40f, 0.40f, 0.40f)));
-	renderer->DrawBox(head, Vec3(0.52f, 0.46f, 0.41f), 0.0f);
-
-	Mat4 pack = Mul(Mul(root, MatTranslate(Vec3(0.0f, 0.48f, -0.26f))),
-					MatScale(Vec3(0.44f, 0.46f, 0.24f)));
-	renderer->DrawBox(pack, Vec3(0.34f, 0.30f, 0.24f), 0.0f);
+	renderer->DrawShadow(playerPos, 0.45f);
+	renderer->DrawModel(MODEL_PLAYER, root, DrawParams());
 }
 
 const char* Game::ObjectiveText() const

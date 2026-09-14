@@ -157,12 +157,17 @@
   <ItemGroup>
     <ClInclude Include="Game.h" />
     <ClInclude Include="Math3D.h" />
+    <ClInclude Include="Mesh.h" />
+    <ClInclude Include="Models.h" />
+    <ClInclude Include="Random.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Game.cpp" />
+    <ClCompile Include="Mesh.cpp" />
+    <ClCompile Include="Models.cpp" />
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="SimpleGame.cpp" />
     <ClCompile Include="stdafx.cpp">

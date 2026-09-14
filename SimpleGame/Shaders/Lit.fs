@@ -1,12 +1,16 @@
 #version 330
 
-// Mode 0: solid prop. Mode 1: procedural ground. Mode 2: reservoir water.
+// Mode 0: model. Mode 1: procedural ground. Mode 2: reservoir water. Mode 3: blob shadow.
 
-in vec3 v_WorldPos;
-in vec3 v_Normal;
+in vec3  v_WorldPos;
+in vec3  v_Normal;
+in vec3  v_Color;
+in vec3  v_Local;
+in float v_Glow;
 
-uniform vec3  u_BaseColor;
+uniform vec3  u_Tint;
 uniform float u_Emissive;
+uniform float u_Flash;
 uniform int   u_Mode;
 
 uniform vec3  u_SunDir;      // direction TOWARD the sun
@@ -63,9 +67,23 @@ float roadCenter(float z)
 
 void main()
 {
+	// Distance runs from the camera target, not the eye: the orthographic eye
+	// sits 55 units back, which would bury the whole screen in fog.
+	float dist = length(v_WorldPos - u_FogOrigin);
+	float heightFade = exp(-max(v_WorldPos.y, 0.0) * 0.13);
+	float fog = clamp(1.0 - exp(-dist * u_FogDensity * heightFade), 0.0, 1.0);
+
+	if (u_Mode == 3)
+	{
+		float r = length(v_Local.xz) * 2.0;
+		float alpha = (1.0 - smoothstep(0.3, 1.0, r)) * 0.38 * (1.0 - fog);
+		FragColor = vec4(0.0, 0.0, 0.0, alpha);
+		return;
+	}
+
 	vec3 n = normalize(v_Normal);
-	vec3 base = u_BaseColor;
-	float emissive = u_Emissive;
+	vec3 base = v_Color * u_Tint;
+	float emissive = u_Emissive + v_Glow;
 	float gloss = 0.0;
 
 	if (u_Mode == 1)
@@ -92,6 +110,7 @@ void main()
 		// Damp low ground near the reservoir reads darker.
 		float damp = 1.0 - smoothstep(6.0, 26.0, length(p - vec2(-15.0, -14.0)));
 		base = mix(base, base * vec3(0.78, 0.86, 0.92), damp * 0.5);
+		emissive = 0.0;
 	}
 	else if (u_Mode == 2)
 	{
@@ -105,6 +124,7 @@ void main()
 		float fres = pow(1.0 - clamp(dot(n, normalize(u_CamPos - v_WorldPos)), 0.0, 1.0), 3.0);
 		base = mix(vec3(0.08, 0.15, 0.17), u_SkyColor * 0.9, 0.35 + fres * 0.55);
 		gloss = 1.0;
+		emissive = 0.0;
 	}
 
 	// Wrapped diffuse keeps the shadow side readable and soft.
@@ -124,18 +144,13 @@ void main()
 	}
 
 	color += base * emissive;
+	color = mix(color, vec3(1.0, 0.95, 0.85), clamp(u_Flash, 0.0, 1.0));
 
 	// Muted palette: only spores and light are allowed to be saturated.
 	float luma = dot(color, vec3(0.299, 0.587, 0.114));
 	color = mix(vec3(luma), color, u_Saturation);
 
-	// Height-attenuated exponential fog. Mist pools in the village hollow.
-	// Distance runs from the camera target, not the eye: the orthographic eye
-	// sits 55 units back, which would bury the whole screen in fog.
-	float dist = length(v_WorldPos - u_FogOrigin);
-	float heightFade = exp(-max(v_WorldPos.y, 0.0) * 0.13);
-	float fog = 1.0 - exp(-dist * u_FogDensity * heightFade);
-	color = mix(color, u_FogColor, clamp(fog, 0.0, 1.0));
+	color = mix(color, u_FogColor, fog);
 
 	FragColor = vec4(color, 1.0);
 }
