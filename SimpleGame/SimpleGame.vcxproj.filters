@@ -51,6 +51,9 @@
     <ClInclude Include="Collision.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="Rpg.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -78,6 +81,12 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="GameVillage.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="GameCombat.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Rpg.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>

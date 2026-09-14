@@ -1,7 +1,9 @@
 #include "stdafx.h"
 #include "Game.h"
 
+#include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <ctime>
 
 #include "Collision.h"
@@ -14,7 +16,12 @@ namespace
 	const uint64_t kRouteSeed = 0;
 
 	const int kStreamRadius = 2;   // chunks kept generated around the player
+	const int kSimRadius = 1;      // chunks whose creatures and finds are live
 	const int kDrawRadius = 1;     // chunks drawn around the camera; covers the orthographic view
+
+	const float kLanternRadius = 4.5f;
+	const float kSleepDuration = 2.2f;
+	const float kSporeDrain = 4.0f;  // health per second once exposure is full
 }
 
 void Game::StartRoute()
@@ -27,31 +34,69 @@ void Game::StartRoute()
 
 	uint64_t seed = kRouteSeed != 0 ? kRouteSeed : MixSeed((uint64_t)std::time(nullptr));
 	routeMap.Reset(seed);
+	chunkStates.clear();
+	enemies.clear();
+	worldItems.clear();
+	popups.clear();
 
-	playerPos = Vec3(0.0f, 0.0f, -6.0f);
+	safePoint = Vec3(0.0f, 0.0f, -7.0f);
+	lanternPos = Vec3(2.5f, 0.0f, -8.5f);
+
+	playerPos = safePoint;
 	playerYaw = 0.0f;
 	rollTimer = 0.0f;
 	rollAngle = 0.0f;
 	camTarget = playerPos;
+	health = MaxHealth(stats);
+	deathTimer = -1.0f;
 	sporeExposure = Minf(sporeExposure, 0.3f);
 
+	if (!hasWeapon) DropItem(ITEM_RUSTY_PIPE, Vec3(0.5f, 0.0f, -3.0f), 0, 0, -1);
+
 	StreamChunks();
+	UpdateChunkActivation();
 	ShowMessage("The road runs on. Walk any way you like; the land grows as you go.", 5.0f);
 }
 
 void Game::UpdateRoute(float dt, const bool* keys)
 {
-	UpdatePlayer(dt, keys);
-	ResolveRouteCollisions();
-	StreamChunks();
+	if (deathTimer >= 0.0f)
+	{
+		deathTimer += dt;
+		if (deathTimer > kSleepDuration) WakeAtSafePoint();
+	}
+	else
+	{
+		UpdatePlayer(dt, keys);
+		ResolveRouteCollisions(playerPos, kPlayerRadius);
+	}
 
-	// Deeper, more overgrown chunks carry thicker spores. Nature Insight still slows it.
+	StreamChunks();
+	UpdateChunkActivation();
+	UpdateEnemies(dt);
+	UpdateItems();
+	UpdateCombatTimers(dt);
+
+	// Deeper, more overgrown chunks carry thicker spores. Insight and dream fragments slow it.
 	const Chunk& here = routeMap.Get(playerChunkX, playerChunkZ);
-	float insight = Maxf(1.0f - 0.18f * (float)fragments, 0.3f);
-	float rate = 0.012f * (float)here.stage * insight;
+	float fragmentGuard = Maxf(1.0f - 0.18f * (float)fragments, 0.3f);
+	float rate = 0.012f * (float)here.stage * fragmentGuard * SporeResistance(stats);
 	if (rollTimer > 0.0f) rate = 0.0f;
 
+	// The lantern clears the air and mends wounds.
+	if (DistXZ(playerPos, lanternPos) < kLanternRadius && deathTimer < 0.0f)
+	{
+		rate = -0.08f;
+		health = Minf(health + 3.0f * dt, MaxHealth(stats));
+	}
+
 	sporeExposure = Saturatef(sporeExposure + rate * dt);
+
+	if (sporeExposure >= 1.0f && deathTimer < 0.0f)
+	{
+		health -= kSporeDrain * dt;
+		if (health <= 0.0f) FallAsleep("The spores close over you. You sink into a long sleep...");
+	}
 }
 
 void Game::StreamChunks()
@@ -65,10 +110,67 @@ void Game::StreamChunks()
 	}
 }
 
-void Game::ResolveRouteCollisions()
+void Game::UpdateChunkActivation()
+{
+	// A chunk drops out of the simulation a ring beyond the live area; its living creatures
+	// and untaken finds return when it comes back.
+	for (std::unordered_map<uint64_t, ChunkState>::iterator it = chunkStates.begin(); it != chunkStates.end(); ++it)
+	{
+		ChunkState& state = it->second;
+		if (!state.active) continue;
+		if (abs(state.cx - playerChunkX) > kSimRadius + 1 || abs(state.cz - playerChunkZ) > kSimRadius + 1)
+			DeactivateChunk(state);
+	}
+
+	for (int dz = -kSimRadius; dz <= kSimRadius; ++dz)
+	{
+		for (int dx = -kSimRadius; dx <= kSimRadius; ++dx)
+			ActivateChunk(playerChunkX + dx, playerChunkZ + dz);
+	}
+}
+
+void Game::ActivateChunk(int cx, int cz)
+{
+	const Chunk& chunk = routeMap.Get(cx, cz);
+	ChunkState& state = chunkStates[ChunkMap::Key(cx, cz)];
+	if (state.active) return;
+
+	state.active = true;
+	state.cx = cx;
+	state.cz = cz;
+	if (state.respawnAt.size() != chunk.spawns.size()) state.respawnAt.assign(chunk.spawns.size(), 0.0f);
+	if (state.itemTaken.size() != chunk.items.size()) state.itemTaken.assign(chunk.items.size(), false);
+
+	for (size_t i = 0; i < chunk.spawns.size(); ++i)
+	{
+		if (state.respawnAt[i] > time) continue;
+		SpawnEnemy(chunk.spawns[i].enemyType, chunk.spawns[i].level, chunk.spawns[i].pos, cx, cz, (int)i);
+	}
+
+	for (size_t i = 0; i < chunk.items.size(); ++i)
+	{
+		if (state.itemTaken[i]) continue;
+		DropItem(chunk.items[i].itemType, chunk.items[i].pos, cx, cz, (int)i);
+	}
+}
+
+void Game::DeactivateChunk(ChunkState& state)
+{
+	state.active = false;
+	int cx = state.cx;
+	int cz = state.cz;
+
+	enemies.erase(std::remove_if(enemies.begin(), enemies.end(),
+		[cx, cz](const Enemy& e) { return e.spawnIndex >= 0 && e.chunkX == cx && e.chunkZ == cz; }), enemies.end());
+
+	worldItems.erase(std::remove_if(worldItems.begin(), worldItems.end(),
+		[cx, cz](const WorldItem& item) { return item.spawnIndex >= 0 && item.chunkX == cx && item.chunkZ == cz; }), worldItems.end());
+}
+
+void Game::ResolveRouteCollisions(Vec3& pos, float radius)
 {
 	int cx, cz;
-	ChunkMap::ChunkCoords(playerPos, cx, cz);
+	ChunkMap::ChunkCoords(pos, cx, cz);
 
 	for (int dz = -1; dz <= 1; ++dz)
 	{
@@ -78,10 +180,12 @@ void Game::ResolveRouteCollisions()
 			for (size_t i = 0; i < c.props.size(); ++i)
 			{
 				if (c.props[i].radius > 0.0f)
-					PushOutOfCircle(playerPos, kPlayerRadius, c.props[i].pos, c.props[i].radius);
+					PushOutOfCircle(pos, radius, c.props[i].pos, c.props[i].radius);
 			}
 		}
 	}
+
+	PushOutOfCircle(pos, radius, lanternPos, 0.5f);
 }
 
 void Game::DrawRoute()
@@ -115,13 +219,21 @@ void Game::DrawRoute()
 			}
 		}
 	}
+
+	DrawParams lantern;
+	lantern.emissive = 0.4f;
+	renderer->DrawShadow(lanternPos, 0.6f);
+	renderer->DrawModel(MODEL_LANTERN, lanternPos, 0.3f, Vec3(1.0f, 1.0f, 1.0f), lantern);
+
+	DrawItems();
+	DrawEnemies();
 }
 
 void Game::DrawRouteHud()
 {
 	const int w = renderer->GetWidth();
 
-	DrawObjective("Walk Route 32. The land grows in every direction.");
+	DrawObjective("Walk Route 32. Fight, gather, and grow stronger.");
 
 	const Chunk& here = routeMap.Get(playerChunkX, playerChunkZ);
 	char lines[4][96];
@@ -141,6 +253,9 @@ void Game::DrawRouteHud()
 	for (int i = 0; i < 4; ++i)
 		renderer->DrawTexts(w - boxW - 32, 40 + i * 20, lines[i], i == 0 ? kHudInk : kHudDim, false);
 
-	DrawCommonHud("WASD move    SPACE roll    T time    ESC quit");
+	DrawCombatHud();
+	DrawPopups();
+	DrawCommonHud("WASD move   SPACE roll   J/Click attack   Q herb   R water   C stats   ESC quit");
 	DrawTitleCard("ROUTE 32", "the road beyond the village");
+	DrawStatPanel();
 }

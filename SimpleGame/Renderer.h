@@ -37,6 +37,9 @@ public:
 	int  GetWidth() const { return (int)windowSizeX; }
 	int  GetHeight() const { return (int)windowSizeY; }
 
+	// Projects a world position to pixels, top-left origin. False when it is behind the camera.
+	bool WorldToScreen(const Vec3& pos, float& sx, float& sy) const;
+
 	// Sun, palette, fog and spore density are evaluated in Shaders/Env.glsl from these values.
 	void BeginFrame();
 	void SetCamera(const Mat4& view, const Mat4& proj, const Vec3& eye, float pxPerUnit);

@@ -314,6 +314,19 @@ void Renderer::SetCamera(const Mat4& view, const Mat4& proj, const Vec3& eye, fl
 	pixelsPerUnit = pxPerUnit;
 }
 
+bool Renderer::WorldToScreen(const Vec3& pos, float& sx, float& sy) const
+{
+	const float* m = viewProj.m;
+	float cx = m[0] * pos.x + m[4] * pos.y + m[8] * pos.z + m[12];
+	float cy = m[1] * pos.x + m[5] * pos.y + m[9] * pos.z + m[13];
+	float cw = m[3] * pos.x + m[7] * pos.y + m[11] * pos.z + m[15];
+	if (cw <= 1e-5f) return false;
+
+	sx = (cx / cw * 0.5f + 0.5f) * (float)windowSizeX;
+	sy = (0.5f - cy / cw * 0.5f) * (float)windowSizeY;
+	return true;
+}
+
 void Renderer::SetFrame(float dayTime, float exposure, const Vec3& fogCenter, float seconds)
 {
 	timeOfDay = dayTime;

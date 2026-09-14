@@ -25,9 +25,13 @@ Game::Game(Renderer* r)
 
 void Game::Update(float dt, const bool* keys)
 {
+	if (messageTimer > 0.0f) messageTimer -= dt;
+
+	// The stat panel pauses the world so the choice can be made calmly.
+	if (statPanelOpen) return;
+
 	time += dt;
 	levelTimer += dt;
-	if (messageTimer > 0.0f) messageTimer -= dt;
 
 	timeOfDay += (dt * timeScale) / dayLength;
 	while (timeOfDay >= 1.0f) timeOfDay -= 1.0f;
@@ -73,7 +77,8 @@ void Game::UpdatePlayer(float dt, const bool* keys)
 	}
 	else if (wishLen > 0.001f)
 	{
-		playerPos = playerPos + wish * (kWalkSpeed * dt);
+		float speed = kWalkSpeed * MoveSpeedScale(stats) * (swingTimer > 0.0f ? 0.7f : 1.0f);
+		playerPos = playerPos + wish * (speed * dt);
 		playerYaw = atan2f(wish.x, wish.z);
 		walkPhase += dt * 9.0f;
 	}
@@ -94,6 +99,12 @@ void Game::OnKeyDown(unsigned char key)
 {
 	if (key >= 'A' && key <= 'Z') key = key - 'A' + 'a';
 
+	if (statPanelOpen)
+	{
+		HandleStatPanelKey(key);
+		return;
+	}
+
 	if (key == 27) // ESC
 	{
 		quit = true;
@@ -108,7 +119,7 @@ void Game::OnKeyDown(unsigned char key)
 
 	if (key == ' ')
 	{
-		if (letterOpen) return;
+		if (letterOpen || deathTimer >= 0.0f) return;
 		if (rollTimer > 0.0f || rollCooldown > 0.0f) return;
 
 		rollTimer = kRollTime;
@@ -124,6 +135,18 @@ void Game::OnKeyDown(unsigned char key)
 		ShowMessage(timeScale > 1.5f ? "Time: fast" : "Time: normal", 2.0f);
 		return;
 	}
+
+	if (level != LEVEL_ROUTE) return;
+
+	if (key == 'j') Attack();
+	else if (key == 'q') UseHerb();
+	else if (key == 'r') UseWater();
+	else if (key == 'c') OpenStatPanel();
+}
+
+void Game::OnMouseDown()
+{
+	if (!statPanelOpen && level == LEVEL_ROUTE) Attack();
 }
 
 void Game::SkipToRoute()
@@ -197,13 +220,22 @@ void Game::DrawPlayer()
 						MatTranslate(Vec3(0.0f, -pivot, 0.0f)));
 		root = Mul(base, spin);
 	}
+	else if (deathTimer >= 0.0f)
+	{
+		root = Mul(base, MatRotateX(-1.45f * Saturatef(deathTimer * 1.5f)));
+	}
 
 	// Lit.vs turns the walk phase into the bob; a roll holds it still.
 	DrawParams params;
 	params.phase = (rollTimer > 0.0f) ? 0.0f : walkPhase;
+	params.flash = playerFlash;
+	if (hurtTimer > 0.0f && fmodf(hurtTimer, 0.16f) < 0.08f)
+		params.flash = Maxf(params.flash, 0.35f);
 
 	renderer->DrawShadow(playerPos, 0.45f);
 	renderer->DrawModel(MODEL_PLAYER, root, params);
+
+	if (hasWeapon) DrawWeapon(root);
 }
 
 void Game::DrawObjective(const char* text)

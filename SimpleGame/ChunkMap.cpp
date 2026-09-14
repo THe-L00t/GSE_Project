@@ -5,6 +5,7 @@
 
 #include "Models.h"
 #include "Random.h"
+#include "Rpg.h"
 
 namespace
 {
@@ -63,6 +64,35 @@ namespace
 		return kPropKinds[0];
 	}
 
+	bool FindOpenSpot(Rng& rng, const Chunk& c, const std::vector<float>& footprints, float footprint,
+					  bool avoidRoad, bool avoidClearing, Vec3& out)
+	{
+		Vec3 center = ChunkMap::ChunkCenter(c.cx, c.cz);
+
+		for (int attempt = 0; attempt < 8; ++attempt)
+		{
+			Vec3 pos(center.x + rng.Range(-0.5f, 0.5f) * (kChunkSize - 2.0f), 0.0f,
+					 center.z + rng.Range(-0.5f, 0.5f) * (kChunkSize - 2.0f));
+
+			if (avoidRoad && fabsf(pos.x - RoadCenter(pos.z)) < 3.4f + footprint) continue;
+			if (avoidClearing && DistXZ(pos, kClearingCenter) < kClearingRadius + footprint) continue;
+
+			bool blocked = false;
+			for (size_t j = 0; j < c.props.size() && !blocked; ++j)
+				blocked = DistXZ(pos, c.props[j].pos) < footprint + footprints[j] + 0.6f;
+			if (blocked) continue;
+
+			out = pos;
+			return true;
+		}
+		return false;
+	}
+
+	int32_t Quantise(float v)
+	{
+		return (int32_t)floorf(v * 100.0f);
+	}
+
 	uint64_t HashChunk(const Chunk& c)
 	{
 		uint64_t h = kFnvOffset;
@@ -75,10 +105,25 @@ namespace
 		{
 			const ChunkProp& p = c.props[i];
 			h = HashInt(h, p.model);
-			h = HashInt(h, (int32_t)floorf(p.pos.x * 100.0f));
-			h = HashInt(h, (int32_t)floorf(p.pos.z * 100.0f));
-			h = HashInt(h, (int32_t)floorf(p.yaw * 100.0f));
-			h = HashInt(h, (int32_t)floorf(p.scale * 100.0f));
+			h = HashInt(h, Quantise(p.pos.x));
+			h = HashInt(h, Quantise(p.pos.z));
+			h = HashInt(h, Quantise(p.yaw));
+			h = HashInt(h, Quantise(p.scale));
+		}
+		for (size_t i = 0; i < c.spawns.size(); ++i)
+		{
+			const ChunkSpawn& s = c.spawns[i];
+			h = HashInt(h, s.enemyType);
+			h = HashInt(h, s.level);
+			h = HashInt(h, Quantise(s.pos.x));
+			h = HashInt(h, Quantise(s.pos.z));
+		}
+		for (size_t i = 0; i < c.items.size(); ++i)
+		{
+			const ChunkItem& item = c.items[i];
+			h = HashInt(h, item.itemType);
+			h = HashInt(h, Quantise(item.pos.x));
+			h = HashInt(h, Quantise(item.pos.z));
 		}
 		return h;
 	}
@@ -146,13 +191,12 @@ const Chunk& ChunkMap::Get(int cx, int cz)
 			break;
 		}
 
+		int px = 0, pz = 0, dir = -1;
+		bool hasParent = ParentOf(x, z, px, pz, dir);
+
 		GrowStep step;
 		step.x = x;
 		step.z = z;
-		step.dir = -1;
-
-		int px = 0, pz = 0, dir = -1;
-		bool hasParent = ParentOf(x, z, px, pz, dir);
 		step.dir = dir;
 		path.push_back(step);
 
@@ -196,7 +240,6 @@ Chunk ChunkMap::Generate(int cx, int cz, uint64_t seed, int parentDir) const
 	if (origin) c.stage = 1;
 	if (c.stage > 3) c.stage = 3;
 
-	Vec3 center = ChunkCenter(cx, cz);
 	std::vector<float> footprints;
 
 	int count = 8 + rng.RangeInt(0, 6) + (c.stage - 1) * 3;
@@ -206,28 +249,44 @@ Chunk ChunkMap::Generate(int cx, int cz, uint64_t seed, int parentDir) const
 		float scale = rng.Range(kind.minScale, kind.maxScale) * (c.stage == 3 ? 1.25f : 1.0f);
 		float footprint = kind.spacing * scale;
 
-		for (int attempt = 0; attempt < 8; ++attempt)
+		Vec3 pos;
+		if (!FindOpenSpot(rng, c, footprints, footprint, true, origin, pos)) continue;
+
+		ChunkProp prop;
+		prop.model = kind.model;
+		prop.pos = pos;
+		prop.yaw = rng.Range(0.0f, 2.0f * kPi);
+		prop.scale = scale;
+		prop.radius = kind.collision * scale;
+		c.props.push_back(prop);
+		footprints.push_back(footprint);
+	}
+
+	// The opening chunk is scripted; everywhere else creatures and finds are part of the seed.
+	if (!origin)
+	{
+		int spawnCount = rng.RangeInt(0, 1 + c.stage);
+		for (int i = 0; i < spawnCount; ++i)
 		{
-			Vec3 pos(center.x + rng.Range(-0.5f, 0.5f) * (kChunkSize - 2.0f), 0.0f,
-					 center.z + rng.Range(-0.5f, 0.5f) * (kChunkSize - 2.0f));
+			float roll = rng.Unit();
+			int type = ENEMY_SPORE_MITE;
+			if (ring >= 2 && roll < 0.25f) type = ENEMY_MOSS_BOAR;
+			else if (ring >= 1 && roll < 0.55f) type = ENEMY_HUSK;
 
-			if (fabsf(pos.x - RoadCenter(pos.z)) < 3.4f + footprint) continue;
-			if (origin && DistXZ(pos, kClearingCenter) < kClearingRadius + footprint) continue;
+			ChunkSpawn spawn;
+			if (!FindOpenSpot(rng, c, footprints, 1.2f, false, false, spawn.pos)) continue;
+			spawn.enemyType = type;
+			spawn.level = 1 + ring / 2 + (rng.Chance(0.3f) ? 1 : 0);
+			c.spawns.push_back(spawn);
+		}
 
-			bool blocked = false;
-			for (size_t j = 0; j < c.props.size() && !blocked; ++j)
-				blocked = DistXZ(pos, c.props[j].pos) < footprint + footprints[j] + 0.6f;
-			if (blocked) continue;
-
-			ChunkProp prop;
-			prop.model = kind.model;
-			prop.pos = pos;
-			prop.yaw = rng.Range(0.0f, 2.0f * kPi);
-			prop.scale = scale;
-			prop.radius = kind.collision * scale;
-			c.props.push_back(prop);
-			footprints.push_back(footprint);
-			break;
+		if (rng.Chance(0.55f))
+		{
+			float roll = rng.Unit();
+			ChunkItem item;
+			item.itemType = roll < 0.6f ? ITEM_HERB : (roll < 0.9f ? ITEM_CLEAN_WATER : ITEM_RELIC);
+			if (FindOpenSpot(rng, c, footprints, 0.6f, false, false, item.pos))
+				c.items.push_back(item);
 		}
 	}
 

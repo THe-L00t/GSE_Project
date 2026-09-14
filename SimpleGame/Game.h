@@ -1,11 +1,15 @@
 #pragma once
 
-#include <vector>
+#include <cstdint>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 #include "Math3D.h"
+#include "Random.h"
 #include "Renderer.h"
 #include "ChunkMap.h"
+#include "Rpg.h"
 
 const float kPlayerRadius = 0.38f;
 const float kInteractRange = 2.3f;
@@ -49,6 +53,67 @@ enum LevelId
 	LEVEL_ROUTE
 };
 
+enum EnemyState
+{
+	ENEMY_IDLE,
+	ENEMY_CHASE,
+	ENEMY_WINDUP,
+	ENEMY_STRIKE,
+	ENEMY_RECOVER,
+	ENEMY_DYING
+};
+
+struct Enemy
+{
+	int   type = ENEMY_SPORE_MITE;
+	int   level = 1;
+	Vec3  pos;
+	Vec3  home;
+	Vec3  moveTarget;
+	Vec3  strikeDir;
+	Vec3  knockback;
+	float yaw = 0.0f;
+	float health = 1.0f;
+	float maxHealth = 1.0f;
+	int   state = ENEMY_IDLE;
+	float stateTimer = 0.0f;
+	bool  strikeHit = false;
+	bool  alive = true;
+	float flash = 0.0f;
+	int   chunkX = 0;
+	int   chunkZ = 0;
+	int   spawnIndex = -1;  // index into the owning chunk's spawns, -1 when scripted
+};
+
+struct WorldItem
+{
+	int   type = ITEM_HERB;
+	Vec3  pos;
+	float phase = 0.0f;
+	bool  taken = false;
+	int   chunkX = 0;
+	int   chunkZ = 0;
+	int   spawnIndex = -1;  // index into the owning chunk's items, -1 for drops and scripted items
+};
+
+struct Popup
+{
+	Vec3  pos;
+	Vec3  color;
+	float timer = 0.0f;
+	char  text[16] = "";
+};
+
+// What has happened to a generated chunk's creatures and finds since it was first visited.
+struct ChunkState
+{
+	bool  active = false;
+	int   cx = 0;
+	int   cz = 0;
+	std::vector<float> respawnAt;   // game time when each spawn may appear again
+	std::vector<bool>  itemTaken;
+};
+
 class Game
 {
 public:
@@ -59,6 +124,7 @@ public:
 
 	// Edge-triggered: fires once per physical press.
 	void OnKeyDown(unsigned char key);
+	void OnMouseDown();
 
 	// Demo aid: jump straight to the level after the tutorial.
 	void SkipToRoute();
@@ -97,9 +163,41 @@ private:
 	void StartRoute();
 	void UpdateRoute(float dt, const bool* keys);
 	void StreamChunks();
-	void ResolveRouteCollisions();
+	void UpdateChunkActivation();
+	void ActivateChunk(int cx, int cz);
+	void DeactivateChunk(ChunkState& state);
+	void ResolveRouteCollisions(Vec3& pos, float radius);
 	void DrawRoute();
 	void DrawRouteHud();
+
+	// GameCombat.cpp: attacks, creatures, items and growth
+	void Attack();
+	void DamageEnemy(Enemy& e, float amount, const Vec3& push);
+	void KillEnemy(Enemy& e);
+	void DamagePlayer(float amount, const Vec3& push);
+	void FallAsleep(const char* reason);
+	void WakeAtSafePoint();
+	void UpdateEnemies(float dt);
+	void UpdateEnemy(Enemy& e, float dt);
+	void UpdateItems();
+	void UpdateCombatTimers(float dt);
+	void SpawnEnemy(int type, int enemyLevel, const Vec3& pos, int chunkX, int chunkZ, int spawnIndex);
+	void DropItem(int type, const Vec3& pos, int chunkX, int chunkZ, int spawnIndex);
+	void PickUp(WorldItem& item);
+	void UseHerb();
+	void UseWater();
+	void GrantXp(int amount);
+	void AddPopup(const Vec3& pos, const char* text, const Vec3& color);
+	void OpenStatPanel();
+	void CloseStatPanel();
+	void HandleStatPanelKey(unsigned char key);
+	void ConfirmStats();
+	void DrawEnemies();
+	void DrawItems();
+	void DrawWeapon(const Mat4& root);
+	void DrawCombatHud();
+	void DrawPopups();
+	void DrawStatPanel();
 
 	Renderer* renderer = nullptr;
 	int   level = LEVEL_VILLAGE;
@@ -123,6 +221,9 @@ private:
 	ChunkMap routeMap;
 	int   playerChunkX = 0;
 	int   playerChunkZ = 0;
+	Vec3  safePoint;
+	Vec3  lanternPos;
+	std::unordered_map<uint64_t, ChunkState> chunkStates;
 
 	Vec3  playerPos{ 2.0f, 0.0f, 1.5f };
 	float playerYaw = kPi;
@@ -131,6 +232,31 @@ private:
 	float rollCooldown = 0.0f;
 	float rollAngle = 0.0f;
 	Vec3  rollDir;
+
+	CharacterStats stats;
+	float health = 76.0f;
+	bool  hasWeapon = false;
+	int   inventory[ITEM_TYPE_COUNT] = { 0, 0, 0, 0 };
+	float attackTimer = 0.0f;     // cooldown until the next swing
+	float swingTimer = 0.0f;      // > 0 while the swing plays
+	float hurtTimer = 0.0f;       // invulnerable while > 0
+	float playerFlash = 0.0f;
+	float deathTimer = -1.0f;     // >= 0 while sinking into the long sleep
+	float levelUpTimer = 0.0f;
+	Rng   combatRng{ 0x5EED5EEDULL };
+
+	std::vector<Enemy>     enemies;
+	std::vector<WorldItem> worldItems;
+	std::vector<Popup>     popups;
+
+	bool  statPanelOpen = false;
+	int   statCursor = 0;
+	int   pendingPoints[STAT_COUNT] = { 0, 0, 0, 0 };
+
+	int   kills[ENEMY_TYPE_COUNT] = { 0, 0, 0 };
+	int   pickups[ITEM_TYPE_COUNT] = { 0, 0, 0, 0 };
+	int   herbsUsed = 0;
+	int   statConfirmations = 0;
 
 	Vec3  camTarget;
 	float camYaw = DegToRad(45.0f);

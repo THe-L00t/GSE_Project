@@ -162,6 +162,7 @@
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Models.h" />
     <ClInclude Include="Random.h" />
+    <ClInclude Include="Rpg.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
@@ -169,11 +170,13 @@
   <ItemGroup>
     <ClCompile Include="ChunkMap.cpp" />
     <ClCompile Include="Game.cpp" />
+    <ClCompile Include="GameCombat.cpp" />
     <ClCompile Include="GameRoute.cpp" />
     <ClCompile Include="GameVillage.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Models.cpp" />
     <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="Rpg.cpp" />
     <ClCompile Include="SimpleGame.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
