@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <unordered_map>
@@ -51,6 +52,17 @@ enum LevelId
 {
 	LEVEL_VILLAGE,
 	LEVEL_ROUTE
+};
+
+// The opening of Route 32 walks through fighting, levelling up and assigning stats.
+enum RouteGuide
+{
+	GUIDE_TAKE_PIPE,
+	GUIDE_FIGHT_MITES,
+	GUIDE_ASSIGN_STATS,
+	GUIDE_FIGHT_BOAR,
+	GUIDE_ASSIGN_AGAIN,
+	GUIDE_EXPLORE
 };
 
 enum EnemyState
@@ -162,6 +174,9 @@ private:
 	// GameRoute.cpp: Route 32, grown chunk by chunk from the world seed
 	void StartRoute();
 	void UpdateRoute(float dt, const bool* keys);
+	void SetGuide(int next);
+	void UpdateGuide();
+	void GuideText(char* buf, size_t size) const;
 	void StreamChunks();
 	void UpdateChunkActivation();
 	void ActivateChunk(int cx, int cz);
@@ -169,6 +184,7 @@ private:
 	void ResolveRouteCollisions(Vec3& pos, float radius);
 	void DrawRoute();
 	void DrawRouteHud();
+	void DrawGuideCard();
 
 	// GameCombat.cpp: attacks, creatures, items and growth
 	void Attack();
@@ -224,6 +240,8 @@ private:
 	Vec3  safePoint;
 	Vec3  lanternPos;
 	std::unordered_map<uint64_t, ChunkState> chunkStates;
+	int   guide = GUIDE_TAKE_PIPE;
+	int   guideBaseline = 0;      // counter value when the current guide step began
 
 	Vec3  playerPos{ 2.0f, 0.0f, 1.5f };
 	float playerYaw = kPi;

@@ -733,5 +733,8 @@ void Game::DrawStatPanel()
 	sprintf_s(buf, sizeof(buf), "Spore guard %4d%% -> %4d%%", (int)(100.0f / SporeResistance(stats) + 0.5f), (int)(100.0f / SporeResistance(preview) + 0.5f));
 	renderer->DrawTexts(x + 300, y, buf, kHudInk, false);
 
+	if (level == LEVEL_ROUTE && (guide == GUIDE_ASSIGN_STATS || guide == GUIDE_ASSIGN_AGAIN))
+		renderer->DrawTexts(x, (int)(py + ph) - 48, "Tip: press D a few times and watch the right-hand numbers move.", kHudDim, false);
+
 	renderer->DrawTexts(x, (int)(py + ph) - 22, "W/S select    D add    A remove    E confirm    C close", kHudAccent, false);
 }

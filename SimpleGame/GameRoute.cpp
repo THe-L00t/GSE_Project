@@ -22,6 +22,8 @@ namespace
 	const float kLanternRadius = 4.5f;
 	const float kSleepDuration = 2.2f;
 	const float kSporeDrain = 4.0f;  // health per second once exposure is full
+
+	const int kGuideMites = 3;
 }
 
 void Game::StartRoute()
@@ -52,10 +54,10 @@ void Game::StartRoute()
 	sporeExposure = Minf(sporeExposure, 0.3f);
 
 	if (!hasWeapon) DropItem(ITEM_RUSTY_PIPE, Vec3(0.5f, 0.0f, -3.0f), 0, 0, -1);
+	SetGuide(GUIDE_TAKE_PIPE);
 
 	StreamChunks();
 	UpdateChunkActivation();
-	ShowMessage("The road runs on. Walk any way you like; the land grows as you go.", 5.0f);
 }
 
 void Game::UpdateRoute(float dt, const bool* keys)
@@ -76,6 +78,7 @@ void Game::UpdateRoute(float dt, const bool* keys)
 	UpdateEnemies(dt);
 	UpdateItems();
 	UpdateCombatTimers(dt);
+	UpdateGuide();
 
 	// Deeper, more overgrown chunks carry thicker spores. Insight and dream fragments slow it.
 	const Chunk& here = routeMap.Get(playerChunkX, playerChunkZ);
@@ -96,6 +99,109 @@ void Game::UpdateRoute(float dt, const bool* keys)
 	{
 		health -= kSporeDrain * dt;
 		if (health <= 0.0f) FallAsleep("The spores close over you. You sink into a long sleep...");
+	}
+}
+
+void Game::SetGuide(int next)
+{
+	guide = next;
+
+	switch (next)
+	{
+	case GUIDE_TAKE_PIPE:
+		ShowMessage("Something glints on the road ahead. Walk over it to pick it up.", 5.0f);
+		break;
+
+	case GUIDE_FIGHT_MITES:
+		guideBaseline = kills[ENEMY_SPORE_MITE];
+		SpawnEnemy(ENEMY_SPORE_MITE, 1, Vec3(-3.5f, 0.0f, 3.0f), 0, 0, -1);
+		SpawnEnemy(ENEMY_SPORE_MITE, 1, Vec3(3.5f, 0.0f, 4.5f), 0, 0, -1);
+		SpawnEnemy(ENEMY_SPORE_MITE, 1, Vec3(0.0f, 0.0f, 8.0f), 0, 0, -1);
+		ShowMessage("Spore mites are stirring. Attack with J or the left mouse button.", 5.0f);
+		break;
+
+	case GUIDE_ASSIGN_STATS:
+		guideBaseline = statConfirmations;
+		ShowMessage("Level up: 3 stat points and full health. Press C to spend the points.", 6.0f);
+		break;
+
+	case GUIDE_FIGHT_BOAR:
+		guideBaseline = kills[ENEMY_MOSS_BOAR];
+		SpawnEnemy(ENEMY_MOSS_BOAR, 1, Vec3(RoadCenter(22.0f), 0.0f, 22.0f), 0, 1, -1);
+		if (inventory[ITEM_HERB] == 0)
+			DropItem(ITEM_HERB, playerPos + Vec3(1.5f, 0.0f, 1.0f), 0, 0, -1);
+		ShowMessage("A moss boar blocks the road south. When it glows red, roll through the charge.", 6.0f);
+		break;
+
+	case GUIDE_ASSIGN_AGAIN:
+		guideBaseline = statConfirmations;
+		ShowMessage("Level up again. Try putting these points somewhere new.", 5.0f);
+		break;
+
+	case GUIDE_EXPLORE:
+		ShowMessage("The road opens. Every step grows new land from the ground behind you.", 6.0f);
+		break;
+
+	default:
+		break;
+	}
+}
+
+void Game::UpdateGuide()
+{
+	// Each step also clears when its goal is already met, so no order of play can stall it.
+	switch (guide)
+	{
+	case GUIDE_TAKE_PIPE:
+		if (hasWeapon) SetGuide(GUIDE_FIGHT_MITES);
+		break;
+
+	case GUIDE_FIGHT_MITES:
+		if (kills[ENEMY_SPORE_MITE] - guideBaseline >= kGuideMites)
+			SetGuide(stats.unspentPoints > 0 ? GUIDE_ASSIGN_STATS : GUIDE_FIGHT_BOAR);
+		break;
+
+	case GUIDE_ASSIGN_STATS:
+		if (statConfirmations > guideBaseline || stats.unspentPoints == 0) SetGuide(GUIDE_FIGHT_BOAR);
+		break;
+
+	case GUIDE_FIGHT_BOAR:
+		if (kills[ENEMY_MOSS_BOAR] - guideBaseline >= 1)
+			SetGuide(stats.unspentPoints > 0 ? GUIDE_ASSIGN_AGAIN : GUIDE_EXPLORE);
+		break;
+
+	case GUIDE_ASSIGN_AGAIN:
+		if (statConfirmations > guideBaseline || stats.unspentPoints == 0) SetGuide(GUIDE_EXPLORE);
+		break;
+
+	default:
+		break;
+	}
+}
+
+void Game::GuideText(char* buf, size_t size) const
+{
+	switch (guide)
+	{
+	case GUIDE_TAKE_PIPE:
+		sprintf_s(buf, size, "Take the rusty pipe lying on the road.");
+		break;
+	case GUIDE_FIGHT_MITES:
+		sprintf_s(buf, size, "Defeat the spore mites (%d/%d).  J or click to attack.",
+				  kills[ENEMY_SPORE_MITE] - guideBaseline, kGuideMites);
+		break;
+	case GUIDE_ASSIGN_STATS:
+		sprintf_s(buf, size, "You reached level %d. Press C and assign your stat points.", stats.level);
+		break;
+	case GUIDE_FIGHT_BOAR:
+		sprintf_s(buf, size, "Defeat the moss boar to the south. SPACE rolls through its charge.");
+		break;
+	case GUIDE_ASSIGN_AGAIN:
+		sprintf_s(buf, size, "Level %d. Spend the new points - try a different stat.", stats.level);
+		break;
+	default:
+		sprintf_s(buf, size, "Walk Route 32. The land grows in every direction.");
+		break;
 	}
 }
 
@@ -233,7 +339,9 @@ void Game::DrawRouteHud()
 {
 	const int w = renderer->GetWidth();
 
-	DrawObjective("Walk Route 32. Fight, gather, and grow stronger.");
+	char objective[128];
+	GuideText(objective, sizeof(objective));
+	DrawObjective(objective);
 
 	const Chunk& here = routeMap.Get(playerChunkX, playerChunkZ);
 	char lines[4][96];
@@ -253,9 +361,41 @@ void Game::DrawRouteHud()
 	for (int i = 0; i < 4; ++i)
 		renderer->DrawTexts(w - boxW - 32, 40 + i * 20, lines[i], i == 0 ? kHudInk : kHudDim, false);
 
+	DrawGuideCard();
 	DrawCombatHud();
 	DrawPopups();
 	DrawCommonHud("WASD move   SPACE roll   J/Click attack   Q herb   R water   C stats   ESC quit");
-	DrawTitleCard("ROUTE 32", "the road beyond the village");
+	DrawTitleCard("ROUTE 32", "where the road teaches you to grow");
 	DrawStatPanel();
+}
+
+void Game::DrawGuideCard()
+{
+	if (guide < GUIDE_ASSIGN_STATS || guide > GUIDE_ASSIGN_AGAIN) return;
+
+	const int w = renderer->GetWidth();
+
+	const char* lines[] =
+	{
+		"HOW YOU GROW",
+		"Creatures and relics give XP.",
+		"A full XP bar raises your level:",
+		"  +3 stat points and full health.",
+		"Each level asks for more XP.",
+		"C opens stats; place points freely.",
+	};
+	const int lineCount = (int)(sizeof(lines) / sizeof(lines[0]));
+
+	int boxW = 0;
+	for (int i = 0; i < lineCount; ++i)
+	{
+		int tw = renderer->TextWidth(lines[i], false);
+		if (tw > boxW) boxW = tw;
+	}
+
+	float x = (float)(w - boxW - 46);
+	float y = 128.0f;
+	renderer->DrawRectPx(x, y, (float)(boxW + 28), 24.0f + 20.0f * (float)lineCount, kHudPanel, 0.45f);
+	for (int i = 0; i < lineCount; ++i)
+		renderer->DrawTexts((int)x + 14, (int)y + 26 + i * 20, lines[i], i == 0 ? kHudAccent : kHudInk, false);
 }

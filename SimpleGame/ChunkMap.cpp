@@ -262,16 +262,17 @@ Chunk ChunkMap::Generate(int cx, int cz, uint64_t seed, int parentDir) const
 		footprints.push_back(footprint);
 	}
 
-	// The opening chunk is scripted; everywhere else creatures and finds are part of the seed.
+	// The opening chunk is scripted, and the first ring stays free of creatures so the guided
+	// fights are not interrupted. Beyond that, creatures and finds are part of the seed.
 	if (!origin)
 	{
-		int spawnCount = rng.RangeInt(0, 1 + c.stage);
+		int spawnCount = ring >= 2 ? rng.RangeInt(0, 1 + c.stage) : 0;
 		for (int i = 0; i < spawnCount; ++i)
 		{
 			float roll = rng.Unit();
 			int type = ENEMY_SPORE_MITE;
-			if (ring >= 2 && roll < 0.25f) type = ENEMY_MOSS_BOAR;
-			else if (ring >= 1 && roll < 0.55f) type = ENEMY_HUSK;
+			if (ring >= 3 && roll < 0.25f) type = ENEMY_MOSS_BOAR;
+			else if (roll < 0.55f) type = ENEMY_HUSK;
 
 			ChunkSpawn spawn;
 			if (!FindOpenSpot(rng, c, footprints, 1.2f, false, false, spawn.pos)) continue;
