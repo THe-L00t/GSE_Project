@@ -16,6 +16,7 @@ struct SceneEnv
 	Vec3  skyColor;     // ambient from above
 	Vec3  groundColor;  // ambient bounce
 	Vec3  fogColor;
+	Vec3  fogOrigin;    // fog distance is measured from here (the camera target)
 	float fogDensity;
 	float saturation;
 
@@ -25,6 +26,7 @@ struct SceneEnv
 		, skyColor(0.30f, 0.35f, 0.38f)
 		, groundColor(0.10f, 0.12f, 0.10f)
 		, fogColor(0.55f, 0.60f, 0.62f)
+		, fogOrigin(0.0f, 0.0f, 0.0f)
 		, fogDensity(0.030f)
 		, saturation(0.80f)
 	{

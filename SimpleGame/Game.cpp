@@ -589,11 +589,11 @@ SceneEnv Game::MakeEnv() const
 	// midnight -> dawn (violet) -> noon (pale green) -> dusk (orange) -> midnight
 	static const Anchor kAnchors[5] =
 	{
-		{ Vec3(0.17f, 0.20f, 0.36f), Vec3(0.07f, 0.09f, 0.16f), Vec3(0.02f, 0.03f, 0.05f), Vec3(0.05f, 0.07f, 0.13f), 0.055f, 0.60f },
-		{ Vec3(0.64f, 0.49f, 0.70f), Vec3(0.30f, 0.27f, 0.41f), Vec3(0.06f, 0.06f, 0.10f), Vec3(0.50f, 0.45f, 0.58f), 0.062f, 0.70f },
-		{ Vec3(0.98f, 1.00f, 0.90f), Vec3(0.40f, 0.46f, 0.42f), Vec3(0.09f, 0.12f, 0.09f), Vec3(0.63f, 0.70f, 0.65f), 0.024f, 0.80f },
-		{ Vec3(1.00f, 0.64f, 0.36f), Vec3(0.38f, 0.32f, 0.30f), Vec3(0.07f, 0.06f, 0.06f), Vec3(0.60f, 0.46f, 0.38f), 0.038f, 0.76f },
-		{ Vec3(0.17f, 0.20f, 0.36f), Vec3(0.07f, 0.09f, 0.16f), Vec3(0.02f, 0.03f, 0.05f), Vec3(0.05f, 0.07f, 0.13f), 0.055f, 0.60f },
+		{ Vec3(0.17f, 0.20f, 0.36f), Vec3(0.07f, 0.09f, 0.16f), Vec3(0.02f, 0.03f, 0.05f), Vec3(0.05f, 0.07f, 0.13f), 0.028f, 0.60f },
+		{ Vec3(0.64f, 0.49f, 0.70f), Vec3(0.30f, 0.27f, 0.41f), Vec3(0.06f, 0.06f, 0.10f), Vec3(0.50f, 0.45f, 0.58f), 0.032f, 0.70f },
+		{ Vec3(0.98f, 1.00f, 0.90f), Vec3(0.40f, 0.46f, 0.42f), Vec3(0.09f, 0.12f, 0.09f), Vec3(0.63f, 0.70f, 0.65f), 0.012f, 0.80f },
+		{ Vec3(1.00f, 0.64f, 0.36f), Vec3(0.38f, 0.32f, 0.30f), Vec3(0.07f, 0.06f, 0.06f), Vec3(0.60f, 0.46f, 0.38f), 0.019f, 0.76f },
+		{ Vec3(0.17f, 0.20f, 0.36f), Vec3(0.07f, 0.09f, 0.16f), Vec3(0.02f, 0.03f, 0.05f), Vec3(0.05f, 0.07f, 0.13f), 0.028f, 0.60f },
 	};
 
 	float t = m_TimeOfDay * 4.0f;
@@ -619,8 +619,11 @@ SceneEnv Game::MakeEnv() const
 	float elev = sinf(ang);
 	env.sunDir = Normalize(Vec3(cosf(ang) * 0.75f, Maxf(elev, -0.15f) * 0.9f + 0.18f, 0.42f));
 
+	// Fog clears around the player and gathers toward the edges of the screen.
+	env.fogOrigin = m_CamTarget;
+
 	// Exposure thickens the air around the player.
-	env.fogDensity += m_SporeExposure * 0.020f;
+	env.fogDensity += m_SporeExposure * 0.010f;
 
 	return env;
 }

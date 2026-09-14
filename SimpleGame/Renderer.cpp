@@ -304,6 +304,7 @@ void Renderer::BindLit(const Mat4& model, const Vec3& color, float emissive, int
 	glUniform3f(glGetUniformLocation(m_LitShader, "u_GroundColor"), m_Env.groundColor.x, m_Env.groundColor.y, m_Env.groundColor.z);
 	glUniform3f(glGetUniformLocation(m_LitShader, "u_FogColor"), m_Env.fogColor.x, m_Env.fogColor.y, m_Env.fogColor.z);
 	glUniform1f(glGetUniformLocation(m_LitShader, "u_FogDensity"), m_Env.fogDensity);
+	glUniform3f(glGetUniformLocation(m_LitShader, "u_FogOrigin"), m_Env.fogOrigin.x, m_Env.fogOrigin.y, m_Env.fogOrigin.z);
 	glUniform1f(glGetUniformLocation(m_LitShader, "u_Saturation"), m_Env.saturation);
 	glUniform1f(glGetUniformLocation(m_LitShader, "u_Time"), m_Time);
 	glUniform3f(glGetUniformLocation(m_LitShader, "u_CamPos"), m_CamPos.x, m_CamPos.y, m_CamPos.z);

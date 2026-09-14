@@ -15,6 +15,7 @@ uniform vec3  u_SkyColor;    // ambient from above
 uniform vec3  u_GroundColor; // ambient bounce from below
 uniform vec3  u_FogColor;
 uniform float u_FogDensity;
+uniform vec3  u_FogOrigin;   // camera target; fog thickens away from it
 uniform float u_Saturation;
 uniform float u_Time;
 uniform vec3  u_CamPos;
@@ -129,7 +130,9 @@ void main()
 	color = mix(vec3(luma), color, u_Saturation);
 
 	// Height-attenuated exponential fog. Mist pools in the village hollow.
-	float dist = length(v_WorldPos - u_CamPos);
+	// Distance runs from the camera target, not the eye: the orthographic eye
+	// sits 55 units back, which would bury the whole screen in fog.
+	float dist = length(v_WorldPos - u_FogOrigin);
 	float heightFade = exp(-max(v_WorldPos.y, 0.0) * 0.13);
 	float fog = 1.0 - exp(-dist * u_FogDensity * heightFade);
 	color = mix(color, u_FogColor, clamp(fog, 0.0, 1.0));
