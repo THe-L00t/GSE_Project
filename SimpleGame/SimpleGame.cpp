@@ -95,6 +95,12 @@ static unsigned char SpecialToKey(int key)
 
 void SpecialKeyInput(int key, int x, int y)
 {
+	if (key == GLUT_KEY_F2)
+	{
+		if (g_Game) g_Game->SkipToRoute();
+		return;
+	}
+
 	unsigned char k = SpecialToKey(key);
 	if (k) g_Keys[k] = true;
 }
@@ -139,6 +145,7 @@ int main(int argc, char **argv)
 	std::cout << " SPACE         : roll (dash)\n";
 	std::cout << " E             : interact\n";
 	std::cout << " T             : toggle fast time of day\n";
+	std::cout << " F2            : skip to Route 32\n";
 	std::cout << " ESC           : quit\n\n";
 
 	// One key press per physical press, so SPACE cannot auto-repeat into a chain of rolls.

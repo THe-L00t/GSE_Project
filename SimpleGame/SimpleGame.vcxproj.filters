@@ -45,6 +45,12 @@
     <ClInclude Include="Random.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="ChunkMap.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Collision.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -63,6 +69,15 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="Models.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="ChunkMap.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="GameRoute.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="GameVillage.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>

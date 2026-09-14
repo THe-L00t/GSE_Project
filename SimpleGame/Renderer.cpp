@@ -119,6 +119,11 @@ void Renderer::CacheUniformLocations()
 	lit.fogOrigin = glGetUniformLocation(litShader, "u_FogOrigin");
 	lit.time = glGetUniformLocation(litShader, "u_Time");
 	lit.camPos = glGetUniformLocation(litShader, "u_CamPos");
+	lit.stage = glGetUniformLocation(litShader, "u_Stage");
+	lit.neighborStage = glGetUniformLocation(litShader, "u_NeighborStage");
+	lit.chunkCenter = glGetUniformLocation(litShader, "u_ChunkCenter");
+	lit.chunkSize = glGetUniformLocation(litShader, "u_ChunkSize");
+	lit.damp = glGetUniformLocation(litShader, "u_Damp");
 
 	overlay.rect = glGetUniformLocation(overlayShader, "u_Rect");
 	overlay.mode = glGetUniformLocation(overlayShader, "u_Mode");
@@ -387,10 +392,17 @@ void Renderer::DrawShadow(const Vec3& pos, float radius)
 	glDepthMask(GL_TRUE);
 }
 
-void Renderer::DrawGround(const Vec3& center, float extent)
+void Renderer::DrawGround(const Vec3& center, float extent, const GroundParams& params)
 {
 	Mat4 model = Mul(MatTranslate(Vec3(center.x, 0.0f, center.z)), MatScale(Vec3(extent, 1.0f, extent)));
 	BindLit(model, DrawParams(), 1);
+
+	glUniform1f(lit.stage, params.stage);
+	glUniform4f(lit.neighborStage, params.neighborStage[0], params.neighborStage[1], params.neighborStage[2], params.neighborStage[3]);
+	glUniform2f(lit.chunkCenter, center.x, center.z);
+	glUniform1f(lit.chunkSize, params.chunkSize);
+	glUniform3f(lit.damp, params.dampCenter.x, params.dampCenter.z, params.dampStrength);
+
 	DrawMesh(MODEL_GROUND);
 }
 

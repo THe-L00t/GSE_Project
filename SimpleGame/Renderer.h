@@ -17,6 +17,15 @@ struct DrawParams
 	float flash = 0.0f;
 };
 
+struct GroundParams
+{
+	float stage = 0.0f;                                      // naturalisation: 0 bare village, 3 overgrown
+	float neighborStage[4] = { 0.0f, 0.0f, 0.0f, 0.0f };     // -x, +x, -z, +z
+	float chunkSize = 0.0f;                                  // zero turns neighbour blending off
+	Vec3  dampCenter;
+	float dampStrength = 0.0f;
+};
+
 class Renderer
 {
 public:
@@ -36,7 +45,7 @@ public:
 	void DrawModel(int id, const Mat4& model, const DrawParams& params);
 	void DrawModel(int id, const Vec3& pos, float yaw, const Vec3& scale, const DrawParams& params);
 	void DrawShadow(const Vec3& pos, float radius);
-	void DrawGround(const Vec3& center, float extent);
+	void DrawGround(const Vec3& center, float extent, const GroundParams& params);
 	void DrawWater(const Vec3& center, float sizeX, float sizeZ);
 	void DrawSpores(const Vec3& center, const Vec3& field, const Vec3& color, float densityScale, float size);
 
@@ -74,6 +83,11 @@ private:
 		GLint fogOrigin = -1;
 		GLint time = -1;
 		GLint camPos = -1;
+		GLint stage = -1;
+		GLint neighborStage = -1;
+		GLint chunkCenter = -1;
+		GLint chunkSize = -1;
+		GLint damp = -1;
 	};
 
 	struct OverlayLocations
