@@ -1,12 +1,10 @@
-﻿#include "stdafx.h"
+#include "stdafx.h"
 #include "Game.h"
 
 #include <cstdio>
 #include <cstring>
 
-// Mulangae Village, the morning the spores arrived.
-// Prototype scope: movement, roll, quarter view, atmosphere, one small quest.
-// All on-screen text is ASCII; the bitmap fonts freeglut ships cannot draw Hangul.
+// On-screen text stays ASCII: the bitmap fonts freeglut ships cannot draw Hangul.
 
 namespace
 {
@@ -23,43 +21,12 @@ namespace
 	const float kExitZ = 26.0f;
 }
 
-Game::Game(Renderer* renderer)
-	: m_Renderer(renderer)
-	, m_WaterCenter(-15.0f, 0.03f, -14.0f)
-	, m_WaterSizeX(22.0f)
-	, m_WaterSizeZ(18.0f)
-	, m_PlayerPos(2.0f, 0.0f, 1.5f)
-	, m_PlayerYaw(kPi)
-	, m_WalkPhase(0.0f)
-	, m_RollTimer(0.0f)
-	, m_RollCooldown(0.0f)
-	, m_RollAngle(0.0f)
-	, m_CamYaw(DegToRad(45.0f))
-	, m_CamPitch(DegToRad(30.0f))
-	, m_CamDistance(55.0f)
-	, m_OrthoHeight(20.0f)
-	, m_Time(0.0f)
-	, m_TimeOfDay(0.27f)          // just after dawn
-	, m_DayLength(240.0f)
-	, m_TimeScale(1.0f)
-	, m_SporeExposure(0.15f)
-	, m_Stage(QUEST_FIND_GRANDMOTHER)
-	, m_Fragments(0)
-	, m_FragmentGoal(3)
-	, m_LetterOpen(false)
-	, m_LetterFound(false)
-	, m_MessageTimer(0.0f)
-	, m_TitleTimer(0.0f)
-	, m_EndingTimer(-1.0f)
-	, m_Quit(false)
-	, m_TargetSleeper(-1)
-	, m_TargetLetter(false)
+Game::Game(Renderer* r)
+	: renderer(r)
 {
-	m_CamTarget = m_PlayerPos;
+	camTarget = playerPos;
 	BuildWorld();
 }
-
-// ------------------------------------------------------------- world ----
 
 void Game::AddHouse(const Vec3& pos, float w, float h, float d, float yaw,
 					const Vec3& wall, const Vec3& roof)
@@ -70,7 +37,7 @@ void Game::AddHouse(const Vec3& pos, float w, float h, float d, float yaw,
 	body.yaw = yaw;
 	body.color = wall;
 	body.solid = true;
-	m_Props.push_back(body);
+	props.push_back(body);
 
 	Prop cap;
 	cap.pos = Vec3(pos.x, pos.y + h, pos.z);
@@ -78,16 +45,15 @@ void Game::AddHouse(const Vec3& pos, float w, float h, float d, float yaw,
 	cap.yaw = yaw;
 	cap.color = roof;
 	cap.solid = false;
-	m_Props.push_back(cap);
+	props.push_back(cap);
 
-	// A second, smaller slab suggests a gable without needing new geometry.
 	Prop ridge;
 	ridge.pos = Vec3(pos.x, pos.y + h + 0.45f, pos.z);
 	ridge.size = Vec3(w * 0.62f, 0.40f, d * 0.62f);
 	ridge.yaw = yaw;
 	ridge.color = roof * 0.88f;
 	ridge.solid = false;
-	m_Props.push_back(ridge);
+	props.push_back(ridge);
 }
 
 void Game::AddTree(const Vec3& pos, float scale)
@@ -97,7 +63,7 @@ void Game::AddTree(const Vec3& pos, float scale)
 	trunk.size = Vec3(0.45f * scale, 2.6f * scale, 0.45f * scale);
 	trunk.color = Vec3(0.22f, 0.19f, 0.16f);
 	trunk.solid = true;
-	m_Props.push_back(trunk);
+	props.push_back(trunk);
 
 	const float foliage[3][4] =
 	{
@@ -114,7 +80,7 @@ void Game::AddTree(const Vec3& pos, float scale)
 		leaf.yaw = foliage[i][3];
 		leaf.color = Vec3(0.17f + 0.03f * i, 0.28f + 0.03f * i, 0.19f);
 		leaf.solid = false;
-		m_Props.push_back(leaf);
+		props.push_back(leaf);
 		y += foliage[i][1] * scale * 0.72f;
 	}
 }
@@ -132,7 +98,7 @@ void Game::AddFence(const Vec3& from, const Vec3& to)
 		p.size = Vec3(0.14f, 1.0f, 0.14f);
 		p.color = Vec3(0.26f, 0.24f, 0.20f);
 		p.solid = false;
-		m_Props.push_back(p);
+		props.push_back(p);
 	}
 
 	Prop rail;
@@ -142,7 +108,7 @@ void Game::AddFence(const Vec3& from, const Vec3& to)
 	rail.size = Vec3(0.08f, 0.12f, len);
 	rail.color = Vec3(0.24f, 0.22f, 0.19f);
 	rail.solid = false;
-	m_Props.push_back(rail);
+	props.push_back(rail);
 }
 
 void Game::BuildWorld()
@@ -152,28 +118,28 @@ void Game::BuildWorld()
 	const Vec3 roofA(0.21f, 0.21f, 0.20f);
 	const Vec3 roofB(0.24f, 0.22f, 0.19f);
 
-	// Grandmother's house, at the north edge facing the village.
+	// Grandmother's house
 	AddHouse(Vec3(-2.0f, 0.0f, -10.0f), 7.0f, 3.6f, 6.0f, 0.0f, wallA, roofA);
 	AddHouse(Vec3(9.5f, 0.0f, -7.0f), 5.5f, 3.2f, 5.0f, 0.12f, wallB, roofB);
 	AddHouse(Vec3(-10.5f, 0.0f, 3.0f), 5.0f, 3.0f, 4.6f, -0.15f, wallA, roofB);
 	AddHouse(Vec3(9.0f, 0.0f, 8.5f), 5.0f, 3.1f, 5.0f, 0.05f, wallB, roofA);
 	AddHouse(Vec3(-7.0f, 0.0f, 16.5f), 4.6f, 2.9f, 4.4f, 0.20f, wallA, roofB);
 
-	// The well the tutorial would open with, now standing unused.
+	// Well
 	{
 		Prop ring;
 		ring.pos = Vec3(2.5f, 0.0f, -2.0f);
 		ring.size = Vec3(1.9f, 0.85f, 1.9f);
 		ring.color = Vec3(0.33f, 0.33f, 0.31f);
 		ring.solid = true;
-		m_Props.push_back(ring);
+		props.push_back(ring);
 
 		Prop water;
 		water.pos = Vec3(2.5f, 0.85f, -2.0f);
 		water.size = Vec3(1.5f, 0.04f, 1.5f);
 		water.color = Vec3(0.10f, 0.16f, 0.18f);
 		water.solid = false;
-		m_Props.push_back(water);
+		props.push_back(water);
 
 		for (int i = 0; i < 2; ++i)
 		{
@@ -182,7 +148,7 @@ void Game::BuildWorld()
 			post.size = Vec3(0.16f, 2.4f, 0.16f);
 			post.color = Vec3(0.25f, 0.23f, 0.19f);
 			post.solid = false;
-			m_Props.push_back(post);
+			props.push_back(post);
 		}
 
 		Prop roof;
@@ -190,10 +156,10 @@ void Game::BuildWorld()
 		roof.size = Vec3(2.6f, 0.28f, 2.2f);
 		roof.color = Vec3(0.22f, 0.21f, 0.18f);
 		roof.solid = false;
-		m_Props.push_back(roof);
+		props.push_back(roof);
 	}
 
-	// Trees, kept clear of the road painted by the ground shader.
+	// Trees stay clear of the road painted by Lit.fs.
 	AddTree(Vec3(-6.5f, 0.0f, -17.0f), 1.15f);
 	AddTree(Vec3(6.5f, 0.0f, -15.5f), 0.95f);
 	AddTree(Vec3(15.0f, 0.0f, -2.0f), 1.20f);
@@ -208,7 +174,7 @@ void Game::BuildWorld()
 	AddFence(Vec3(-6.0f, 0.0f, 1.5f), Vec3(-1.0f, 0.0f, 1.5f));
 	AddFence(Vec3(12.5f, 0.0f, 4.0f), Vec3(12.5f, 0.0f, 12.0f));
 
-	// A truck that stopped where the road gave out, already half bark.
+	// Abandoned truck
 	{
 		Prop bed;
 		bed.pos = Vec3(11.5f, 0.0f, 15.0f);
@@ -216,7 +182,7 @@ void Game::BuildWorld()
 		bed.yaw = 0.30f;
 		bed.color = Vec3(0.30f, 0.27f, 0.23f);
 		bed.solid = true;
-		m_Props.push_back(bed);
+		props.push_back(bed);
 
 		Prop cab;
 		cab.pos = Vec3(11.9f, 1.1f, 13.6f);
@@ -224,7 +190,7 @@ void Game::BuildWorld()
 		cab.yaw = 0.30f;
 		cab.color = Vec3(0.26f, 0.25f, 0.22f);
 		cab.solid = false;
-		m_Props.push_back(cab);
+		props.push_back(cab);
 
 		Prop moss;
 		moss.pos = Vec3(11.5f, 1.1f, 15.6f);
@@ -232,10 +198,10 @@ void Game::BuildWorld()
 		moss.yaw = 0.30f;
 		moss.color = Vec3(0.20f, 0.33f, 0.20f);
 		moss.solid = false;
-		m_Props.push_back(moss);
+		props.push_back(moss);
 	}
 
-	// Road sign at the southern edge: the way to Route 32.
+	// Road sign toward Route 32
 	{
 		const float signZ = 24.5f;
 		const float signX = RoadCenter(signZ) + 3.2f;
@@ -245,7 +211,7 @@ void Game::BuildWorld()
 		post.size = Vec3(0.16f, 2.3f, 0.16f);
 		post.color = Vec3(0.27f, 0.25f, 0.21f);
 		post.solid = false;
-		m_Props.push_back(post);
+		props.push_back(post);
 
 		Prop board;
 		board.pos = Vec3(signX, 1.7f, signZ);
@@ -254,16 +220,15 @@ void Game::BuildWorld()
 		board.color = Vec3(0.42f, 0.44f, 0.40f);
 		board.emissive = 0.10f;
 		board.solid = false;
-		m_Props.push_back(board);
+		props.push_back(board);
 	}
 
-	// The villagers, asleep where the spores caught them.
 	Sleeper grandma;
 	grandma.pos = Vec3(-2.0f, 0.0f, -6.2f);
 	grandma.yaw = 0.35f;
 	grandma.isGrandma = true;
 	grandma.phase = 0.0f;
-	m_Sleepers.push_back(grandma);
+	sleepers.push_back(grandma);
 
 	const float others[4][3] =
 	{
@@ -278,35 +243,33 @@ void Game::BuildWorld()
 		s.pos = Vec3(others[i][0], 0.0f, others[i][1]);
 		s.yaw = others[i][2];
 		s.phase = 1.3f * (float)(i + 1);
-		m_Sleepers.push_back(s);
+		sleepers.push_back(s);
 	}
 
-	m_LetterPos = Vec3(-0.6f, 0.0f, -6.0f);
+	letterPos = Vec3(-0.6f, 0.0f, -6.0f);
 }
-
-// ------------------------------------------------------------ update ----
 
 void Game::Update(float dt, const bool* keys)
 {
-	m_Time += dt;
+	time += dt;
 
-	if (!m_LetterOpen)
+	if (!letterOpen)
 		UpdatePlayer(dt, keys);
 
 	UpdateCamera(dt);
 	UpdateWorldState(dt);
 	UpdateInteractionTarget();
 
-	if (m_MessageTimer > 0.0f) m_MessageTimer -= dt;
-	m_TitleTimer += dt;
-	if (m_EndingTimer >= 0.0f) m_EndingTimer += dt;
+	if (messageTimer > 0.0f) messageTimer -= dt;
+	titleTimer += dt;
+	if (endingTimer >= 0.0f) endingTimer += dt;
 }
 
 void Game::UpdatePlayer(float dt, const bool* keys)
 {
-	// Movement is camera relative: W always goes "up" the screen.
-	Vec3 forward(-sinf(m_CamYaw), 0.0f, -cosf(m_CamYaw));
-	Vec3 right(cosf(m_CamYaw), 0.0f, -sinf(m_CamYaw));
+	// Camera relative: W always moves up the screen.
+	Vec3 forward(-sinf(camYaw), 0.0f, -cosf(camYaw));
+	Vec3 right(cosf(camYaw), 0.0f, -sinf(camYaw));
 
 	Vec3 wish;
 	if (keys['w']) wish = wish + forward;
@@ -317,44 +280,44 @@ void Game::UpdatePlayer(float dt, const bool* keys)
 	float wishLen = Length(wish);
 	if (wishLen > 0.001f) wish = wish * (1.0f / wishLen);
 
-	if (m_RollCooldown > 0.0f) m_RollCooldown -= dt;
+	if (rollCooldown > 0.0f) rollCooldown -= dt;
 
-	if (m_RollTimer > 0.0f)
+	if (rollTimer > 0.0f)
 	{
 		// The roll commits to its direction; steering during it would rob the weight.
-		m_RollTimer -= dt;
-		float k = Saturatef(m_RollTimer / kRollTime);
+		rollTimer -= dt;
+		float k = Saturatef(rollTimer / kRollTime);
 		float speed = kRollSpeed * (0.35f + 0.65f * k);
-		m_PlayerPos = m_PlayerPos + m_RollDir * (speed * dt);
-		m_RollAngle += dt / kRollTime * 2.0f * kPi;
-		if (m_RollTimer <= 0.0f)
+		playerPos = playerPos + rollDir * (speed * dt);
+		rollAngle += dt / kRollTime * 2.0f * kPi;
+		if (rollTimer <= 0.0f)
 		{
-			m_RollTimer = 0.0f;
-			m_RollAngle = 0.0f;
+			rollTimer = 0.0f;
+			rollAngle = 0.0f;
 		}
 	}
 	else if (wishLen > 0.001f)
 	{
-		m_PlayerPos = m_PlayerPos + wish * (kWalkSpeed * dt);
-		m_PlayerYaw = atan2f(wish.x, wish.z);
-		m_WalkPhase += dt * 9.0f;
+		playerPos = playerPos + wish * (kWalkSpeed * dt);
+		playerYaw = atan2f(wish.x, wish.z);
+		walkPhase += dt * 9.0f;
 	}
 	else
 	{
-		m_WalkPhase = Approach(m_WalkPhase, 0.0f, 6.0f, dt);
+		walkPhase = Approach(walkPhase, 0.0f, 6.0f, dt);
 	}
 
 	ResolveCollisions();
 
-	// Keep the player inside the playable field, but let them walk out south.
-	m_PlayerPos.x = Clampf(m_PlayerPos.x, -30.0f, 30.0f);
-	m_PlayerPos.z = Clampf(m_PlayerPos.z, -28.0f, 32.0f);
-	m_PlayerPos.y = 0.0f;
+	// Clamp to the field, but leave the south open for the exit.
+	playerPos.x = Clampf(playerPos.x, -30.0f, 30.0f);
+	playerPos.z = Clampf(playerPos.z, -28.0f, 32.0f);
+	playerPos.y = 0.0f;
 
-	if (m_Stage == QUEST_LEAVE_VILLAGE && m_PlayerPos.z > kExitZ)
+	if (stage == QUEST_LEAVE_VILLAGE && playerPos.z > kExitZ)
 	{
-		m_Stage = QUEST_DONE;
-		m_EndingTimer = 0.0f;
+		stage = QUEST_DONE;
+		endingTimer = 0.0f;
 		ShowMessage("", 0.0f);
 	}
 }
@@ -362,141 +325,140 @@ void Game::UpdatePlayer(float dt, const bool* keys)
 void Game::ResolveCollisions()
 {
 	// Axis-aligned pushes. Prop yaw is small enough that ignoring it reads fine.
-	for (size_t i = 0; i < m_Props.size(); ++i)
+	for (size_t i = 0; i < props.size(); ++i)
 	{
-		const Prop& p = m_Props[i];
+		const Prop& p = props[i];
 		if (!p.solid) continue;
 
 		float hx = p.size.x * 0.5f + kPlayerRadius;
 		float hz = p.size.z * 0.5f + kPlayerRadius;
-		float dx = m_PlayerPos.x - p.pos.x;
-		float dz = m_PlayerPos.z - p.pos.z;
+		float dx = playerPos.x - p.pos.x;
+		float dz = playerPos.z - p.pos.z;
 
 		if (fabsf(dx) < hx && fabsf(dz) < hz)
 		{
 			float penX = hx - fabsf(dx);
 			float penZ = hz - fabsf(dz);
 			if (penX < penZ)
-				m_PlayerPos.x += (dx < 0.0f ? -penX : penX);
+				playerPos.x += (dx < 0.0f ? -penX : penX);
 			else
-				m_PlayerPos.z += (dz < 0.0f ? -penZ : penZ);
+				playerPos.z += (dz < 0.0f ? -penZ : penZ);
 		}
 	}
 
-	// The reservoir edge stops you too.
-	float hx = m_WaterSizeX * 0.5f + kPlayerRadius;
-	float hz = m_WaterSizeZ * 0.5f + kPlayerRadius;
-	float dx = m_PlayerPos.x - m_WaterCenter.x;
-	float dz = m_PlayerPos.z - m_WaterCenter.z;
+	float hx = waterSizeX * 0.5f + kPlayerRadius;
+	float hz = waterSizeZ * 0.5f + kPlayerRadius;
+	float dx = playerPos.x - waterCenter.x;
+	float dz = playerPos.z - waterCenter.z;
 	if (fabsf(dx) < hx && fabsf(dz) < hz)
 	{
 		float penX = hx - fabsf(dx);
 		float penZ = hz - fabsf(dz);
 		if (penX < penZ)
-			m_PlayerPos.x += (dx < 0.0f ? -penX : penX);
+			playerPos.x += (dx < 0.0f ? -penX : penX);
 		else
-			m_PlayerPos.z += (dz < 0.0f ? -penZ : penZ);
+			playerPos.z += (dz < 0.0f ? -penZ : penZ);
 	}
 }
 
 void Game::UpdateCamera(float dt)
 {
-	m_CamTarget = LerpV(m_CamTarget, m_PlayerPos, 1.0f - expf(-6.0f * dt));
+	camTarget = LerpV(camTarget, playerPos, 1.0f - expf(-6.0f * dt));
 }
 
 void Game::UpdateWorldState(float dt)
 {
-	m_TimeOfDay += (dt * m_TimeScale) / m_DayLength;
-	while (m_TimeOfDay >= 1.0f) m_TimeOfDay -= 1.0f;
+	timeOfDay += (dt * timeScale) / dayLength;
+	while (timeOfDay >= 1.0f) timeOfDay -= 1.0f;
 
-	// Spore exposure. Nature Insight slows it; the water's edge clears your head.
-	float insight = 1.0f - 0.18f * (float)m_Fragments;
+	// Nature Insight slows exposure; the water's edge clears it.
+	float insight = 1.0f - 0.18f * (float)fragments;
 	if (insight < 0.3f) insight = 0.3f;
 
 	float rate = 0.028f * insight;
 
-	float nearWaterX = Maxf(fabsf(m_PlayerPos.x - m_WaterCenter.x) - m_WaterSizeX * 0.5f, 0.0f);
-	float nearWaterZ = Maxf(fabsf(m_PlayerPos.z - m_WaterCenter.z) - m_WaterSizeZ * 0.5f, 0.0f);
+	float nearWaterX = Maxf(fabsf(playerPos.x - waterCenter.x) - waterSizeX * 0.5f, 0.0f);
+	float nearWaterZ = Maxf(fabsf(playerPos.z - waterCenter.z) - waterSizeZ * 0.5f, 0.0f);
 	float waterDist = sqrtf(nearWaterX * nearWaterX + nearWaterZ * nearWaterZ);
 	if (waterDist < 4.5f) rate = -0.075f;
 
 	// Rolling holds your breath.
-	if (m_RollTimer > 0.0f) rate = Minf(rate, 0.0f);
+	if (rollTimer > 0.0f) rate = Minf(rate, 0.0f);
 
-	m_SporeExposure = Saturatef(m_SporeExposure + rate * dt);
+	sporeExposure = Saturatef(sporeExposure + rate * dt);
 }
 
 void Game::UpdateInteractionTarget()
 {
-	m_TargetSleeper = -1;
-	m_TargetLetter = false;
-	m_Prompt.clear();
+	targetSleeper = -1;
+	targetLetter = false;
+	prompt.clear();
 
-	if (m_LetterOpen)
+	if (letterOpen)
 	{
-		m_Prompt = "[E]  Close";
+		prompt = "[E]  Close";
 		return;
 	}
 
 	// The letter wins over the sleeper it lies beside.
-	if (m_LetterFound && m_Stage == QUEST_READ_LETTER &&
-		DistXZ(m_PlayerPos, m_LetterPos) < kInteractRange)
+	if (letterFound && stage == QUEST_READ_LETTER &&
+		DistXZ(playerPos, letterPos) < kInteractRange)
 	{
-		m_TargetLetter = true;
-		m_Prompt = "[E]  Read the letter";
+		targetLetter = true;
+		prompt = "[E]  Read the letter";
 		return;
 	}
 
 	float best = kInteractRange;
-	for (size_t i = 0; i < m_Sleepers.size(); ++i)
+	for (size_t i = 0; i < sleepers.size(); ++i)
 	{
-		float d = DistXZ(m_PlayerPos, m_Sleepers[i].pos);
+		float d = DistXZ(playerPos, sleepers[i].pos);
 		if (d < best)
 		{
 			best = d;
-			m_TargetSleeper = (int)i;
+			targetSleeper = (int)i;
 		}
 	}
 
-	if (m_TargetSleeper >= 0)
+	if (targetSleeper >= 0)
 	{
-		const Sleeper& s = m_Sleepers[m_TargetSleeper];
+		const Sleeper& s = sleepers[targetSleeper];
 		if (s.isGrandma)
-			m_Prompt = (m_Stage == QUEST_FIND_GRANDMOTHER) ? "[E]  Look at grandmother" : "[E]  Sit with her";
+			prompt = (stage == QUEST_FIND_GRANDMOTHER) ? "[E]  Look at grandmother" : "[E]  Sit with her";
 		else
-			m_Prompt = s.visited ? "" : "[E]  Rest beside them";
+			prompt = s.visited ? "" : "[E]  Rest beside them";
 	}
 }
 
 void Game::TryInteract()
 {
-	if (m_LetterOpen)
+	if (letterOpen)
 	{
-		m_LetterOpen = false;
-		if (m_Stage == QUEST_READ_LETTER)
+		letterOpen = false;
+		if (stage == QUEST_READ_LETTER)
 		{
-			m_Stage = QUEST_LEAVE_VILLAGE;
+			stage = QUEST_LEAVE_VILLAGE;
 			ShowMessage("Follow the road south, out of the village.", 5.0f);
 		}
 		return;
 	}
 
-	if (m_TargetLetter)
+	if (targetLetter)
 	{
-		m_LetterOpen = true;
+		letterOpen = true;
 		return;
 	}
 
-	if (m_TargetSleeper < 0) return;
+	if (targetSleeper < 0) return;
 
-	Sleeper& s = m_Sleepers[m_TargetSleeper];
+	Sleeper& s = sleepers[targetSleeper];
 
 	if (s.isGrandma)
 	{
-		if (m_Stage == QUEST_FIND_GRANDMOTHER)
+		if (stage == QUEST_FIND_GRANDMOTHER)
 		{
-			m_Stage = QUEST_READ_LETTER;
-			m_LetterFound = true;
+			stage = QUEST_READ_LETTER;
+			letterFound = true;
 			ShowMessage("She is breathing. Moss has started at her fingertips. A letter lies beside her.", 6.5f);
 		}
 		else
@@ -509,9 +471,9 @@ void Game::TryInteract()
 	if (!s.visited)
 	{
 		s.visited = true;
-		++m_Fragments;
+		++fragments;
 		char buf[128];
-		sprintf_s(buf, sizeof(buf), "A dream fragment: the first spring, seen from someone else's eyes.  Nature Insight %d", m_Fragments);
+		sprintf_s(buf, sizeof(buf), "A dream fragment: the first spring, seen from someone else's eyes.  Nature Insight %d", fragments);
 		ShowMessage(buf, 5.0f);
 	}
 	else
@@ -526,7 +488,7 @@ void Game::OnKeyDown(unsigned char key)
 
 	if (key == 27) // ESC
 	{
-		m_Quit = true;
+		quit = true;
 		return;
 	}
 
@@ -538,32 +500,29 @@ void Game::OnKeyDown(unsigned char key)
 
 	if (key == ' ')
 	{
-		if (m_LetterOpen) return;
-		if (m_RollTimer > 0.0f || m_RollCooldown > 0.0f) return;
+		if (letterOpen) return;
+		if (rollTimer > 0.0f || rollCooldown > 0.0f) return;
 
-		m_RollTimer = kRollTime;
-		m_RollCooldown = kRollCooldown;
-		m_RollAngle = 0.0f;
-		m_RollDir = Vec3(sinf(m_PlayerYaw), 0.0f, cosf(m_PlayerYaw));
+		rollTimer = kRollTime;
+		rollCooldown = kRollCooldown;
+		rollAngle = 0.0f;
+		rollDir = Vec3(sinf(playerYaw), 0.0f, cosf(playerYaw));
 		return;
 	}
 
 	if (key == 't')
 	{
-		// Demo aid: run the day cycle fast enough to see dawn, noon, dusk, night.
-		m_TimeScale = (m_TimeScale > 1.5f) ? 1.0f : 12.0f;
-		ShowMessage(m_TimeScale > 1.5f ? "Time: fast" : "Time: normal", 2.0f);
+		timeScale = (timeScale > 1.5f) ? 1.0f : 12.0f;
+		ShowMessage(timeScale > 1.5f ? "Time: fast" : "Time: normal", 2.0f);
 		return;
 	}
 }
 
 void Game::ShowMessage(const char* text, float seconds)
 {
-	m_Message = text;
-	m_MessageTimer = seconds;
+	message = text;
+	messageTimer = seconds;
 }
-
-// ------------------------------------------------------- environment ----
 
 Vec3 Game::SkyColorNow() const
 {
@@ -572,8 +531,7 @@ Vec3 Game::SkyColorNow() const
 
 float Game::SporeDensityNow() const
 {
-	// The village was engulfed this morning, so the field is thick throughout.
-	float a = (m_TimeOfDay - 0.25f) * 2.0f * kPi;
+	float a = (timeOfDay - 0.25f) * 2.0f * kPi;
 	float day = Saturatef(sinf(a));
 	return 0.72f + 0.28f * (1.0f - day);
 }
@@ -596,7 +554,7 @@ SceneEnv Game::MakeEnv() const
 		{ Vec3(0.17f, 0.20f, 0.36f), Vec3(0.07f, 0.09f, 0.16f), Vec3(0.02f, 0.03f, 0.05f), Vec3(0.05f, 0.07f, 0.13f), 0.028f, 0.60f },
 	};
 
-	float t = m_TimeOfDay * 4.0f;
+	float t = timeOfDay * 4.0f;
 	int i = (int)t;
 	if (i < 0) i = 0;
 	if (i > 3) i = 3;
@@ -615,41 +573,35 @@ SceneEnv Game::MakeEnv() const
 	env.saturation = Lerpf(a.sat, b.sat, f);
 
 	// The sun rises at 0.25 and sets at 0.75. A floor keeps night readable.
-	float ang = (m_TimeOfDay - 0.25f) * 2.0f * kPi;
+	float ang = (timeOfDay - 0.25f) * 2.0f * kPi;
 	float elev = sinf(ang);
 	env.sunDir = Normalize(Vec3(cosf(ang) * 0.75f, Maxf(elev, -0.15f) * 0.9f + 0.18f, 0.42f));
 
-	// Fog clears around the player and gathers toward the edges of the screen.
-	env.fogOrigin = m_CamTarget;
-
-	// Exposure thickens the air around the player.
-	env.fogDensity += m_SporeExposure * 0.010f;
+	env.fogOrigin = camTarget;
+	env.fogDensity += sporeExposure * 0.010f;
 
 	return env;
 }
-
-// ------------------------------------------------------------ render ----
 
 void Game::Render()
 {
 	SceneEnv env = MakeEnv();
 
-	m_Renderer->BeginFrame(env.fogColor);
-	m_Renderer->SetEnv(env, m_Time);
+	renderer->BeginFrame(env.fogColor);
+	renderer->SetEnv(env, time);
 
-	// Fixed quarter view: 45 degrees of yaw, 30 of pitch, orthographic.
-	Vec3 dir(cosf(m_CamPitch) * sinf(m_CamYaw), sinf(m_CamPitch), cosf(m_CamPitch) * cosf(m_CamYaw));
-	Vec3 eye = m_CamTarget + dir * m_CamDistance;
+	Vec3 dir(cosf(camPitch) * sinf(camYaw), sinf(camPitch), cosf(camPitch) * cosf(camYaw));
+	Vec3 eye = camTarget + dir * camDistance;
 
-	float aspect = (float)m_Renderer->GetWidth() / (float)Maxf((float)m_Renderer->GetHeight(), 1.0f);
-	float hh = m_OrthoHeight * 0.5f;
+	float aspect = (float)renderer->GetWidth() / (float)Maxf((float)renderer->GetHeight(), 1.0f);
+	float hh = orthoHeight * 0.5f;
 	float hw = hh * aspect;
 
-	Mat4 view = MatLookAt(eye, m_CamTarget, Vec3(0.0f, 1.0f, 0.0f));
+	Mat4 view = MatLookAt(eye, camTarget, Vec3(0.0f, 1.0f, 0.0f));
 	Mat4 proj = MatOrtho(-hw, hw, -hh, hh, 0.1f, 400.0f);
-	float pixelsPerUnit = (float)m_Renderer->GetHeight() / m_OrthoHeight;
+	float pixelsPerUnit = (float)renderer->GetHeight() / orthoHeight;
 
-	m_Renderer->SetCamera(view, proj, eye, pixelsPerUnit);
+	renderer->SetCamera(view, proj, eye, pixelsPerUnit);
 
 	DrawWorld();
 	DrawSleepers();
@@ -657,116 +609,110 @@ void Game::Render()
 
 	// Spores last: additive, and they should sit over everything.
 	Vec3 sporeColor(0.55f, 0.95f, 0.80f);
-	m_Renderer->DrawSpores(Vec3(m_CamTarget.x, 0.0f, m_CamTarget.z),
-						   Vec3(70.0f, 16.0f, 70.0f),
-						   sporeColor,
-						   SporeDensityNow() * 0.55f,
-						   0.13f);
+	renderer->DrawSpores(Vec3(camTarget.x, 0.0f, camTarget.z),
+						 Vec3(70.0f, 16.0f, 70.0f),
+						 sporeColor,
+						 SporeDensityNow() * 0.55f,
+						 0.13f);
 
-	m_Renderer->BeginUI();
+	renderer->BeginUI();
 
-	float haze = 0.08f + m_SporeExposure * 0.34f;
-	float vignette = 0.28f + m_SporeExposure * 0.42f;
-	m_Renderer->DrawAtmosphere(vignette, haze, Vec3(0.42f, 0.70f, 0.62f));
+	float haze = 0.08f + sporeExposure * 0.34f;
+	float vignette = 0.28f + sporeExposure * 0.42f;
+	renderer->DrawAtmosphere(vignette, haze, Vec3(0.42f, 0.70f, 0.62f));
 
 	DrawHUD();
 	DrawLetterPanel();
 	DrawTitleCards();
 
-	m_Renderer->EndUI();
+	renderer->EndUI();
 }
 
 void Game::DrawWorld()
 {
-	m_Renderer->DrawGround(m_CamTarget, 400.0f);
-	m_Renderer->DrawWater(m_WaterCenter, m_WaterSizeX, m_WaterSizeZ);
+	renderer->DrawGround(camTarget, 400.0f);
+	renderer->DrawWater(waterCenter, waterSizeX, waterSizeZ);
 
-	for (size_t i = 0; i < m_Props.size(); ++i)
+	for (size_t i = 0; i < props.size(); ++i)
 	{
-		const Prop& p = m_Props[i];
-		m_Renderer->DrawBox(p.pos, p.size, p.yaw, p.color, p.emissive);
+		const Prop& p = props[i];
+		renderer->DrawBox(p.pos, p.size, p.yaw, p.color, p.emissive);
 	}
 
-	// The letter, once you know it is there.
-	if (m_LetterFound && m_Stage == QUEST_READ_LETTER)
+	if (letterFound && stage == QUEST_READ_LETTER)
 	{
-		float glow = 0.25f + 0.15f * sinf(m_Time * 2.0f);
-		m_Renderer->DrawBox(m_LetterPos, Vec3(0.42f, 0.03f, 0.30f), 0.4f,
-							Vec3(0.86f, 0.84f, 0.76f), glow);
+		float glow = 0.25f + 0.15f * sinf(time * 2.0f);
+		renderer->DrawBox(letterPos, Vec3(0.42f, 0.03f, 0.30f), 0.4f,
+						  Vec3(0.86f, 0.84f, 0.76f), glow);
 	}
 }
 
 void Game::DrawSleepers()
 {
-	for (size_t i = 0; i < m_Sleepers.size(); ++i)
+	for (size_t i = 0; i < sleepers.size(); ++i)
 	{
-		const Sleeper& s = m_Sleepers[i];
+		const Sleeper& s = sleepers[i];
 
 		Mat4 root = Mul(MatTranslate(s.pos), MatRotateY(s.yaw));
 
-		// Slow breathing: they are asleep, not dead.
-		float breath = 1.0f + 0.06f * sinf(m_Time * 0.7f + s.phase);
+		float breath = 1.0f + 0.06f * sinf(time * 0.7f + s.phase);
 
 		Vec3 cloth = s.isGrandma ? Vec3(0.40f, 0.36f, 0.34f) : Vec3(0.33f, 0.33f, 0.32f);
 		Mat4 body = Mul(root, MatScale(Vec3(0.58f, 0.38f * breath, 1.75f)));
-		m_Renderer->DrawBox(body, cloth, 0.0f);
+		renderer->DrawBox(body, cloth, 0.0f);
 
 		Mat4 head = Mul(Mul(root, MatTranslate(Vec3(0.0f, 0.0f, 0.98f))),
 						MatScale(Vec3(0.34f, 0.34f, 0.34f)));
-		m_Renderer->DrawBox(head, Vec3(0.46f, 0.42f, 0.38f), 0.0f);
+		renderer->DrawBox(head, Vec3(0.46f, 0.42f, 0.38f), 0.0f);
 
-		// Moss already taking hold, breathing with a faint light.
-		float pulse = 0.10f + 0.08f * sinf(m_Time * 0.9f + s.phase);
+		float pulse = 0.10f + 0.08f * sinf(time * 0.9f + s.phase);
 		float mossLen = s.isGrandma ? 1.30f : 0.95f;
 		Mat4 moss = Mul(Mul(root, MatTranslate(Vec3(0.0f, 0.38f * breath, -0.15f))),
 						MatScale(Vec3(0.52f, 0.07f, mossLen)));
-		m_Renderer->DrawBox(moss, Vec3(0.26f, 0.46f, 0.30f), pulse);
+		renderer->DrawBox(moss, Vec3(0.26f, 0.46f, 0.30f), pulse);
 
 		if (!s.isGrandma && !s.visited)
 		{
-			// A dream still unread hangs just above them.
-			float h = 1.05f + 0.06f * sinf(m_Time * 1.3f + s.phase);
+			float h = 1.05f + 0.06f * sinf(time * 1.3f + s.phase);
 			Mat4 mote = Mul(Mul(root, MatTranslate(Vec3(0.0f, h, 0.2f))),
 							MatScale(Vec3(0.10f, 0.10f, 0.10f)));
-			m_Renderer->DrawBox(mote, Vec3(0.60f, 0.95f, 0.82f), 0.85f);
+			renderer->DrawBox(mote, Vec3(0.60f, 0.95f, 0.82f), 0.85f);
 		}
 	}
 }
 
 void Game::DrawPlayer()
 {
-	float bob = (m_RollTimer > 0.0f) ? 0.0f : fabsf(sinf(m_WalkPhase)) * 0.05f;
+	float bob = (rollTimer > 0.0f) ? 0.0f : fabsf(sinf(walkPhase)) * 0.05f;
 
-	Mat4 base = Mul(MatTranslate(Vec3(m_PlayerPos.x, m_PlayerPos.y + bob, m_PlayerPos.z)),
-					MatRotateY(m_PlayerYaw));
+	Mat4 base = Mul(MatTranslate(Vec3(playerPos.x, playerPos.y + bob, playerPos.z)),
+					MatRotateY(playerYaw));
 
 	// Roll pivots around the waist so the tumble reads from a quarter view.
 	const float pivot = 0.62f;
 	Mat4 root = base;
-	if (m_RollTimer > 0.0f)
+	if (rollTimer > 0.0f)
 	{
-		Mat4 spin = Mul(Mul(MatTranslate(Vec3(0.0f, pivot, 0.0f)), MatRotateX(m_RollAngle)),
+		Mat4 spin = Mul(Mul(MatTranslate(Vec3(0.0f, pivot, 0.0f)), MatRotateX(rollAngle)),
 						MatTranslate(Vec3(0.0f, -pivot, 0.0f)));
 		root = Mul(base, spin);
 	}
 
 	Mat4 body = Mul(root, MatScale(Vec3(0.55f, 1.12f, 0.42f)));
-	m_Renderer->DrawBox(body, Vec3(0.30f, 0.36f, 0.36f), 0.0f);
+	renderer->DrawBox(body, Vec3(0.30f, 0.36f, 0.36f), 0.0f);
 
 	Mat4 head = Mul(Mul(root, MatTranslate(Vec3(0.0f, 1.12f, 0.0f))),
 					MatScale(Vec3(0.40f, 0.40f, 0.40f)));
-	m_Renderer->DrawBox(head, Vec3(0.52f, 0.46f, 0.41f), 0.0f);
+	renderer->DrawBox(head, Vec3(0.52f, 0.46f, 0.41f), 0.0f);
 
 	Mat4 pack = Mul(Mul(root, MatTranslate(Vec3(0.0f, 0.48f, -0.26f))),
 					MatScale(Vec3(0.44f, 0.46f, 0.24f)));
-	m_Renderer->DrawBox(pack, Vec3(0.34f, 0.30f, 0.24f), 0.0f);
+	renderer->DrawBox(pack, Vec3(0.34f, 0.30f, 0.24f), 0.0f);
 }
-
-// --------------------------------------------------------------- HUD ----
 
 const char* Game::ObjectiveText() const
 {
-	switch (m_Stage)
+	switch (stage)
 	{
 	case QUEST_FIND_GRANDMOTHER: return "Find your grandmother.";
 	case QUEST_READ_LETTER:      return "Read the letter beside her.";
@@ -777,79 +723,73 @@ const char* Game::ObjectiveText() const
 
 void Game::DrawHUD()
 {
-	const int w = m_Renderer->GetWidth();
-	const int h = m_Renderer->GetHeight();
+	const int w = renderer->GetWidth();
+	const int h = renderer->GetHeight();
 
 	const Vec3 ink(0.90f, 0.93f, 0.90f);
 	const Vec3 dim(0.62f, 0.68f, 0.65f);
 	const Vec3 accent(0.60f, 0.92f, 0.80f);
 
-	// Objective, top left.
-	m_Renderer->DrawRectPx(18.0f, 18.0f, 430.0f, 62.0f, Vec3(0.03f, 0.05f, 0.05f), 0.38f);
-	m_Renderer->DrawTexts(32, 40, "OBJECTIVE", dim, false);
-	m_Renderer->DrawTexts(32, 64, ObjectiveText(), ink, false);
+	renderer->DrawRectPx(18.0f, 18.0f, 430.0f, 62.0f, Vec3(0.03f, 0.05f, 0.05f), 0.38f);
+	renderer->DrawTexts(32, 40, "OBJECTIVE", dim, false);
+	renderer->DrawTexts(32, 64, ObjectiveText(), ink, false);
 
-	// Dream fragments, top right.
 	{
 		char buf[64];
-		sprintf_s(buf, sizeof(buf), "Dream fragments  %d / %d", m_Fragments, m_FragmentGoal);
-		int tw = m_Renderer->TextWidth(buf, false);
-		m_Renderer->DrawRectPx((float)(w - tw - 46), 18.0f, (float)(tw + 28), 38.0f,
-							   Vec3(0.03f, 0.05f, 0.05f), 0.38f);
-		m_Renderer->DrawTexts(w - tw - 32, 42, buf, m_Fragments >= m_FragmentGoal ? accent : ink, false);
+		sprintf_s(buf, sizeof(buf), "Dream fragments  %d / %d", fragments, fragmentGoal);
+		int tw = renderer->TextWidth(buf, false);
+		renderer->DrawRectPx((float)(w - tw - 46), 18.0f, (float)(tw + 28), 38.0f,
+							 Vec3(0.03f, 0.05f, 0.05f), 0.38f);
+		renderer->DrawTexts(w - tw - 32, 42, buf, fragments >= fragmentGoal ? accent : ink, false);
 	}
 
-	// Spore exposure, bottom left. It never kills you here; it only closes in.
 	{
 		float bx = 24.0f, by = (float)h - 54.0f, bw = 220.0f, bh = 12.0f;
-		m_Renderer->DrawTexts(24, h - 62, "SPORE EXPOSURE", dim, false);
-		m_Renderer->DrawRectPx(bx, by, bw, bh, Vec3(0.05f, 0.07f, 0.07f), 0.55f);
-		m_Renderer->DrawRectPx(bx, by, bw * m_SporeExposure, bh,
-							   LerpV(Vec3(0.35f, 0.70f, 0.60f), Vec3(0.75f, 0.95f, 0.55f), m_SporeExposure),
-							   0.85f);
+		renderer->DrawTexts(24, h - 62, "SPORE EXPOSURE", dim, false);
+		renderer->DrawRectPx(bx, by, bw, bh, Vec3(0.05f, 0.07f, 0.07f), 0.55f);
+		renderer->DrawRectPx(bx, by, bw * sporeExposure, bh,
+							 LerpV(Vec3(0.35f, 0.70f, 0.60f), Vec3(0.75f, 0.95f, 0.55f), sporeExposure),
+							 0.85f);
 	}
 
-	// Controls, bottom right.
 	{
 		const char* help = "WASD move    SPACE roll    E interact    T time    ESC quit";
-		int tw = m_Renderer->TextWidth(help, false);
-		m_Renderer->DrawTexts(w - tw - 24, h - 24, help, dim, false);
+		int tw = renderer->TextWidth(help, false);
+		renderer->DrawTexts(w - tw - 24, h - 24, help, dim, false);
 	}
 
-	// Interaction prompt, just under the middle of the screen.
-	if (!m_Prompt.empty())
+	if (!prompt.empty())
 	{
-		int tw = m_Renderer->TextWidth(m_Prompt.c_str(), true);
-		m_Renderer->DrawRectPx((float)(w / 2 - tw / 2 - 18), (float)(h - 150), (float)(tw + 36), 40.0f,
-							   Vec3(0.03f, 0.05f, 0.05f), 0.45f);
-		m_Renderer->DrawTexts(w / 2 - tw / 2, h - 123, m_Prompt.c_str(), accent, true);
+		int tw = renderer->TextWidth(prompt.c_str(), true);
+		renderer->DrawRectPx((float)(w / 2 - tw / 2 - 18), (float)(h - 150), (float)(tw + 36), 40.0f,
+							 Vec3(0.03f, 0.05f, 0.05f), 0.45f);
+		renderer->DrawTexts(w / 2 - tw / 2, h - 123, prompt.c_str(), accent, true);
 	}
 
-	// Transient message.
-	if (m_MessageTimer > 0.0f && !m_Message.empty())
+	if (messageTimer > 0.0f && !message.empty())
 	{
-		float alpha = Saturatef(m_MessageTimer);
-		int tw = m_Renderer->TextWidth(m_Message.c_str(), false);
-		m_Renderer->DrawRectPx((float)(w / 2 - tw / 2 - 20), (float)(h - 100), (float)(tw + 40), 36.0f,
-							   Vec3(0.02f, 0.04f, 0.04f), 0.55f * alpha);
-		m_Renderer->DrawTexts(w / 2 - tw / 2, h - 77, m_Message.c_str(), ink, false);
+		float alpha = Saturatef(messageTimer);
+		int tw = renderer->TextWidth(message.c_str(), false);
+		renderer->DrawRectPx((float)(w / 2 - tw / 2 - 20), (float)(h - 100), (float)(tw + 40), 36.0f,
+							 Vec3(0.02f, 0.04f, 0.04f), 0.55f * alpha);
+		renderer->DrawTexts(w / 2 - tw / 2, h - 77, message.c_str(), ink, false);
 	}
 }
 
 void Game::DrawLetterPanel()
 {
-	if (!m_LetterOpen) return;
+	if (!letterOpen) return;
 
-	const int w = m_Renderer->GetWidth();
-	const int h = m_Renderer->GetHeight();
+	const int w = renderer->GetWidth();
+	const int h = renderer->GetHeight();
 
-	m_Renderer->DrawFade(Vec3(0.02f, 0.03f, 0.04f), 0.55f);
+	renderer->DrawFade(Vec3(0.02f, 0.03f, 0.04f), 0.55f);
 
 	float pw = 620.0f, ph = 290.0f;
 	float px = (float)w * 0.5f - pw * 0.5f;
 	float py = (float)h * 0.5f - ph * 0.5f;
-	m_Renderer->DrawRectPx(px, py, pw, ph, Vec3(0.10f, 0.11f, 0.10f), 0.94f);
-	m_Renderer->DrawRectPx(px, py, pw, 3.0f, Vec3(0.45f, 0.60f, 0.50f), 0.8f);
+	renderer->DrawRectPx(px, py, pw, ph, Vec3(0.10f, 0.11f, 0.10f), 0.94f);
+	renderer->DrawRectPx(px, py, pw, 3.0f, Vec3(0.45f, 0.60f, 0.50f), 0.8f);
 
 	const char* lines[] =
 	{
@@ -866,53 +806,51 @@ void Game::DrawLetterPanel()
 	int y = (int)py + 52;
 	for (int i = 0; i < 8; ++i)
 	{
-		m_Renderer->DrawTexts((int)px + 40, y, lines[i], Vec3(0.88f, 0.90f, 0.86f), false);
+		renderer->DrawTexts((int)px + 40, y, lines[i], Vec3(0.88f, 0.90f, 0.86f), false);
 		y += 26;
 	}
-	m_Renderer->DrawTexts((int)(px + pw) - 130, y + 12, "- Sunim", Vec3(0.70f, 0.76f, 0.72f), false);
-	m_Renderer->DrawTexts((int)px + 40, (int)(py + ph) - 18, "[E]  Close", Vec3(0.60f, 0.92f, 0.80f), false);
+	renderer->DrawTexts((int)(px + pw) - 130, y + 12, "- Sunim", Vec3(0.70f, 0.76f, 0.72f), false);
+	renderer->DrawTexts((int)px + 40, (int)(py + ph) - 18, "[E]  Close", Vec3(0.60f, 0.92f, 0.80f), false);
 }
 
 void Game::DrawTitleCards()
 {
-	const int w = m_Renderer->GetWidth();
-	const int h = m_Renderer->GetHeight();
+	const int w = renderer->GetWidth();
+	const int h = renderer->GetHeight();
 
-	// Opening card.
-	if (m_TitleTimer < 8.0f)
+	if (titleTimer < 8.0f)
 	{
 		float alpha = 1.0f;
-		if (m_TitleTimer < 1.0f) alpha = m_TitleTimer;
-		else if (m_TitleTimer > 6.0f) alpha = Saturatef((8.0f - m_TitleTimer) * 0.5f);
+		if (titleTimer < 1.0f) alpha = titleTimer;
+		else if (titleTimer > 6.0f) alpha = Saturatef((8.0f - titleTimer) * 0.5f);
 
 		const char* t1 = "MULANGAE VILLAGE";
 		const char* t2 = "the morning the spores arrived";
-		int w1 = m_Renderer->TextWidth(t1, true);
-		int w2 = m_Renderer->TextWidth(t2, false);
+		int w1 = renderer->TextWidth(t1, true);
+		int w2 = renderer->TextWidth(t2, false);
 
-		m_Renderer->DrawTexts(w / 2 - w1 / 2, h / 2 - 20, t1, Vec3(0.92f, 0.95f, 0.92f) * alpha, true);
-		m_Renderer->DrawTexts(w / 2 - w2 / 2, h / 2 + 10, t2, Vec3(0.70f, 0.82f, 0.76f) * alpha, false);
+		renderer->DrawTexts(w / 2 - w1 / 2, h / 2 - 20, t1, Vec3(0.92f, 0.95f, 0.92f) * alpha, true);
+		renderer->DrawTexts(w / 2 - w2 / 2, h / 2 + 10, t2, Vec3(0.70f, 0.82f, 0.76f) * alpha, false);
 	}
 
-	// Ending card.
-	if (m_EndingTimer >= 0.0f)
+	if (endingTimer >= 0.0f)
 	{
-		float a = Saturatef(m_EndingTimer * 0.5f);
-		m_Renderer->DrawFade(Vec3(0.62f, 0.72f, 0.66f), a * 0.82f);
+		float a = Saturatef(endingTimer * 0.5f);
+		renderer->DrawFade(Vec3(0.62f, 0.72f, 0.66f), a * 0.82f);
 
-		if (m_EndingTimer > 1.0f)
+		if (endingTimer > 1.0f)
 		{
-			float ta = Saturatef((m_EndingTimer - 1.0f) * 0.8f);
+			float ta = Saturatef((endingTimer - 1.0f) * 0.8f);
 			const char* t1 = "You left Mulangae Village.";
 			const char* t2 = "Route 32 lies ahead.";
 			const char* t3 = "-- prototype end --   ESC to quit";
-			int w1 = m_Renderer->TextWidth(t1, true);
-			int w2 = m_Renderer->TextWidth(t2, false);
-			int w3 = m_Renderer->TextWidth(t3, false);
+			int w1 = renderer->TextWidth(t1, true);
+			int w2 = renderer->TextWidth(t2, false);
+			int w3 = renderer->TextWidth(t3, false);
 
-			m_Renderer->DrawTexts(w / 2 - w1 / 2, h / 2 - 24, t1, Vec3(0.10f, 0.14f, 0.12f) * ta, true);
-			m_Renderer->DrawTexts(w / 2 - w2 / 2, h / 2 + 6, t2, Vec3(0.16f, 0.22f, 0.18f) * ta, false);
-			m_Renderer->DrawTexts(w / 2 - w3 / 2, h / 2 + 40, t3, Vec3(0.20f, 0.26f, 0.22f) * ta, false);
+			renderer->DrawTexts(w / 2 - w1 / 2, h / 2 - 24, t1, Vec3(0.10f, 0.14f, 0.12f) * ta, true);
+			renderer->DrawTexts(w / 2 - w2 / 2, h / 2 + 6, t2, Vec3(0.16f, 0.22f, 0.18f) * ta, false);
+			renderer->DrawTexts(w / 2 - w3 / 2, h / 2 + 40, t3, Vec3(0.20f, 0.26f, 0.22f) * ta, false);
 		}
 	}
 }

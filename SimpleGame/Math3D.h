@@ -1,7 +1,6 @@
 #pragma once
 
-// Minimal 3D math for the SimpleGame prototype.
-// Header-only. Column-major matrices, matching OpenGL's memory layout.
+// Column-major matrices, matching OpenGL's memory layout.
 // ASCII only: the project is built with CP949 sources, so non-ASCII comments corrupt.
 
 #include <cmath>
@@ -17,7 +16,7 @@ inline float Lerpf(float a, float b, float t) { return a + (b - a) * t; }
 inline float DegToRad(float d) { return d * kPi / 180.0f; }
 inline float RandUnit() { return (float)rand() / (float)RAND_MAX; }
 
-// Smooth, frame-rate independent approach toward a target.
+// Frame-rate independent approach toward a target.
 inline float Approach(float current, float target, float rate, float dt)
 {
 	float t = 1.0f - expf(-rate * dt);
@@ -26,10 +25,10 @@ inline float Approach(float current, float target, float rate, float dt)
 
 struct Vec3
 {
-	float x, y, z;
+	float x = 0.0f, y = 0.0f, z = 0.0f;
 
-	Vec3() : x(0.0f), y(0.0f), z(0.0f) {}
-	Vec3(float a, float b, float c) : x(a), y(b), z(c) {}
+	Vec3() = default;
+	Vec3(float px, float py, float pz) : x(px), y(py), z(pz) {}
 };
 
 inline Vec3 operator+(const Vec3& a, const Vec3& b) { return Vec3(a.x + b.x, a.y + b.y, a.z + b.z); }
@@ -61,8 +60,6 @@ inline Vec3 LerpV(const Vec3& a, const Vec3& b, float t)
 	return Vec3(Lerpf(a.x, b.x, t), Lerpf(a.y, b.y, t), Lerpf(a.z, b.z, t));
 }
 
-// Horizontal (XZ plane) distance. The world is a flat quarter-view field,
-// so most gameplay checks ignore height.
 inline float DistXZ(const Vec3& a, const Vec3& b)
 {
 	float dx = a.x - b.x;
@@ -171,8 +168,7 @@ inline Mat4 MatLookAt(const Vec3& eye, const Vec3& center, const Vec3& up)
 	return r;
 }
 
-// Normal matrix = cofactor(upper 3x3) / det, i.e. transpose(inverse(M3)).
-// Needed because boxes are drawn with non-uniform scale.
+// transpose(inverse(M3)) via cofactors. Boxes are drawn with non-uniform scale.
 inline void MatNormal3x3(const Mat4& mat, float out[9])
 {
 	float a = mat.m[0], b = mat.m[4], c = mat.m[8];

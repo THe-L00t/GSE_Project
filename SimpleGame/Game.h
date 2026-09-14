@@ -6,29 +6,23 @@
 #include "Math3D.h"
 #include "Renderer.h"
 
-// A static piece of the village. Everything is built from boxes.
 struct Prop
 {
-	Vec3  pos;      // base centre, sitting on the ground
-	Vec3  size;     // width, height, depth
-	float yaw;
+	Vec3  pos;              // base centre, sitting on the ground
+	Vec3  size;
+	float yaw = 0.0f;
 	Vec3  color;
-	float emissive;
-	bool  solid;    // takes part in collision
-
-	Prop() : yaw(0.0f), emissive(0.0f), solid(true) {}
+	float emissive = 0.0f;
+	bool  solid = true;     // takes part in collision
 };
 
-// A villager who fell asleep when the spores arrived.
 struct Sleeper
 {
 	Vec3  pos;
-	float yaw;
-	bool  isGrandma;
-	bool  visited;
-	float phase;    // breathing offset
-
-	Sleeper() : yaw(0.0f), isGrandma(false), visited(false), phase(0.0f) {}
+	float yaw = 0.0f;
+	bool  isGrandma = false;
+	bool  visited = false;
+	float phase = 0.0f;     // breathing offset
 };
 
 enum QuestStage
@@ -42,15 +36,15 @@ enum QuestStage
 class Game
 {
 public:
-	explicit Game(Renderer* renderer);
+	explicit Game(Renderer* r);
 
 	void Update(float dt, const bool* keys);
 	void Render();
 
-	// Edge-triggered input (fires once per physical press).
+	// Edge-triggered: fires once per physical press.
 	void OnKeyDown(unsigned char key);
 
-	bool WantsQuit() const { return m_Quit; }
+	bool WantsQuit() const { return quit; }
 
 private:
 	void BuildWorld();
@@ -81,56 +75,49 @@ private:
 	void ShowMessage(const char* text, float seconds);
 	const char* ObjectiveText() const;
 
-	Renderer* m_Renderer;
+	Renderer* renderer = nullptr;
 
-	// ---- world ----
-	std::vector<Prop>    m_Props;
-	std::vector<Sleeper> m_Sleepers;
-	Vec3  m_WaterCenter;
-	float m_WaterSizeX;
-	float m_WaterSizeZ;
-	Vec3  m_LetterPos;
+	std::vector<Prop>    props;
+	std::vector<Sleeper> sleepers;
+	Vec3  waterCenter{ -15.0f, 0.03f, -14.0f };
+	float waterSizeX = 22.0f;
+	float waterSizeZ = 18.0f;
+	Vec3  letterPos;
 
-	// ---- player ----
-	Vec3  m_PlayerPos;
-	Vec3  m_PlayerVel;
-	float m_PlayerYaw;
-	float m_WalkPhase;
-	float m_RollTimer;      // > 0 while rolling
-	float m_RollCooldown;
-	float m_RollAngle;
-	Vec3  m_RollDir;
+	Vec3  playerPos{ 2.0f, 0.0f, 1.5f };
+	Vec3  playerVel;
+	float playerYaw = kPi;
+	float walkPhase = 0.0f;
+	float rollTimer = 0.0f;       // > 0 while rolling
+	float rollCooldown = 0.0f;
+	float rollAngle = 0.0f;
+	Vec3  rollDir;
 
-	// ---- camera ----
-	Vec3  m_CamTarget;
-	float m_CamYaw;
-	float m_CamPitch;
-	float m_CamDistance;
-	float m_OrthoHeight;
+	Vec3  camTarget;
+	float camYaw = DegToRad(45.0f);
+	float camPitch = DegToRad(30.0f);
+	float camDistance = 55.0f;
+	float orthoHeight = 20.0f;
 
-	// ---- time and atmosphere ----
-	float m_Time;           // seconds since start
-	float m_TimeOfDay;      // [0,1), 0 is midnight
-	float m_DayLength;      // real seconds per in-game day
-	float m_TimeScale;
-	float m_SporeExposure;  // [0,1]
+	float time = 0.0f;
+	float timeOfDay = 0.27f;      // [0,1), 0 is midnight
+	float dayLength = 240.0f;     // real seconds per in-game day
+	float timeScale = 1.0f;
+	float sporeExposure = 0.15f;  // [0,1]
 
-	// ---- quest ----
-	int   m_Stage;
-	int   m_Fragments;
-	int   m_FragmentGoal;
-	bool  m_LetterOpen;
-	bool  m_LetterFound;
+	int   stage = QUEST_FIND_GRANDMOTHER;
+	int   fragments = 0;
+	int   fragmentGoal = 3;
+	bool  letterOpen = false;
+	bool  letterFound = false;
 
-	// ---- presentation ----
-	std::string m_Message;
-	float m_MessageTimer;
-	float m_TitleTimer;
-	float m_EndingTimer;
-	bool  m_Quit;
+	std::string message;
+	float messageTimer = 0.0f;
+	float titleTimer = 0.0f;
+	float endingTimer = -1.0f;
+	bool  quit = false;
 
-	// ---- interaction ----
-	int   m_TargetSleeper;   // index into m_Sleepers, -1 if none
-	bool  m_TargetLetter;
-	std::string m_Prompt;
+	int   targetSleeper = -1;     // index into sleepers, -1 if none
+	bool  targetLetter = false;
+	std::string prompt;
 };

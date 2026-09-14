@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <string>
 #include <cstdlib>
@@ -8,55 +8,39 @@
 #include "Dependencies\glew.h"
 #include "Math3D.h"
 
-// Lighting and atmosphere for one frame. Driven by the time of day.
 struct SceneEnv
 {
-	Vec3  sunDir;       // direction TOWARD the sun
-	Vec3  sunColor;
-	Vec3  skyColor;     // ambient from above
-	Vec3  groundColor;  // ambient bounce
-	Vec3  fogColor;
-	Vec3  fogOrigin;    // fog distance is measured from here (the camera target)
-	float fogDensity;
-	float saturation;
-
-	SceneEnv()
-		: sunDir(0.4f, 0.8f, 0.3f)
-		, sunColor(0.9f, 0.9f, 0.85f)
-		, skyColor(0.30f, 0.35f, 0.38f)
-		, groundColor(0.10f, 0.12f, 0.10f)
-		, fogColor(0.55f, 0.60f, 0.62f)
-		, fogOrigin(0.0f, 0.0f, 0.0f)
-		, fogDensity(0.030f)
-		, saturation(0.80f)
-	{
-	}
+	Vec3  sunDir{ 0.4f, 0.8f, 0.3f };         // direction TOWARD the sun
+	Vec3  sunColor{ 0.9f, 0.9f, 0.85f };
+	Vec3  skyColor{ 0.30f, 0.35f, 0.38f };    // ambient from above
+	Vec3  groundColor{ 0.10f, 0.12f, 0.10f }; // ambient bounce
+	Vec3  fogColor{ 0.55f, 0.60f, 0.62f };
+	Vec3  fogOrigin;                          // fog distance is measured from here (the camera target)
+	float fogDensity = 0.030f;
+	float saturation = 0.80f;
 };
 
 class Renderer
 {
 public:
-	Renderer(int windowSizeX, int windowSizeY);
+	Renderer(int sizeX, int sizeY);
 	~Renderer();
 
 	bool IsInitialized();
-	void Resize(int windowSizeX, int windowSizeY);
-	int  GetWidth() const { return (int)m_WindowSizeX; }
-	int  GetHeight() const { return (int)m_WindowSizeY; }
+	void Resize(int sizeX, int sizeY);
+	int  GetWidth() const { return (int)windowSizeX; }
+	int  GetHeight() const { return (int)windowSizeY; }
 
-	// ---- frame setup ----
 	void BeginFrame(const Vec3& clearColor);
-	void SetCamera(const Mat4& view, const Mat4& proj, const Vec3& camPos, float pixelsPerUnit);
-	void SetEnv(const SceneEnv& env, float time);
+	void SetCamera(const Mat4& view, const Mat4& proj, const Vec3& eye, float pxPerUnit);
+	void SetEnv(const SceneEnv& sceneEnv, float seconds);
 
-	// ---- world ----
 	void DrawBox(const Mat4& model, const Vec3& color, float emissive);
 	void DrawBox(const Vec3& pos, const Vec3& size, float yaw, const Vec3& color, float emissive);
 	void DrawGround(const Vec3& center, float extent);
 	void DrawWater(const Vec3& center, float sizeX, float sizeZ);
 	void DrawSpores(const Vec3& center, const Vec3& field, const Vec3& color, float density, float size);
 
-	// ---- screen space ----
 	void BeginUI();
 	void EndUI();
 	void DrawRectPx(float x, float y, float w, float h, const Vec3& color, float alpha);
@@ -69,9 +53,9 @@ public:
 	void DrawSolidRect(float x, float y, float z, float size, float r, float g, float b, float a);
 
 private:
-	void Initialize(int windowSizeX, int windowSizeY);
+	void Initialize(int sizeX, int sizeY);
 	bool ReadFile(const char* filename, std::string* target);
-	void AddShader(GLuint ShaderProgram, const char* pShaderText, GLenum ShaderType);
+	void AddShader(GLuint program, const char* shaderText, GLenum shaderType);
 	GLuint CompileShaders(const char* filenameVS, const char* filenameFS);
 	void CreateVertexBufferObjects();
 	void GetGLPosition(float x, float y, float* newX, float* newY);
@@ -81,31 +65,28 @@ private:
 						 const Vec3& color, float alpha,
 						 float vignette, float haze, const Vec3& hazeColor);
 
-	bool m_Initialized = false;
+	bool initialized = false;
 
-	unsigned int m_WindowSizeX = 0;
-	unsigned int m_WindowSizeY = 0;
+	unsigned int windowSizeX = 0;
+	unsigned int windowSizeY = 0;
 
-	// Template geometry and shader.
-	GLuint m_VBORect = 0;
-	GLuint m_SolidRectShader = 0;
+	GLuint vboRect = 0;
+	GLuint solidRectShader = 0;
 
-	// Prototype geometry.
-	GLuint m_VAO = 0;
-	GLuint m_VBOBox = 0;      // unit cube, x/z in [-0.5,0.5], y in [0,1]
-	GLuint m_VBOQuad = 0;     // unit quad on the XZ plane
-	GLuint m_VBOScreen = 0;   // unit quad in [0,1]^2 for screen space
-	GLuint m_VBOSpores = 0;
-	int    m_SporeCount = 0;
+	GLuint vao = 0;
+	GLuint vboBox = 0;      // unit cube, x/z in [-0.5,0.5], y in [0,1]
+	GLuint vboQuad = 0;     // unit quad on the XZ plane
+	GLuint vboScreen = 0;   // unit quad in [0,1]^2 for screen space
+	GLuint vboSpores = 0;
+	int    sporeCount = 0;
 
-	GLuint m_LitShader = 0;
-	GLuint m_ParticleShader = 0;
-	GLuint m_OverlayShader = 0;
+	GLuint litShader = 0;
+	GLuint particleShader = 0;
+	GLuint overlayShader = 0;
 
-	// Per-frame state.
-	Mat4  m_ViewProj;
-	Vec3  m_CamPos;
-	float m_PixelsPerUnit = 1.0f;
-	SceneEnv m_Env;
-	float m_Time = 0.0f;
+	Mat4     viewProj;
+	Vec3     camPos;
+	float    pixelsPerUnit = 1.0f;
+	SceneEnv env;
+	float    time = 0.0f;
 };

@@ -107,7 +107,6 @@ void SpecialKeyUpInput(int key, int x, int y)
 
 int main(int argc, char **argv)
 {
-	// Initialize GL things
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA);
 	glutInitWindowPosition(80, 40);
@@ -126,7 +125,6 @@ int main(int argc, char **argv)
 		std::cout << "GLEW 3.0 not supported\n ";
 	}
 
-	// Initialize Renderer
 	g_Renderer = new Renderer(1280, 720);
 	if (!g_Renderer->IsInitialized())
 	{
