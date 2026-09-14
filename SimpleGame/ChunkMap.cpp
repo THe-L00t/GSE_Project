@@ -71,8 +71,11 @@ namespace
 
 		for (int attempt = 0; attempt < 8; ++attempt)
 		{
-			Vec3 pos(center.x + rng.Range(-0.5f, 0.5f) * (kChunkSize - 2.0f), 0.0f,
-					 center.z + rng.Range(-0.5f, 0.5f) * (kChunkSize - 2.0f));
+			// Separate statements: argument evaluation order is unspecified, and the same seed
+			// must give the same layout on every compiler and configuration.
+			float offsetX = rng.Range(-0.5f, 0.5f);
+			float offsetZ = rng.Range(-0.5f, 0.5f);
+			Vec3 pos(center.x + offsetX * (kChunkSize - 2.0f), 0.0f, center.z + offsetZ * (kChunkSize - 2.0f));
 
 			if (avoidRoad && fabsf(pos.x - RoadCenter(pos.z)) < 3.4f + footprint) continue;
 			if (avoidClearing && DistXZ(pos, kClearingCenter) < kClearingRadius + footprint) continue;

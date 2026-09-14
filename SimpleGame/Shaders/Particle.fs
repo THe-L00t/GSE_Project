@@ -17,8 +17,8 @@ void main()
 	float r = length(d);
 
 	// Soft core with a wide halo. Spores are the only high-saturation element.
-	float core = smoothstep(0.50, 0.06, r);
-	float halo = smoothstep(0.50, 0.20, r) * 0.35;
+	float core = 1.0 - smoothstep(0.06, 0.50, r);
+	float halo = (1.0 - smoothstep(0.20, 0.50, r)) * 0.35;
 
 	// Each spore breathes at its own pace.
 	float pulse = 0.75 + 0.25 * sin(u_Time * 1.6 + v_Rand * 6.283);

@@ -298,8 +298,8 @@ void Game::UpdateItems()
 	{
 		WorldItem& item = worldItems[i];
 
-		// Drops that fall far behind are forgotten.
-		if (item.spawnIndex < 0 && DistXZ(playerPos, item.pos) > 60.0f)
+		// Drops that fall far behind are forgotten. The pipe stays: the guide waits for it.
+		if (item.spawnIndex < 0 && item.type != ITEM_RUSTY_PIPE && DistXZ(playerPos, item.pos) > 60.0f)
 		{
 			item.taken = true;
 			continue;
