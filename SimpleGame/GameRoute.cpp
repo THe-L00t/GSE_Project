@@ -15,7 +15,6 @@ namespace
 
 	const int kStreamRadius = 2;   // chunks kept generated around the player
 	const int kSimRadius = 1;      // chunks whose creatures and finds are live
-	const int kKeepRadius = kStreamRadius + 2;   // chunk actors kept; creatures at the edge look further out
 
 	const float kSleepDuration = 2.2f;
 	const float kSporeDrain = 4.0f;  // health per second once exposure is full
@@ -226,11 +225,12 @@ void Game::StreamChunks()
 			EnsureChunk(playerChunkX + dx, playerChunkZ + dz);
 	}
 
-	// Dropped chunk actors are rebuilt from the map when they are needed again.
+	// Chunk actors nothing looked up last update go; the map rebuilds them when they are needed again.
+	// Creatures far from the player keep the chunks around them alive.
 	for (std::unordered_map<uint64_t, ChunkActor*>::iterator it = chunkActors.begin(); it != chunkActors.end();)
 	{
 		ChunkActor* chunk = it->second;
-		if (abs(chunk->cx - playerChunkX) > kKeepRadius || abs(chunk->cz - playerChunkZ) > kKeepRadius)
+		if (chunk->lastTick < tick - 1)
 		{
 			chunk->Destroy();
 			it = chunkActors.erase(it);
@@ -309,9 +309,14 @@ ChunkActor* Game::EnsureChunk(int cx, int cz)
 {
 	uint64_t key = ChunkMap::Key(cx, cz);
 	std::unordered_map<uint64_t, ChunkActor*>::iterator found = chunkActors.find(key);
-	if (found != chunkActors.end()) return found->second;
+	if (found != chunkActors.end())
+	{
+		found->second->lastTick = tick;
+		return found->second;
+	}
 
 	ChunkActor* chunk = chunkGroup->AddChild(new ChunkActor(routeMap.Get(cx, cz)));
+	chunk->lastTick = tick;
 	chunkActors[key] = chunk;
 	return chunk;
 }
@@ -351,7 +356,7 @@ void Game::ResolveRouteCollisions(Vec3& pos, float radius)
 			for (size_t i = 0; i < c->ChildCount(); ++i)
 			{
 				const Actor* prop = c->Child(i);
-				if (prop->collider.shape == COLLIDER_CIRCLE)
+				if (!prop->IsDestroyed() && prop->collider.shape == COLLIDER_CIRCLE)
 					PushOutOfCircle(pos, radius, prop->WorldPosition(), prop->collider.radius);
 			}
 		}

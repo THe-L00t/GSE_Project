@@ -205,6 +205,7 @@ private:
 	int   statConfirmations = 0;
 
 	float time = 0.0f;
+	int   tick = 0;               // updates run while the world was not paused
 	float timeOfDay = 0.27f;      // [0,1), 0 is midnight
 	float dayLength = 240.0f;     // real seconds per in-game day
 	float timeScale = 1.0f;

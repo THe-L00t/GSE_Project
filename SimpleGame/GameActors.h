@@ -151,6 +151,7 @@ public:
 	int      cz = 0;
 	int      stage = 1;
 	uint64_t hash = 0;
+	int      lastTick = 0;           // last update that looked the chunk up
 	bool     hasNeighborStages = false;
 	float    neighborStage[4] = { 0.0f, 0.0f, 0.0f, 0.0f };   // -x, +x, -z, +z
 };

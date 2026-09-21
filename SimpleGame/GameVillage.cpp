@@ -96,7 +96,8 @@ void Game::BuildVillage()
 
 	// Road sign toward Route 32
 	const float signZ = 24.5f;
-	AddProp(MODEL_SIGN, Vec3(RoadCenter(signZ) + 3.2f, 0.0f, signZ), kUnitScale, 0.0f, 0.0f, 0.0f)->emissive = 0.10f;
+	PropActor* sign = AddProp(MODEL_SIGN, Vec3(RoadCenter(signZ) + 3.2f, 0.0f, signZ), kUnitScale, 0.0f, 0.0f, 0.0f);
+	sign->emissive = 0.10f;
 
 	// After the props: the player is pushed out of the water last.
 	water = levelNode->AddChild(new WaterActor(22.0f, 18.0f));
@@ -173,7 +174,7 @@ void Game::ResolveVillageCollisions()
 	for (size_t i = 0; i < levelNode->ChildCount(); ++i)
 	{
 		const Actor* a = levelNode->Child(i);
-		if (a->collider.shape == COLLIDER_BOX)
+		if (!a->IsDestroyed() && a->collider.shape == COLLIDER_BOX)
 			PushOutOfBox(pos, player->collider.radius, a->WorldPosition(), a->collider.halfX, a->collider.halfZ);
 	}
 	player->SetPosition(pos);

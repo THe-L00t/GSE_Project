@@ -38,6 +38,7 @@ void Game::Update(float dt, const bool* keys)
 
 	time += dt;
 	levelTimer += dt;
+	++tick;
 
 	timeOfDay += (dt * timeScale) / dayLength;
 	while (timeOfDay >= 1.0f) timeOfDay -= 1.0f;
