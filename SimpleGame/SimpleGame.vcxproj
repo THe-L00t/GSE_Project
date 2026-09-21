@@ -159,6 +159,7 @@
     <ClInclude Include="ChunkMap.h" />
     <ClInclude Include="Collision.h" />
     <ClInclude Include="Game.h" />
+    <ClInclude Include="GameActors.h" />
     <ClInclude Include="Math3D.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Models.h" />
@@ -173,6 +174,7 @@
     <ClCompile Include="Actor.cpp" />
     <ClCompile Include="ChunkMap.cpp" />
     <ClCompile Include="Game.cpp" />
+    <ClCompile Include="GameActors.cpp" />
     <ClCompile Include="GameCombat.cpp" />
     <ClCompile Include="GameRoute.cpp" />
     <ClCompile Include="GameVillage.cpp" />

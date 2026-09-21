@@ -34,6 +34,13 @@ void Game::StartRoute()
 	letterOpen = false;
 	prompt.clear();
 
+	levelNode->Destroy();
+	levelNode = worldNode->AddChild(new Actor(ACTOR_NODE));
+	water = nullptr;
+	letter = nullptr;
+	villageExit = nullptr;
+	targetSleeper = nullptr;
+
 	uint64_t seed = kRouteSeed != 0 ? kRouteSeed : MixSeed((uint64_t)std::time(nullptr));
 	routeMap.Reset(seed);
 	chunkStates.clear();
@@ -44,16 +51,16 @@ void Game::StartRoute()
 	safePoint = Vec3(0.0f, 0.0f, -7.0f);
 	lanternPos = Vec3(2.5f, 0.0f, -8.5f);
 
-	playerPos = safePoint;
-	playerYaw = 0.0f;
-	rollTimer = 0.0f;
-	rollAngle = 0.0f;
-	camTarget = playerPos;
+	player->SetPosition(safePoint);
+	player->SetYaw(0.0f);
+	player->rollTimer = 0.0f;
+	player->rollAngle = 0.0f;
+	camera->SetPosition(player->Position());
 	health = MaxHealth(stats);
 	deathTimer = -1.0f;
 	sporeExposure = Minf(sporeExposure, 0.3f);
 
-	if (!hasWeapon) DropItem(ITEM_RUSTY_PIPE, Vec3(0.5f, 0.0f, -3.0f), 0, 0, -1);
+	if (!player->weapon) DropItem(ITEM_RUSTY_PIPE, Vec3(0.5f, 0.0f, -3.0f), 0, 0, -1);
 	SetGuide(GUIDE_TAKE_PIPE);
 
 	StreamChunks();
@@ -70,7 +77,9 @@ void Game::UpdateRoute(float dt, const bool* keys)
 	else
 	{
 		UpdatePlayer(dt, keys);
-		ResolveRouteCollisions(playerPos, kPlayerRadius);
+		Vec3 pos = player->Position();
+		ResolveRouteCollisions(pos, player->collider.radius);
+		player->SetPosition(pos);
 	}
 
 	StreamChunks();
@@ -84,10 +93,10 @@ void Game::UpdateRoute(float dt, const bool* keys)
 	const Chunk& here = routeMap.Get(playerChunkX, playerChunkZ);
 	float fragmentGuard = Maxf(1.0f - 0.18f * (float)fragments, 0.3f);
 	float rate = 0.012f * (float)here.stage * fragmentGuard * SporeResistance(stats);
-	if (rollTimer > 0.0f) rate = 0.0f;
+	if (player->rollTimer > 0.0f) rate = 0.0f;
 
 	// The lantern clears the air and mends wounds.
-	if (DistXZ(playerPos, lanternPos) < kLanternRadius && deathTimer < 0.0f)
+	if (DistXZ(player->Position(), lanternPos) < kLanternRadius && deathTimer < 0.0f)
 	{
 		rate = -0.08f;
 		health = Minf(health + 3.0f * dt, MaxHealth(stats));
@@ -129,7 +138,7 @@ void Game::SetGuide(int next)
 		guideBaseline = kills[ENEMY_MOSS_BOAR];
 		SpawnEnemy(ENEMY_MOSS_BOAR, 1, Vec3(RoadCenter(22.0f), 0.0f, 22.0f), 0, 1, -1);
 		if (inventory[ITEM_HERB] == 0)
-			DropItem(ITEM_HERB, playerPos + Vec3(1.5f, 0.0f, 1.0f), 0, 0, -1);
+			DropItem(ITEM_HERB, player->Position() + Vec3(1.5f, 0.0f, 1.0f), 0, 0, -1);
 		ShowMessage("A moss boar blocks the road south. When it glows red, roll through the charge.", 6.0f);
 		break;
 
@@ -153,7 +162,7 @@ void Game::UpdateGuide()
 	switch (guide)
 	{
 	case GUIDE_TAKE_PIPE:
-		if (hasWeapon) SetGuide(GUIDE_FIGHT_MITES);
+		if (player->weapon) SetGuide(GUIDE_FIGHT_MITES);
 		break;
 
 	case GUIDE_FIGHT_MITES:
@@ -207,7 +216,7 @@ void Game::GuideText(char* buf, size_t size) const
 
 void Game::StreamChunks()
 {
-	ChunkMap::ChunkCoords(playerPos, playerChunkX, playerChunkZ);
+	ChunkMap::ChunkCoords(player->Position(), playerChunkX, playerChunkZ);
 
 	for (int dz = -kStreamRadius; dz <= kStreamRadius; ++dz)
 	{
@@ -297,7 +306,7 @@ void Game::ResolveRouteCollisions(Vec3& pos, float radius)
 void Game::DrawRoute()
 {
 	int cx, cz;
-	ChunkMap::ChunkCoords(camTarget, cx, cz);
+	ChunkMap::ChunkCoords(camera->Position(), cx, cz);
 
 	for (int dz = -kDrawRadius; dz <= kDrawRadius; ++dz)
 	{

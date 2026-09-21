@@ -10,8 +10,7 @@
 
 namespace
 {
-	const float kSwingTime = 0.22f;
-	const float kPipeBonus = 6.0f;
+	const float kBareHandReach = 1.5f;
 	const float kHurtTime = 0.6f;
 	const float kSleepDuration = 2.2f;
 	const float kPickupRange = 1.1f;
@@ -49,14 +48,15 @@ namespace
 void Game::Attack()
 {
 	if (level != LEVEL_ROUTE || statPanelOpen || deathTimer >= 0.0f) return;
-	if (attackTimer > 0.0f || rollTimer > 0.0f) return;
+	if (player->attackTimer > 0.0f || player->rollTimer > 0.0f) return;
 
-	attackTimer = AttackCooldown(stats);
-	swingTimer = kSwingTime;
+	player->attackTimer = AttackCooldown(stats);
+	player->swingTimer = kSwingTime;
 
-	Vec3 facing(sinf(playerYaw), 0.0f, cosf(playerYaw));
-	float power = AttackPower(stats, hasWeapon ? kPipeBonus : 0.0f);
-	float reach = hasWeapon ? 2.1f : 1.5f;
+	Vec3 playerPos = player->Position();
+	Vec3 facing(sinf(player->Yaw()), 0.0f, cosf(player->Yaw()));
+	float power = AttackPower(stats, player->weapon ? player->weapon->power : 0.0f);
+	float reach = player->weapon ? player->weapon->reach : kBareHandReach;
 
 	for (size_t i = 0; i < enemies.size(); ++i)
 	{
@@ -127,16 +127,16 @@ void Game::KillEnemy(Enemy& e)
 void Game::DamagePlayer(float amount, const Vec3& push)
 {
 	// The roll is the dodge: nothing lands while it plays.
-	if (rollTimer > 0.0f || hurtTimer > 0.0f || deathTimer >= 0.0f) return;
+	if (player->rollTimer > 0.0f || player->hurtTimer > 0.0f || deathTimer >= 0.0f) return;
 
 	health -= amount;
-	hurtTimer = kHurtTime;
-	playerFlash = 1.0f;
-	playerPos = playerPos + FlatDirection(push) * 0.6f;
+	player->hurtTimer = kHurtTime;
+	player->flash = 1.0f;
+	player->SetPosition(player->Position() + FlatDirection(push) * 0.6f);
 
 	char text[16];
 	sprintf_s(text, sizeof(text), "-%d", (int)(amount + 0.5f));
-	AddPopup(playerPos + Vec3(0.0f, 2.0f, 0.0f), text, kHurtColor);
+	AddPopup(player->Position() + Vec3(0.0f, 2.0f, 0.0f), text, kHurtColor);
 
 	if (health <= 0.0f) FallAsleep("You sink into a long sleep...");
 }
@@ -145,7 +145,7 @@ void Game::FallAsleep(const char* reason)
 {
 	health = 0.0f;
 	deathTimer = 0.0f;
-	swingTimer = 0.0f;
+	player->swingTimer = 0.0f;
 	ShowMessage(reason, kSleepDuration + 1.0f);
 }
 
@@ -154,11 +154,11 @@ void Game::WakeAtSafePoint()
 	deathTimer = -1.0f;
 	health = MaxHealth(stats);
 	sporeExposure = 0.2f;
-	playerPos = safePoint;
-	camTarget = playerPos;
-	rollTimer = 0.0f;
-	rollAngle = 0.0f;
-	hurtTimer = 1.5f;
+	player->SetPosition(safePoint);
+	camera->SetPosition(player->Position());
+	player->rollTimer = 0.0f;
+	player->rollAngle = 0.0f;
+	player->hurtTimer = 1.5f;
 
 	for (size_t i = 0; i < enemies.size(); ++i)
 	{
@@ -204,7 +204,7 @@ void Game::UpdateEnemy(Enemy& e, float dt)
 		return;
 	}
 
-	Vec3 toPlayer(playerPos.x - e.pos.x, 0.0f, playerPos.z - e.pos.z);
+	Vec3 toPlayer(player->Position().x - e.pos.x, 0.0f, player->Position().z - e.pos.z);
 	float dist = Length(toPlayer);
 	Vec3 toPlayerDir = FlatDirection(toPlayer);
 	bool playerAwake = deathTimer < 0.0f;
@@ -238,7 +238,7 @@ void Game::UpdateEnemy(Enemy& e, float dt)
 		}
 		else
 		{
-			MoveToward(e, playerPos, speed, dt);
+			MoveToward(e, player->Position(), speed, dt);
 		}
 		break;
 
@@ -261,7 +261,7 @@ void Game::UpdateEnemy(Enemy& e, float dt)
 		if (!e.strikeHit && playerAwake)
 		{
 			bool hit = (info.lunge > 0.0f)
-				? (dist < info.radius + kPlayerRadius + 0.25f)
+				? (dist < info.radius + player->collider.radius + 0.25f)
 				: (dist < info.attackRange + 0.3f && Dot(toPlayerDir, e.strikeDir) > 0.3f);
 			if (hit)
 			{
@@ -289,7 +289,7 @@ void Game::UpdateEnemy(Enemy& e, float dt)
 
 	ResolveRouteCollisions(e.pos, info.radius);
 	if (e.state != ENEMY_STRIKE && playerAwake)
-		PushOutOfCircle(e.pos, info.radius, playerPos, kPlayerRadius);
+		PushOutOfCircle(e.pos, info.radius, player->Position(), player->collider.radius);
 }
 
 void Game::UpdateItems()
@@ -299,13 +299,13 @@ void Game::UpdateItems()
 		WorldItem& item = worldItems[i];
 
 		// Drops that fall far behind are forgotten. The pipe stays: the guide waits for it.
-		if (item.spawnIndex < 0 && item.type != ITEM_RUSTY_PIPE && DistXZ(playerPos, item.pos) > 60.0f)
+		if (item.spawnIndex < 0 && item.type != ITEM_RUSTY_PIPE && DistXZ(player->Position(), item.pos) > 60.0f)
 		{
 			item.taken = true;
 			continue;
 		}
 
-		if (deathTimer < 0.0f && DistXZ(playerPos, item.pos) < kPickupRange)
+		if (deathTimer < 0.0f && DistXZ(player->Position(), item.pos) < kPickupRange)
 		{
 			item.taken = true;
 			PickUp(item);
@@ -318,10 +318,10 @@ void Game::UpdateItems()
 
 void Game::UpdateCombatTimers(float dt)
 {
-	attackTimer = Maxf(attackTimer - dt, 0.0f);
-	swingTimer = Maxf(swingTimer - dt, 0.0f);
-	hurtTimer = Maxf(hurtTimer - dt, 0.0f);
-	playerFlash = Maxf(playerFlash - dt * 4.0f, 0.0f);
+	player->attackTimer = Maxf(player->attackTimer - dt, 0.0f);
+	player->swingTimer = Maxf(player->swingTimer - dt, 0.0f);
+	player->hurtTimer = Maxf(player->hurtTimer - dt, 0.0f);
+	player->flash = Maxf(player->flash - dt * 4.0f, 0.0f);
 	levelUpTimer = Maxf(levelUpTimer - dt, 0.0f);
 
 	for (size_t i = 0; i < popups.size(); ++i)
@@ -382,7 +382,7 @@ void Game::PickUp(WorldItem& item)
 	switch (item.type)
 	{
 	case ITEM_RUSTY_PIPE:
-		hasWeapon = true;
+		EquipWeapon();
 		break;
 	case ITEM_RELIC:
 		GrantXp((int)kRelicXp);
@@ -391,6 +391,11 @@ void Game::PickUp(WorldItem& item)
 		++inventory[item.type];
 		break;
 	}
+}
+
+void Game::EquipWeapon()
+{
+	if (!player->weapon) player->weapon = player->AddChild(new WeaponActor());
 }
 
 void Game::UseHerb()
@@ -416,7 +421,7 @@ void Game::UseHerb()
 
 	char text[16];
 	sprintf_s(text, sizeof(text), "+%d", (int)(heal + 0.5f));
-	AddPopup(playerPos + Vec3(0.0f, 2.0f, 0.0f), text, kHealColor);
+	AddPopup(player->Position() + Vec3(0.0f, 2.0f, 0.0f), text, kHealColor);
 }
 
 void Game::UseWater()
@@ -438,7 +443,7 @@ void Game::GrantXp(int amount)
 {
 	char text[16];
 	sprintf_s(text, sizeof(text), "+%d XP", amount);
-	AddPopup(playerPos + Vec3(0.0f, 2.4f, 0.0f), text, kXpColor);
+	AddPopup(player->Position() + Vec3(0.0f, 2.4f, 0.0f), text, kXpColor);
 
 	int gained = GainXp(stats, amount);
 	if (gained <= 0) return;
@@ -578,21 +583,6 @@ void Game::DrawItems()
 	}
 }
 
-void Game::DrawWeapon(const Mat4& root)
-{
-	// At rest the pipe hangs forward from the right hand; a swing sweeps it from over the shoulder.
-	float angle = 2.7f;
-	if (swingTimer > 0.0f)
-	{
-		float t = 1.0f - swingTimer / kSwingTime;
-		t = 1.0f - (1.0f - t) * (1.0f - t);
-		angle = Lerpf(-0.6f, 2.4f, t);
-	}
-
-	Mat4 hand = Mul(Mul(root, MatTranslate(Vec3(0.36f, 0.62f, 0.10f))), MatRotateX(angle));
-	renderer->DrawModel(MODEL_PIPE, hand, DrawParams());
-}
-
 void Game::DrawPopups()
 {
 	for (size_t i = 0; i < popups.size(); ++i)
@@ -644,7 +634,7 @@ void Game::DrawCombatHud()
 						Vec3(0.40f, 0.55f, 0.75f), Vec3(0.60f, 0.85f, 0.95f));
 
 	sprintf_s(buf, sizeof(buf), "%s    Herb x%d [Q]    Water x%d [R]",
-			  hasWeapon ? "Rusty pipe" : "Bare hands", inventory[ITEM_HERB], inventory[ITEM_CLEAN_WATER]);
+			  player->weapon ? "Rusty pipe" : "Bare hands", inventory[ITEM_HERB], inventory[ITEM_CLEAN_WATER]);
 	renderer->DrawTexts(32, 176, buf, kHudDim, false);
 
 	if (stats.unspentPoints > 0)
@@ -690,7 +680,7 @@ void Game::DrawStatPanel()
 		preview.stat[i] += pendingPoints[i];
 	}
 	int remaining = stats.unspentPoints - pending;
-	float weapon = hasWeapon ? kPipeBonus : 0.0f;
+	float weapon = player->weapon ? player->weapon->power : 0.0f;
 
 	int x = (int)px + 36;
 	int y = (int)py + 44;

@@ -14,16 +14,22 @@ namespace
 	const Vec3 kUnitScale(1.0f, 1.0f, 1.0f);
 }
 
-void Game::AddProp(int model, const Vec3& pos, const Vec3& scale, float yaw, float halfX, float halfZ)
+PropActor* Game::AddProp(int model, const Vec3& pos, const Vec3& scale, float yaw, float halfX, float halfZ)
 {
-	Prop p;
-	p.model = model;
-	p.pos = pos;
-	p.scale = scale;
-	p.yaw = yaw;
-	p.halfX = halfX;
-	p.halfZ = halfZ;
-	props.push_back(p);
+	PropActor* p = levelNode->AddChild(new PropActor(ACTOR_PROP, model));
+	p->SetPosition(pos);
+	p->SetYaw(yaw);
+	p->SetScale(scale);
+	p->phase = pos.x * 0.37f + pos.z * 0.21f;
+
+	// A zero footprint takes no part in collision.
+	if (halfX > 0.0f && halfZ > 0.0f)
+	{
+		p->collider.shape = COLLIDER_BOX;
+		p->collider.halfX = halfX;
+		p->collider.halfZ = halfZ;
+	}
+	return p;
 }
 
 void Game::AddHouse(const Vec3& pos, float w, float h, float d, float yaw, int model)
@@ -51,8 +57,17 @@ void Game::AddFence(const Vec3& from, const Vec3& to)
 	AddProp(MODEL_FENCE_RAIL, Vec3(mid.x, 0.62f, mid.z), Vec3(0.08f, 0.12f, len), atan2f(d.x, d.z), 0.0f, 0.0f);
 }
 
+void Game::AddSleeper(const Vec3& pos, float yaw, bool grandma, float phase)
+{
+	SleeperActor* s = levelNode->AddChild(new SleeperActor(grandma, phase));
+	s->SetPosition(pos);
+	s->SetYaw(yaw);
+}
+
 void Game::BuildVillage()
 {
+	levelNode = worldNode->AddChild(new Actor(ACTOR_NODE));
+
 	// Grandmother's house
 	AddHouse(Vec3(-2.0f, 0.0f, -10.0f), 7.0f, 3.6f, 6.0f, 0.0f, MODEL_HOUSE_A);
 	AddHouse(Vec3(9.5f, 0.0f, -7.0f), 5.5f, 3.2f, 5.0f, 0.12f, MODEL_HOUSE_B);
@@ -81,15 +96,25 @@ void Game::BuildVillage()
 
 	// Road sign toward Route 32
 	const float signZ = 24.5f;
-	AddProp(MODEL_SIGN, Vec3(RoadCenter(signZ) + 3.2f, 0.0f, signZ), kUnitScale, 0.0f, 0.0f, 0.0f);
-	props.back().emissive = 0.10f;
+	AddProp(MODEL_SIGN, Vec3(RoadCenter(signZ) + 3.2f, 0.0f, signZ), kUnitScale, 0.0f, 0.0f, 0.0f)->emissive = 0.10f;
 
-	Sleeper grandma;
-	grandma.pos = Vec3(-2.0f, 0.0f, -6.2f);
-	grandma.yaw = 0.35f;
-	grandma.isGrandma = true;
-	grandma.phase = 0.0f;
-	sleepers.push_back(grandma);
+	// After the props: the player is pushed out of the water last.
+	water = levelNode->AddChild(new WaterActor(22.0f, 18.0f));
+	water->SetPosition(Vec3(-15.0f, 0.03f, -14.0f));
+
+	GroundParams ground;
+	ground.stage = 0.0f;
+	ground.dampCenter = water->Position();
+	ground.dampStrength = 1.0f;
+	levelNode->AddChild(new GroundActor(400.0f, ground));
+
+	letter = levelNode->AddChild(new PropActor(ACTOR_LETTER, MODEL_LETTER));
+	letter->SetPosition(Vec3(-0.6f, 0.0f, -6.0f));
+	letter->SetYaw(0.4f);
+	letter->emissive = 0.3f;
+	letter->visible = false;
+
+	AddSleeper(Vec3(-2.0f, 0.0f, -6.2f), 0.35f, true, 0.0f);
 
 	const float others[4][3] =
 	{
@@ -99,15 +124,10 @@ void Game::BuildVillage()
 		{ -4.5f, 17.5f, 0.80f },
 	};
 	for (int i = 0; i < 4; ++i)
-	{
-		Sleeper s;
-		s.pos = Vec3(others[i][0], 0.0f, others[i][1]);
-		s.yaw = others[i][2];
-		s.phase = 1.3f * (float)(i + 1);
-		sleepers.push_back(s);
-	}
+		AddSleeper(Vec3(others[i][0], 0.0f, others[i][1]), others[i][2], false, 1.3f * (float)(i + 1));
 
-	letterPos = Vec3(-0.6f, 0.0f, -6.0f);
+	villageExit = levelNode->AddChild(new ExitActor());
+	villageExit->SetPosition(Vec3(0.0f, 0.0f, kExitZ));
 }
 
 void Game::UpdateVillage(float dt, const bool* keys)
@@ -118,10 +138,12 @@ void Game::UpdateVillage(float dt, const bool* keys)
 		ResolveVillageCollisions();
 
 		// Clamp to the field, but leave the south open for the exit.
-		playerPos.x = Clampf(playerPos.x, -30.0f, 30.0f);
-		playerPos.z = Clampf(playerPos.z, -28.0f, 32.0f);
+		Vec3 pos = player->Position();
+		pos.x = Clampf(pos.x, -30.0f, 30.0f);
+		pos.z = Clampf(pos.z, -28.0f, 32.0f);
+		player->SetPosition(pos);
 
-		if (stage == QUEST_LEAVE_VILLAGE && playerPos.z > kExitZ)
+		if (stage == QUEST_LEAVE_VILLAGE && villageExit->Contains(pos))
 		{
 			stage = QUEST_DONE;
 			endingTimer = 0.0f;
@@ -133,13 +155,10 @@ void Game::UpdateVillage(float dt, const bool* keys)
 	float insight = Maxf(1.0f - 0.18f * (float)fragments, 0.3f);
 	float rate = 0.028f * insight;
 
-	float nearWaterX = Maxf(fabsf(playerPos.x - waterCenter.x) - waterSizeX * 0.5f, 0.0f);
-	float nearWaterZ = Maxf(fabsf(playerPos.z - waterCenter.z) - waterSizeZ * 0.5f, 0.0f);
-	float waterDist = sqrtf(nearWaterX * nearWaterX + nearWaterZ * nearWaterZ);
-	if (waterDist < 4.5f) rate = -0.075f;
+	if (water->ShoreDistance(player->Position()) < water->clearRange) rate = -0.075f;
 
 	// Rolling holds your breath.
-	if (rollTimer > 0.0f) rate = Minf(rate, 0.0f);
+	if (player->rollTimer > 0.0f) rate = Minf(rate, 0.0f);
 
 	sporeExposure = Saturatef(sporeExposure + rate * dt);
 
@@ -150,19 +169,19 @@ void Game::UpdateVillage(float dt, const bool* keys)
 void Game::ResolveVillageCollisions()
 {
 	// Axis-aligned pushes. Prop yaw is small enough that ignoring it reads fine.
-	for (size_t i = 0; i < props.size(); ++i)
+	Vec3 pos = player->Position();
+	for (size_t i = 0; i < levelNode->ChildCount(); ++i)
 	{
-		const Prop& p = props[i];
-		if (p.halfX > 0.0f && p.halfZ > 0.0f)
-			PushOutOfBox(playerPos, kPlayerRadius, p.pos, p.halfX, p.halfZ);
+		const Actor* a = levelNode->Child(i);
+		if (a->collider.shape == COLLIDER_BOX)
+			PushOutOfBox(pos, player->collider.radius, a->WorldPosition(), a->collider.halfX, a->collider.halfZ);
 	}
-
-	PushOutOfBox(playerPos, kPlayerRadius, waterCenter, waterSizeX * 0.5f, waterSizeZ * 0.5f);
+	player->SetPosition(pos);
 }
 
 void Game::UpdateInteractionTarget()
 {
-	targetSleeper = -1;
+	targetSleeper = nullptr;
 	targetLetter = false;
 	prompt.clear();
 
@@ -174,33 +193,24 @@ void Game::UpdateInteractionTarget()
 		return;
 	}
 
+	const Vec3& pos = player->Position();
+
 	// The letter wins over the sleeper it lies beside.
 	if (letterFound && stage == QUEST_READ_LETTER &&
-		DistXZ(playerPos, letterPos) < kInteractRange)
+		DistXZ(pos, letter->Position()) < kInteractRange)
 	{
 		targetLetter = true;
 		prompt = "[E]  Read the letter";
 		return;
 	}
 
-	float best = kInteractRange;
-	for (size_t i = 0; i < sleepers.size(); ++i)
+	targetSleeper = static_cast<SleeperActor*>(SceneGraph::FindNearest(levelNode, ACTOR_SLEEPER, pos, kInteractRange));
+	if (targetSleeper)
 	{
-		float d = DistXZ(playerPos, sleepers[i].pos);
-		if (d < best)
-		{
-			best = d;
-			targetSleeper = (int)i;
-		}
-	}
-
-	if (targetSleeper >= 0)
-	{
-		const Sleeper& s = sleepers[targetSleeper];
-		if (s.isGrandma)
+		if (targetSleeper->isGrandma)
 			prompt = (stage == QUEST_FIND_GRANDMOTHER) ? "[E]  Look at grandmother" : "[E]  Sit with her";
 		else
-			prompt = s.visited ? "" : "[E]  Rest beside them";
+			prompt = targetSleeper->visited ? "" : "[E]  Rest beside them";
 	}
 }
 
@@ -218,6 +228,7 @@ void Game::TryInteract()
 		if (stage == QUEST_READ_LETTER)
 		{
 			stage = QUEST_LEAVE_VILLAGE;
+			letter->visible = false;
 			ShowMessage("Follow the road south, out of the village.", 5.0f);
 		}
 		return;
@@ -229,9 +240,9 @@ void Game::TryInteract()
 		return;
 	}
 
-	if (targetSleeper < 0) return;
+	if (!targetSleeper) return;
 
-	Sleeper& s = sleepers[targetSleeper];
+	SleeperActor& s = *targetSleeper;
 
 	if (s.isGrandma)
 	{
@@ -239,6 +250,7 @@ void Game::TryInteract()
 		{
 			stage = QUEST_READ_LETTER;
 			letterFound = true;
+			letter->visible = true;
 			ShowMessage("She is breathing. Moss has started at her fingertips. A letter lies beside her.", 6.5f);
 		}
 		else
@@ -251,6 +263,8 @@ void Game::TryInteract()
 	if (!s.visited)
 	{
 		s.visited = true;
+		s.mote->Destroy();
+		s.mote = nullptr;
 		++fragments;
 		char buf[128];
 		sprintf_s(buf, sizeof(buf), "A dream fragment: the first spring, seen from someone else's eyes.  Nature Insight %d", fragments);
@@ -259,53 +273,6 @@ void Game::TryInteract()
 	else
 	{
 		ShowMessage("Their sleep is quiet.", 2.5f);
-	}
-}
-
-void Game::DrawVillage()
-{
-	GroundParams ground;
-	ground.stage = 0.0f;
-	ground.dampCenter = waterCenter;
-	ground.dampStrength = 1.0f;
-	renderer->DrawGround(camTarget, 400.0f, ground);
-	renderer->DrawWater(waterCenter, waterSizeX, waterSizeZ);
-
-	for (size_t i = 0; i < props.size(); ++i)
-	{
-		const Prop& p = props[i];
-		DrawParams params;
-		params.emissive = p.emissive;
-		params.phase = p.pos.x * 0.37f + p.pos.z * 0.21f;
-		renderer->DrawModel(p.model, p.pos, p.yaw, p.scale, params);
-	}
-
-	if (letterFound && stage == QUEST_READ_LETTER)
-	{
-		DrawParams params;
-		params.emissive = 0.3f;
-		renderer->DrawModel(MODEL_LETTER, letterPos, 0.4f, kUnitScale, params);
-	}
-
-	DrawSleepers();
-}
-
-void Game::DrawSleepers()
-{
-	for (size_t i = 0; i < sleepers.size(); ++i)
-	{
-		const Sleeper& s = sleepers[i];
-		Mat4 root = Mul(MatTranslate(s.pos), MatRotateY(s.yaw));
-
-		DrawParams params;
-		params.phase = s.phase;
-		renderer->DrawModel(s.isGrandma ? MODEL_SLEEPER_ELDER : MODEL_SLEEPER, root, params);
-
-		if (!s.isGrandma && !s.visited)
-		{
-			params.emissive = 0.6f;
-			renderer->DrawModel(MODEL_DREAM_MOTE, root, params);
-		}
 	}
 }
 

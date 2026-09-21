@@ -3,8 +3,6 @@
 
 #include <cstdio>
 
-#include "Models.h"
-
 // On-screen text stays ASCII: the bitmap fonts freeglut ships cannot draw Hangul.
 
 namespace
@@ -19,7 +17,15 @@ namespace
 Game::Game(Renderer* r)
 	: renderer(r)
 {
-	camTarget = playerPos;
+	worldNode = scene.Root()->AddChild(new Actor(ACTOR_NODE));
+
+	player = scene.Root()->AddChild(new PlayerActor());
+	player->SetPosition(Vec3(2.0f, 0.0f, 1.5f));
+	player->SetYaw(kPi);
+
+	camera = scene.Root()->AddChild(new CameraActor());
+	camera->SetPosition(player->Position());
+
 	BuildVillage();
 }
 
@@ -42,11 +48,15 @@ void Game::Update(float dt, const bool* keys)
 		UpdateRoute(dt, keys);
 
 	UpdateCamera(dt);
+	scene.RemoveDestroyed();
 }
 
 void Game::UpdatePlayer(float dt, const bool* keys)
 {
+	PlayerActor& p = *player;
+
 	// Camera relative: W always moves up the screen.
+	float camYaw = camera->Yaw();
 	Vec3 forward(-sinf(camYaw), 0.0f, -cosf(camYaw));
 	Vec3 right(cosf(camYaw), 0.0f, -sinf(camYaw));
 
@@ -59,40 +69,42 @@ void Game::UpdatePlayer(float dt, const bool* keys)
 	float wishLen = Length(wish);
 	if (wishLen > 0.001f) wish = wish * (1.0f / wishLen);
 
-	if (rollCooldown > 0.0f) rollCooldown -= dt;
+	if (p.rollCooldown > 0.0f) p.rollCooldown -= dt;
 
-	if (rollTimer > 0.0f)
+	Vec3 pos = p.Position();
+	if (p.rollTimer > 0.0f)
 	{
 		// The roll commits to its direction; steering during it would rob the weight.
-		rollTimer -= dt;
-		float k = Saturatef(rollTimer / kRollTime);
+		p.rollTimer -= dt;
+		float k = Saturatef(p.rollTimer / kRollTime);
 		float speed = kRollSpeed * (0.35f + 0.65f * k);
-		playerPos = playerPos + rollDir * (speed * dt);
-		rollAngle += dt / kRollTime * 2.0f * kPi;
-		if (rollTimer <= 0.0f)
+		pos = pos + p.rollDir * (speed * dt);
+		p.rollAngle += dt / kRollTime * 2.0f * kPi;
+		if (p.rollTimer <= 0.0f)
 		{
-			rollTimer = 0.0f;
-			rollAngle = 0.0f;
+			p.rollTimer = 0.0f;
+			p.rollAngle = 0.0f;
 		}
 	}
 	else if (wishLen > 0.001f)
 	{
-		float speed = kWalkSpeed * MoveSpeedScale(stats) * (swingTimer > 0.0f ? 0.7f : 1.0f);
-		playerPos = playerPos + wish * (speed * dt);
-		playerYaw = atan2f(wish.x, wish.z);
-		walkPhase += dt * 9.0f;
+		float speed = kWalkSpeed * MoveSpeedScale(stats) * (p.swingTimer > 0.0f ? 0.7f : 1.0f);
+		pos = pos + wish * (speed * dt);
+		p.SetYaw(atan2f(wish.x, wish.z));
+		p.walkPhase += dt * 9.0f;
 	}
 	else
 	{
-		walkPhase = Approach(walkPhase, 0.0f, 6.0f, dt);
+		p.walkPhase = Approach(p.walkPhase, 0.0f, 6.0f, dt);
 	}
 
-	playerPos.y = 0.0f;
+	pos.y = 0.0f;
+	p.SetPosition(pos);
 }
 
 void Game::UpdateCamera(float dt)
 {
-	camTarget = LerpV(camTarget, playerPos, 1.0f - expf(-6.0f * dt));
+	camera->SetPosition(LerpV(camera->Position(), player->Position(), 1.0f - expf(-6.0f * dt)));
 }
 
 void Game::OnKeyDown(unsigned char key)
@@ -120,12 +132,12 @@ void Game::OnKeyDown(unsigned char key)
 	if (key == ' ')
 	{
 		if (letterOpen || deathTimer >= 0.0f) return;
-		if (rollTimer > 0.0f || rollCooldown > 0.0f) return;
+		if (player->rollTimer > 0.0f || player->rollCooldown > 0.0f) return;
 
-		rollTimer = kRollTime;
-		rollCooldown = kRollCooldown;
-		rollAngle = 0.0f;
-		rollDir = Vec3(sinf(playerYaw), 0.0f, cosf(playerYaw));
+		player->rollTimer = kRollTime;
+		player->rollCooldown = kRollCooldown;
+		player->rollAngle = 0.0f;
+		player->rollDir = Vec3(sinf(player->Yaw()), 0.0f, cosf(player->Yaw()));
 		return;
 	}
 
@@ -160,37 +172,21 @@ void Game::ShowMessage(const char* text, float seconds)
 	messageTimer = seconds;
 }
 
-void Game::SetupCamera()
-{
-	Vec3 dir(cosf(camPitch) * sinf(camYaw), sinf(camPitch), cosf(camPitch) * cosf(camYaw));
-	Vec3 eye = camTarget + dir * camDistance;
-
-	float aspect = (float)renderer->GetWidth() / (float)Maxf((float)renderer->GetHeight(), 1.0f);
-	float hh = orthoHeight * 0.5f;
-	float hw = hh * aspect;
-
-	Mat4 view = MatLookAt(eye, camTarget, Vec3(0.0f, 1.0f, 0.0f));
-	Mat4 proj = MatOrtho(-hw, hw, -hh, hh, 0.1f, 400.0f);
-	float pixelsPerUnit = (float)renderer->GetHeight() / orthoHeight;
-
-	renderer->SetCamera(view, proj, eye, pixelsPerUnit);
-}
-
 void Game::Render()
 {
+	Vec3 view = camera->Position();
+
 	renderer->BeginFrame();
-	renderer->SetFrame(timeOfDay, sporeExposure, camTarget, time);
-	SetupCamera();
+	renderer->SetFrame(timeOfDay, sporeExposure, view, time);
+	camera->Apply(renderer);
 
-	if (level == LEVEL_VILLAGE)
-		DrawVillage();
-	else
-		DrawRoute();
+	if (level == LEVEL_ROUTE) DrawRoute();
 
-	DrawPlayer();
+	player->UpdatePose(deathTimer);
+	scene.Draw(renderer, view);
 
 	// Spores last: additive, and they should sit over everything.
-	renderer->DrawSpores(Vec3(camTarget.x, 0.0f, camTarget.z), Vec3(70.0f, 16.0f, 70.0f),
+	renderer->DrawSpores(Vec3(view.x, 0.0f, view.z), Vec3(70.0f, 16.0f, 70.0f),
 						 Vec3(0.55f, 0.95f, 0.80f), 0.55f, 0.13f);
 
 	renderer->BeginUI();
@@ -205,37 +201,6 @@ void Game::Render()
 		DrawRouteHud();
 
 	renderer->EndUI();
-}
-
-void Game::DrawPlayer()
-{
-	Mat4 base = Mul(MatTranslate(playerPos), MatRotateY(playerYaw));
-
-	// Roll pivots around the waist so the tumble reads from a quarter view.
-	const float pivot = 0.62f;
-	Mat4 root = base;
-	if (rollTimer > 0.0f)
-	{
-		Mat4 spin = Mul(Mul(MatTranslate(Vec3(0.0f, pivot, 0.0f)), MatRotateX(rollAngle)),
-						MatTranslate(Vec3(0.0f, -pivot, 0.0f)));
-		root = Mul(base, spin);
-	}
-	else if (deathTimer >= 0.0f)
-	{
-		root = Mul(base, MatRotateX(-1.45f * Saturatef(deathTimer * 1.5f)));
-	}
-
-	// Lit.vs turns the walk phase into the bob; a roll holds it still.
-	DrawParams params;
-	params.phase = (rollTimer > 0.0f) ? 0.0f : walkPhase;
-	params.flash = playerFlash;
-	if (hurtTimer > 0.0f && fmodf(hurtTimer, 0.16f) < 0.08f)
-		params.flash = Maxf(params.flash, 0.35f);
-
-	renderer->DrawShadow(playerPos, 0.45f);
-	renderer->DrawModel(MODEL_PLAYER, root, params);
-
-	if (hasWeapon) DrawWeapon(root);
 }
 
 void Game::DrawObjective(const char* text)
