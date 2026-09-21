@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "GameActors.h"
 
+#include <cstdlib>
+
 #include "Models.h"
 
 namespace
@@ -158,4 +160,103 @@ void SleeperActor::Draw(const DrawContext& dc) const
 ExitActor::ExitActor()
 	: Actor(ACTOR_EXIT)
 {
+}
+
+LanternActor::LanternActor()
+	: PropActor(ACTOR_LANTERN, MODEL_LANTERN)
+{
+	SetYaw(0.3f);
+	emissive = 0.4f;
+	shadowRadius = 0.6f;
+	collider.shape = COLLIDER_CIRCLE;
+	collider.radius = 0.5f;
+}
+
+ChunkActor::ChunkActor(const Chunk& chunk)
+	: Actor(ACTOR_CHUNK), cx(chunk.cx), cz(chunk.cz), stage(chunk.stage), hash(chunk.hash)
+{
+	// Stays at the origin, so its props keep the map's world coordinates exactly.
+	layer = LAYER_GROUND;
+
+	for (size_t i = 0; i < chunk.props.size(); ++i)
+	{
+		const ChunkProp& p = chunk.props[i];
+		PropActor* prop = AddChild(new PropActor(ACTOR_PROP, p.model));
+		prop->SetPosition(p.pos);
+		prop->SetYaw(p.yaw);
+		prop->SetScale(Vec3(p.scale, p.scale, p.scale));
+		prop->phase = p.pos.x * 0.37f + p.pos.z * 0.21f;
+
+		if (p.radius > 0.0f)
+		{
+			prop->collider.shape = COLLIDER_CIRCLE;
+			prop->collider.radius = p.radius;
+		}
+	}
+}
+
+bool ChunkActor::IsDrawn(const DrawContext& dc) const
+{
+	int viewX, viewZ;
+	ChunkMap::ChunkCoords(dc.viewCenter, viewX, viewZ);
+	return visible && abs(cx - viewX) <= kChunkDrawRadius && abs(cz - viewZ) <= kChunkDrawRadius;
+}
+
+void ChunkActor::Draw(const DrawContext& dc) const
+{
+	GroundParams ground;
+	ground.stage = (float)stage;
+	for (int i = 0; i < 4; ++i)
+		ground.neighborStage[i] = neighborStage[i];
+	ground.chunkSize = kChunkSize;
+
+	// A hair of overlap hides cracks between neighbouring ground quads.
+	dc.renderer->DrawGround(ChunkMap::ChunkCenter(cx, cz), kChunkSize + 0.02f, ground);
+}
+
+EnemyActor::EnemyActor(int enemyType, int enemyLevel)
+	: Actor(ACTOR_ENEMY), type(enemyType), level(enemyLevel)
+{
+	collider.shape = COLLIDER_CIRCLE;
+	collider.radius = GetEnemyInfo(enemyType).radius;
+}
+
+void EnemyActor::Draw(const DrawContext& dc) const
+{
+	const EnemyInfo& info = GetEnemyInfo(type);
+
+	float size = 1.0f + 0.06f * (float)(level - 1);
+	float squash = alive ? 1.0f : 0.2f + 0.8f * Saturatef(stateTimer / kDyingTime);
+
+	DrawParams params;
+	params.phase = (float)(spawnIndex + 1) * 1.7f + home.x;
+	params.flash = flash;
+
+	// A reddening windup is the tell to roll.
+	if (state == ENEMY_WINDUP)
+	{
+		float w = 1.0f - Saturatef(stateTimer / info.windup);
+		params.tint = Vec3(1.0f, 1.0f - 0.55f * w, 1.0f - 0.55f * w);
+		params.emissive = 0.25f * w;
+	}
+
+	Mat4 model = Mul(WorldMatrix(), MatScale(Vec3(size, size * squash, size)));
+	if (alive) dc.renderer->DrawShadow(WorldPosition(), info.radius * 1.1f * size);
+	dc.renderer->DrawModel(info.model, model, params);
+}
+
+ItemActor::ItemActor(int itemType)
+	: Actor(ACTOR_ITEM), type(itemType)
+{
+	SetScale(Vec3(1.2f, 1.2f, 1.2f));
+}
+
+void ItemActor::Draw(const DrawContext& dc) const
+{
+	DrawParams params;
+	params.phase = phase;
+	params.emissive = 0.35f;
+
+	dc.renderer->DrawShadow(WorldPosition(), 0.3f);
+	dc.renderer->DrawModel(GetItemInfo(type).model, WorldMatrix(), params);
 }

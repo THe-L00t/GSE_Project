@@ -1,13 +1,11 @@
 #include "stdafx.h"
 #include "Game.h"
 
-#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
 
 #include "Collision.h"
-#include "Models.h"
 #include "Random.h"
 
 namespace
@@ -17,9 +15,8 @@ namespace
 
 	const int kStreamRadius = 2;   // chunks kept generated around the player
 	const int kSimRadius = 1;      // chunks whose creatures and finds are live
-	const int kDrawRadius = 1;     // chunks drawn around the camera; covers the orthographic view
+	const int kKeepRadius = kStreamRadius + 2;   // chunk actors kept; creatures at the edge look further out
 
-	const float kLanternRadius = 4.5f;
 	const float kSleepDuration = 2.2f;
 	const float kSporeDrain = 4.0f;  // health per second once exposure is full
 
@@ -35,23 +32,28 @@ void Game::StartRoute()
 	prompt.clear();
 
 	levelNode->Destroy();
-	levelNode = worldNode->AddChild(new Actor(ACTOR_NODE));
 	water = nullptr;
 	letter = nullptr;
 	villageExit = nullptr;
 	targetSleeper = nullptr;
 
+	// Chunks first and creatures last: the order they are drawn in.
+	levelNode = worldNode->AddChild(new Actor(ACTOR_NODE));
+	chunkGroup = levelNode->AddChild(new Actor(ACTOR_NODE));
+	lantern = levelNode->AddChild(new LanternActor());
+	lantern->SetPosition(Vec3(2.5f, 0.0f, -8.5f));
+	safePoint = levelNode->AddChild(new Actor(ACTOR_SAFE_POINT));
+	safePoint->SetPosition(Vec3(0.0f, 0.0f, -7.0f));
+	itemGroup = levelNode->AddChild(new Actor(ACTOR_NODE));
+	enemyGroup = levelNode->AddChild(new Actor(ACTOR_NODE));
+
 	uint64_t seed = kRouteSeed != 0 ? kRouteSeed : MixSeed((uint64_t)std::time(nullptr));
 	routeMap.Reset(seed);
+	chunkActors.clear();
 	chunkStates.clear();
-	enemies.clear();
-	worldItems.clear();
 	popups.clear();
 
-	safePoint = Vec3(0.0f, 0.0f, -7.0f);
-	lanternPos = Vec3(2.5f, 0.0f, -8.5f);
-
-	player->SetPosition(safePoint);
+	player->SetPosition(safePoint->Position());
 	player->SetYaw(0.0f);
 	player->rollTimer = 0.0f;
 	player->rollAngle = 0.0f;
@@ -90,13 +92,13 @@ void Game::UpdateRoute(float dt, const bool* keys)
 	UpdateGuide();
 
 	// Deeper, more overgrown chunks carry thicker spores. Insight and dream fragments slow it.
-	const Chunk& here = routeMap.Get(playerChunkX, playerChunkZ);
+	const ChunkActor* here = EnsureChunk(playerChunkX, playerChunkZ);
 	float fragmentGuard = Maxf(1.0f - 0.18f * (float)fragments, 0.3f);
-	float rate = 0.012f * (float)here.stage * fragmentGuard * SporeResistance(stats);
+	float rate = 0.012f * (float)here->stage * fragmentGuard * SporeResistance(stats);
 	if (player->rollTimer > 0.0f) rate = 0.0f;
 
 	// The lantern clears the air and mends wounds.
-	if (DistXZ(player->Position(), lanternPos) < kLanternRadius && deathTimer < 0.0f)
+	if (DistXZ(player->Position(), lantern->WorldPosition()) < lantern->zoneRadius && deathTimer < 0.0f)
 	{
 		rate = -0.08f;
 		health = Minf(health + 3.0f * dt, MaxHealth(stats));
@@ -221,7 +223,22 @@ void Game::StreamChunks()
 	for (int dz = -kStreamRadius; dz <= kStreamRadius; ++dz)
 	{
 		for (int dx = -kStreamRadius; dx <= kStreamRadius; ++dx)
-			routeMap.Get(playerChunkX + dx, playerChunkZ + dz);
+			EnsureChunk(playerChunkX + dx, playerChunkZ + dz);
+	}
+
+	// Dropped chunk actors are rebuilt from the map when they are needed again.
+	for (std::unordered_map<uint64_t, ChunkActor*>::iterator it = chunkActors.begin(); it != chunkActors.end();)
+	{
+		ChunkActor* chunk = it->second;
+		if (abs(chunk->cx - playerChunkX) > kKeepRadius || abs(chunk->cz - playerChunkZ) > kKeepRadius)
+		{
+			chunk->Destroy();
+			it = chunkActors.erase(it);
+		}
+		else
+		{
+			++it;
+		}
 	}
 }
 
@@ -272,14 +289,53 @@ void Game::ActivateChunk(int cx, int cz)
 void Game::DeactivateChunk(ChunkState& state)
 {
 	state.active = false;
-	int cx = state.cx;
-	int cz = state.cz;
 
-	enemies.erase(std::remove_if(enemies.begin(), enemies.end(),
-		[cx, cz](const Enemy& e) { return e.spawnIndex >= 0 && e.chunkX == cx && e.chunkZ == cz; }), enemies.end());
+	std::vector<EnemyActor*> enemies = LiveEnemies();
+	for (size_t i = 0; i < enemies.size(); ++i)
+	{
+		EnemyActor* e = enemies[i];
+		if (e->spawnIndex >= 0 && e->chunkX == state.cx && e->chunkZ == state.cz) e->Destroy();
+	}
 
-	worldItems.erase(std::remove_if(worldItems.begin(), worldItems.end(),
-		[cx, cz](const WorldItem& item) { return item.spawnIndex >= 0 && item.chunkX == cx && item.chunkZ == cz; }), worldItems.end());
+	std::vector<ItemActor*> items = LiveItems();
+	for (size_t i = 0; i < items.size(); ++i)
+	{
+		ItemActor* item = items[i];
+		if (item->spawnIndex >= 0 && item->chunkX == state.cx && item->chunkZ == state.cz) item->Destroy();
+	}
+}
+
+ChunkActor* Game::EnsureChunk(int cx, int cz)
+{
+	uint64_t key = ChunkMap::Key(cx, cz);
+	std::unordered_map<uint64_t, ChunkActor*>::iterator found = chunkActors.find(key);
+	if (found != chunkActors.end()) return found->second;
+
+	ChunkActor* chunk = chunkGroup->AddChild(new ChunkActor(routeMap.Get(cx, cz)));
+	chunkActors[key] = chunk;
+	return chunk;
+}
+
+void Game::PrepareChunkView()
+{
+	// The ground blends toward each neighbour's stage, so a chunk needs them before it is drawn.
+	int cx, cz;
+	ChunkMap::ChunkCoords(camera->Position(), cx, cz);
+
+	for (int dz = -kChunkDrawRadius; dz <= kChunkDrawRadius; ++dz)
+	{
+		for (int dx = -kChunkDrawRadius; dx <= kChunkDrawRadius; ++dx)
+		{
+			ChunkActor* c = EnsureChunk(cx + dx, cz + dz);
+			if (c->hasNeighborStages) continue;
+
+			c->neighborStage[0] = (float)routeMap.Get(c->cx - 1, c->cz).stage;
+			c->neighborStage[1] = (float)routeMap.Get(c->cx + 1, c->cz).stage;
+			c->neighborStage[2] = (float)routeMap.Get(c->cx, c->cz - 1).stage;
+			c->neighborStage[3] = (float)routeMap.Get(c->cx, c->cz + 1).stage;
+			c->hasNeighborStages = true;
+		}
+	}
 }
 
 void Game::ResolveRouteCollisions(Vec3& pos, float radius)
@@ -291,57 +347,17 @@ void Game::ResolveRouteCollisions(Vec3& pos, float radius)
 	{
 		for (int dx = -1; dx <= 1; ++dx)
 		{
-			const Chunk& c = routeMap.Get(cx + dx, cz + dz);
-			for (size_t i = 0; i < c.props.size(); ++i)
+			const ChunkActor* c = EnsureChunk(cx + dx, cz + dz);
+			for (size_t i = 0; i < c->ChildCount(); ++i)
 			{
-				if (c.props[i].radius > 0.0f)
-					PushOutOfCircle(pos, radius, c.props[i].pos, c.props[i].radius);
+				const Actor* prop = c->Child(i);
+				if (prop->collider.shape == COLLIDER_CIRCLE)
+					PushOutOfCircle(pos, radius, prop->WorldPosition(), prop->collider.radius);
 			}
 		}
 	}
 
-	PushOutOfCircle(pos, radius, lanternPos, 0.5f);
-}
-
-void Game::DrawRoute()
-{
-	int cx, cz;
-	ChunkMap::ChunkCoords(camera->Position(), cx, cz);
-
-	for (int dz = -kDrawRadius; dz <= kDrawRadius; ++dz)
-	{
-		for (int dx = -kDrawRadius; dx <= kDrawRadius; ++dx)
-		{
-			const Chunk& c = routeMap.Get(cx + dx, cz + dz);
-
-			GroundParams ground;
-			ground.stage = (float)c.stage;
-			ground.neighborStage[0] = (float)routeMap.Get(c.cx - 1, c.cz).stage;
-			ground.neighborStage[1] = (float)routeMap.Get(c.cx + 1, c.cz).stage;
-			ground.neighborStage[2] = (float)routeMap.Get(c.cx, c.cz - 1).stage;
-			ground.neighborStage[3] = (float)routeMap.Get(c.cx, c.cz + 1).stage;
-			ground.chunkSize = kChunkSize;
-
-			// A hair of overlap hides cracks between neighbouring ground quads.
-			renderer->DrawGround(ChunkMap::ChunkCenter(c.cx, c.cz), kChunkSize + 0.02f, ground);
-
-			for (size_t i = 0; i < c.props.size(); ++i)
-			{
-				const ChunkProp& p = c.props[i];
-				DrawParams params;
-				params.phase = p.pos.x * 0.37f + p.pos.z * 0.21f;
-				renderer->DrawModel(p.model, p.pos, p.yaw, Vec3(p.scale, p.scale, p.scale), params);
-			}
-		}
-	}
-
-	DrawParams lantern;
-	lantern.emissive = 0.4f;
-	renderer->DrawShadow(lanternPos, 0.6f);
-	renderer->DrawModel(MODEL_LANTERN, lanternPos, 0.3f, Vec3(1.0f, 1.0f, 1.0f), lantern);
-
-	DrawItems();
-	DrawEnemies();
+	PushOutOfCircle(pos, radius, lantern->WorldPosition(), lantern->collider.radius);
 }
 
 void Game::DrawRouteHud()
@@ -352,11 +368,11 @@ void Game::DrawRouteHud()
 	GuideText(objective, sizeof(objective));
 	DrawObjective(objective);
 
-	const Chunk& here = routeMap.Get(playerChunkX, playerChunkZ);
+	const ChunkActor* here = EnsureChunk(playerChunkX, playerChunkZ);
 	char lines[4][96];
 	sprintf_s(lines[0], sizeof(lines[0]), "Seed  %016llX", (unsigned long long)routeMap.WorldSeed());
-	sprintf_s(lines[1], sizeof(lines[1]), "Chunk (%d, %d)  stage %d", here.cx, here.cz, here.stage);
-	sprintf_s(lines[2], sizeof(lines[2]), "Chunk hash  %016llX", (unsigned long long)here.hash);
+	sprintf_s(lines[1], sizeof(lines[1]), "Chunk (%d, %d)  stage %d", here->cx, here->cz, here->stage);
+	sprintf_s(lines[2], sizeof(lines[2]), "Chunk hash  %016llX", (unsigned long long)here->hash);
 	sprintf_s(lines[3], sizeof(lines[3]), "Chunks grown  %d", routeMap.GeneratedCount());
 
 	int boxW = 0;

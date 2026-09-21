@@ -1,10 +1,26 @@
 #pragma once
 
+#include <cstdint>
+
 #include "Actor.h"
+#include "ChunkMap.h"
 #include "Renderer.h"
+#include "Rpg.h"
 
 const float kPlayerRadius = 0.38f;
 const float kSwingTime = 0.22f;
+const float kDyingTime = 0.6f;
+const int   kChunkDrawRadius = 1;   // chunks drawn around the camera; covers the orthographic view
+
+enum EnemyState
+{
+	ENEMY_IDLE,
+	ENEMY_CHASE,
+	ENEMY_WINDUP,
+	ENEMY_STRIKE,
+	ENEMY_RECOVER,
+	ENEMY_DYING
+};
 
 class CameraActor : public Actor
 {
@@ -112,4 +128,68 @@ public:
 	ExitActor();
 
 	bool Contains(const Vec3& pos) const { return pos.z > WorldPosition().z; }
+};
+
+class LanternActor : public PropActor
+{
+public:
+	LanternActor();
+
+	float zoneRadius = 4.5f;      // clears the spores and mends wounds within
+};
+
+// Ground and props of one generated chunk.
+class ChunkActor : public Actor
+{
+public:
+	explicit ChunkActor(const Chunk& chunk);
+
+	bool IsDrawn(const DrawContext& dc) const override;
+	void Draw(const DrawContext& dc) const override;
+
+	int      cx = 0;
+	int      cz = 0;
+	int      stage = 1;
+	uint64_t hash = 0;
+	bool     hasNeighborStages = false;
+	float    neighborStage[4] = { 0.0f, 0.0f, 0.0f, 0.0f };   // -x, +x, -z, +z
+};
+
+class EnemyActor : public Actor
+{
+public:
+	EnemyActor(int enemyType, int enemyLevel);
+
+	void Draw(const DrawContext& dc) const override;
+
+	int   type = ENEMY_SPORE_MITE;
+	int   level = 1;
+	Vec3  home;
+	Vec3  moveTarget;
+	Vec3  strikeDir;
+	Vec3  knockback;
+	float health = 1.0f;
+	float maxHealth = 1.0f;
+	int   state = ENEMY_IDLE;
+	float stateTimer = 0.0f;
+	bool  strikeHit = false;
+	bool  alive = true;
+	float flash = 0.0f;
+	int   chunkX = 0;
+	int   chunkZ = 0;
+	int   spawnIndex = -1;  // index into the owning chunk's spawns, -1 when scripted
+};
+
+class ItemActor : public Actor
+{
+public:
+	explicit ItemActor(int itemType);
+
+	void Draw(const DrawContext& dc) const override;
+
+	int   type = ITEM_HERB;
+	float phase = 0.0f;
+	int   chunkX = 0;
+	int   chunkZ = 0;
+	int   spawnIndex = -1;  // index into the owning chunk's items, -1 for drops and scripted items
 };

@@ -6,7 +6,6 @@
 #include <cstring>
 
 #include "Collision.h"
-#include "Models.h"
 
 namespace
 {
@@ -18,7 +17,6 @@ namespace
 	const float kRespawnDelay = 90.0f;
 	const float kHerbHeal = 0.4f;        // fraction of max health
 	const float kWaterClear = 0.45f;
-	const float kDyingTime = 0.6f;
 	const float kRelicXp = 12.0f;
 
 	const Vec3 kXpColor(0.75f, 0.95f, 0.55f);
@@ -33,16 +31,30 @@ namespace
 		return len > 1e-4f ? d * (1.0f / len) : Vec3(0.0f, 0.0f, 1.0f);
 	}
 
-	void MoveToward(Enemy& e, const Vec3& target, float speed, float dt)
+	void MoveToward(Vec3& pos, float& yaw, const Vec3& target, float speed, float dt)
 	{
-		Vec3 to(target.x - e.pos.x, 0.0f, target.z - e.pos.z);
+		Vec3 to(target.x - pos.x, 0.0f, target.z - pos.z);
 		float dist = Length(to);
 		if (dist < 0.05f) return;
 
 		float step = Minf(speed * dt, dist);
-		e.pos = e.pos + to * (step / dist);
-		e.yaw = atan2f(to.x, to.z);
+		pos = pos + to * (step / dist);
+		yaw = atan2f(to.x, to.z);
 	}
+}
+
+std::vector<EnemyActor*> Game::LiveEnemies() const
+{
+	std::vector<EnemyActor*> list;
+	if (enemyGroup) SceneGraph::Collect(enemyGroup, ACTOR_ENEMY, list);
+	return list;
+}
+
+std::vector<ItemActor*> Game::LiveItems() const
+{
+	std::vector<ItemActor*> list;
+	if (itemGroup) SceneGraph::Collect(itemGroup, ACTOR_ITEM, list);
+	return list;
 }
 
 void Game::Attack()
@@ -58,15 +70,15 @@ void Game::Attack()
 	float power = AttackPower(stats, player->weapon ? player->weapon->power : 0.0f);
 	float reach = player->weapon ? player->weapon->reach : kBareHandReach;
 
+	std::vector<EnemyActor*> enemies = LiveEnemies();
 	for (size_t i = 0; i < enemies.size(); ++i)
 	{
-		Enemy& e = enemies[i];
+		EnemyActor& e = *enemies[i];
 		if (!e.alive) continue;
 
-		const EnemyInfo& info = GetEnemyInfo(e.type);
-		Vec3 to(e.pos.x - playerPos.x, 0.0f, e.pos.z - playerPos.z);
+		Vec3 to(e.Position().x - playerPos.x, 0.0f, e.Position().z - playerPos.z);
 		float dist = Length(to);
-		if (dist > reach + info.radius) continue;
+		if (dist > reach + e.collider.radius) continue;
 
 		// A wide arc in front; point-blank enemies count wherever they stand.
 		if (dist > 0.6f && Dot(to * (1.0f / dist), facing) < 0.35f) continue;
@@ -75,7 +87,7 @@ void Game::Attack()
 	}
 }
 
-void Game::DamageEnemy(Enemy& e, float amount, const Vec3& push)
+void Game::DamageEnemy(EnemyActor& e, float amount, const Vec3& push)
 {
 	if (!e.alive) return;
 
@@ -86,7 +98,7 @@ void Game::DamageEnemy(Enemy& e, float amount, const Vec3& push)
 
 	char text[16];
 	sprintf_s(text, sizeof(text), "%d", (int)(amount + 0.5f));
-	AddPopup(e.pos + Vec3(0.0f, 1.2f + info.radius, 0.0f), text, kHitColor);
+	AddPopup(e.Position() + Vec3(0.0f, 1.2f + info.radius, 0.0f), text, kHitColor);
 
 	// Light creatures lose their windup when struck; the boar's charge cannot be stopped.
 	if (e.type != ENEMY_MOSS_BOAR && e.state == ENEMY_WINDUP)
@@ -102,7 +114,7 @@ void Game::DamageEnemy(Enemy& e, float amount, const Vec3& push)
 	if (e.health <= 0.0f) KillEnemy(e);
 }
 
-void Game::KillEnemy(Enemy& e)
+void Game::KillEnemy(EnemyActor& e)
 {
 	const EnemyInfo& info = GetEnemyInfo(e.type);
 	e.alive = false;
@@ -117,9 +129,9 @@ void Game::KillEnemy(Enemy& e)
 			state.respawnAt[e.spawnIndex] = time + kRespawnDelay;
 	}
 
-	if (combatRng.Chance(info.herbChance)) DropItem(ITEM_HERB, e.pos + Vec3(0.4f, 0.0f, 0.2f), 0, 0, -1);
-	if (combatRng.Chance(info.waterChance)) DropItem(ITEM_CLEAN_WATER, e.pos + Vec3(-0.4f, 0.0f, 0.1f), 0, 0, -1);
-	if (combatRng.Chance(info.relicChance)) DropItem(ITEM_RELIC, e.pos + Vec3(0.0f, 0.0f, -0.4f), 0, 0, -1);
+	if (combatRng.Chance(info.herbChance)) DropItem(ITEM_HERB, e.Position() + Vec3(0.4f, 0.0f, 0.2f), 0, 0, -1);
+	if (combatRng.Chance(info.waterChance)) DropItem(ITEM_CLEAN_WATER, e.Position() + Vec3(-0.4f, 0.0f, 0.1f), 0, 0, -1);
+	if (combatRng.Chance(info.relicChance)) DropItem(ITEM_RELIC, e.Position() + Vec3(0.0f, 0.0f, -0.4f), 0, 0, -1);
 
 	GrantXp(EnemyXpAt(info, e.level));
 }
@@ -154,17 +166,18 @@ void Game::WakeAtSafePoint()
 	deathTimer = -1.0f;
 	health = MaxHealth(stats);
 	sporeExposure = 0.2f;
-	player->SetPosition(safePoint);
+	player->SetPosition(safePoint->Position());
 	camera->SetPosition(player->Position());
 	player->rollTimer = 0.0f;
 	player->rollAngle = 0.0f;
 	player->hurtTimer = 1.5f;
 
+	std::vector<EnemyActor*> enemies = LiveEnemies();
 	for (size_t i = 0; i < enemies.size(); ++i)
 	{
-		if (!enemies[i].alive) continue;
-		enemies[i].state = ENEMY_IDLE;
-		enemies[i].stateTimer = 0.0f;
+		if (!enemies[i]->alive) continue;
+		enemies[i]->state = ENEMY_IDLE;
+		enemies[i]->stateTimer = 0.0f;
 	}
 
 	ShowMessage("You wake beside the lantern. Nothing is lost but time.", 4.0f);
@@ -172,39 +185,46 @@ void Game::WakeAtSafePoint()
 
 void Game::UpdateEnemies(float dt)
 {
+	std::vector<EnemyActor*> enemies = LiveEnemies();
 	for (size_t i = 0; i < enemies.size(); ++i)
-		UpdateEnemy(enemies[i], dt);
+		UpdateEnemy(*enemies[i], dt);
 
 	// Keep creatures from stacking into one another.
 	for (size_t i = 0; i < enemies.size(); ++i)
 	{
 		for (size_t j = i + 1; j < enemies.size(); ++j)
 		{
-			if (!enemies[i].alive || !enemies[j].alive) continue;
-			PushOutOfCircle(enemies[i].pos, GetEnemyInfo(enemies[i].type).radius,
-							enemies[j].pos, GetEnemyInfo(enemies[j].type).radius);
+			if (!enemies[i]->alive || !enemies[j]->alive) continue;
+			Vec3 pos = enemies[i]->Position();
+			PushOutOfCircle(pos, enemies[i]->collider.radius, enemies[j]->Position(), enemies[j]->collider.radius);
+			enemies[i]->SetPosition(pos);
 		}
 	}
 
-	enemies.erase(std::remove_if(enemies.begin(), enemies.end(),
-		[](const Enemy& e) { return !e.alive && e.stateTimer <= 0.0f; }), enemies.end());
+	for (size_t i = 0; i < enemies.size(); ++i)
+	{
+		if (!enemies[i]->alive && enemies[i]->stateTimer <= 0.0f) enemies[i]->Destroy();
+	}
 }
 
-void Game::UpdateEnemy(Enemy& e, float dt)
+void Game::UpdateEnemy(EnemyActor& e, float dt)
 {
 	const EnemyInfo& info = GetEnemyInfo(e.type);
+	Vec3 pos = e.Position();
+	float yaw = e.Yaw();
 
 	e.flash = Maxf(e.flash - dt * 4.0f, 0.0f);
-	e.pos = e.pos + e.knockback * dt;
+	pos = pos + e.knockback * dt;
 	e.knockback = e.knockback * expf(-8.0f * dt);
 
 	if (!e.alive)
 	{
 		e.stateTimer -= dt;
+		e.SetPosition(pos);
 		return;
 	}
 
-	Vec3 toPlayer(player->Position().x - e.pos.x, 0.0f, player->Position().z - e.pos.z);
+	Vec3 toPlayer(player->Position().x - pos.x, 0.0f, player->Position().z - pos.z);
 	float dist = Length(toPlayer);
 	Vec3 toPlayerDir = FlatDirection(toPlayer);
 	bool playerAwake = deathTimer < 0.0f;
@@ -219,12 +239,12 @@ void Game::UpdateEnemy(Enemy& e, float dt)
 			e.moveTarget = e.home + Vec3(combatRng.Range(-4.0f, 4.0f), 0.0f, combatRng.Range(-4.0f, 4.0f));
 			e.stateTimer = combatRng.Range(2.0f, 4.5f);
 		}
-		MoveToward(e, e.moveTarget, speed * 0.35f, dt);
+		MoveToward(pos, yaw, e.moveTarget, speed * 0.35f, dt);
 		if (playerAwake && dist < info.aggroRange) e.state = ENEMY_CHASE;
 		break;
 
 	case ENEMY_CHASE:
-		if (!playerAwake || dist > info.aggroRange * 1.8f || DistXZ(e.pos, e.home) > 22.0f)
+		if (!playerAwake || dist > info.aggroRange * 1.8f || DistXZ(pos, e.home) > 22.0f)
 		{
 			e.state = ENEMY_IDLE;
 			e.moveTarget = e.home;
@@ -238,14 +258,14 @@ void Game::UpdateEnemy(Enemy& e, float dt)
 		}
 		else
 		{
-			MoveToward(e, player->Position(), speed, dt);
+			MoveToward(pos, yaw, player->Position(), speed, dt);
 		}
 		break;
 
 	case ENEMY_WINDUP:
 		// The boar commits to its line when the windup starts; smaller creatures keep tracking.
 		if (e.type != ENEMY_MOSS_BOAR) e.strikeDir = toPlayerDir;
-		e.yaw = atan2f(e.strikeDir.x, e.strikeDir.z);
+		yaw = atan2f(e.strikeDir.x, e.strikeDir.z);
 		e.stateTimer -= dt;
 		if (e.stateTimer <= 0.0f)
 		{
@@ -256,12 +276,12 @@ void Game::UpdateEnemy(Enemy& e, float dt)
 		break;
 
 	case ENEMY_STRIKE:
-		if (info.lunge > 0.0f) e.pos = e.pos + e.strikeDir * (info.lunge * dt);
+		if (info.lunge > 0.0f) pos = pos + e.strikeDir * (info.lunge * dt);
 
 		if (!e.strikeHit && playerAwake)
 		{
 			bool hit = (info.lunge > 0.0f)
-				? (dist < info.radius + player->collider.radius + 0.25f)
+				? (dist < e.collider.radius + player->collider.radius + 0.25f)
 				: (dist < info.attackRange + 0.3f && Dot(toPlayerDir, e.strikeDir) > 0.3f);
 			if (hit)
 			{
@@ -287,33 +307,34 @@ void Game::UpdateEnemy(Enemy& e, float dt)
 		break;
 	}
 
-	ResolveRouteCollisions(e.pos, info.radius);
+	ResolveRouteCollisions(pos, e.collider.radius);
 	if (e.state != ENEMY_STRIKE && playerAwake)
-		PushOutOfCircle(e.pos, info.radius, player->Position(), player->collider.radius);
+		PushOutOfCircle(pos, e.collider.radius, player->Position(), player->collider.radius);
+
+	e.SetPosition(pos);
+	e.SetYaw(yaw);
 }
 
 void Game::UpdateItems()
 {
-	for (size_t i = 0; i < worldItems.size(); ++i)
+	std::vector<ItemActor*> items = LiveItems();
+	for (size_t i = 0; i < items.size(); ++i)
 	{
-		WorldItem& item = worldItems[i];
+		ItemActor& item = *items[i];
 
 		// Drops that fall far behind are forgotten. The pipe stays: the guide waits for it.
-		if (item.spawnIndex < 0 && item.type != ITEM_RUSTY_PIPE && DistXZ(player->Position(), item.pos) > 60.0f)
+		if (item.spawnIndex < 0 && item.type != ITEM_RUSTY_PIPE && DistXZ(player->Position(), item.Position()) > 60.0f)
 		{
-			item.taken = true;
+			item.Destroy();
 			continue;
 		}
 
-		if (deathTimer < 0.0f && DistXZ(player->Position(), item.pos) < kPickupRange)
+		if (deathTimer < 0.0f && DistXZ(player->Position(), item.Position()) < kPickupRange)
 		{
-			item.taken = true;
+			item.Destroy();
 			PickUp(item);
 		}
 	}
-
-	worldItems.erase(std::remove_if(worldItems.begin(), worldItems.end(),
-		[](const WorldItem& item) { return item.taken; }), worldItems.end());
 }
 
 void Game::UpdateCombatTimers(float dt)
@@ -338,35 +359,30 @@ void Game::SpawnEnemy(int type, int enemyLevel, const Vec3& pos, int chunkX, int
 {
 	const EnemyInfo& info = GetEnemyInfo(type);
 
-	Enemy e;
-	e.type = type;
-	e.level = enemyLevel;
-	e.pos = pos;
-	e.home = pos;
-	e.moveTarget = pos;
-	e.maxHealth = EnemyHealthAt(info, enemyLevel);
-	e.health = e.maxHealth;
-	e.yaw = combatRng.Range(0.0f, 2.0f * kPi);
-	e.stateTimer = combatRng.Range(0.5f, 2.0f);
-	e.chunkX = chunkX;
-	e.chunkZ = chunkZ;
-	e.spawnIndex = spawnIndex;
-	enemies.push_back(e);
+	EnemyActor* e = enemyGroup->AddChild(new EnemyActor(type, enemyLevel));
+	e->SetPosition(pos);
+	e->home = pos;
+	e->moveTarget = pos;
+	e->maxHealth = EnemyHealthAt(info, enemyLevel);
+	e->health = e->maxHealth;
+	e->SetYaw(combatRng.Range(0.0f, 2.0f * kPi));
+	e->stateTimer = combatRng.Range(0.5f, 2.0f);
+	e->chunkX = chunkX;
+	e->chunkZ = chunkZ;
+	e->spawnIndex = spawnIndex;
 }
 
 void Game::DropItem(int type, const Vec3& pos, int chunkX, int chunkZ, int spawnIndex)
 {
-	WorldItem item;
-	item.type = type;
-	item.pos = Vec3(pos.x, 0.0f, pos.z);
-	item.phase = combatRng.Range(0.0f, 6.0f);
-	item.chunkX = chunkX;
-	item.chunkZ = chunkZ;
-	item.spawnIndex = spawnIndex;
-	worldItems.push_back(item);
+	ItemActor* item = itemGroup->AddChild(new ItemActor(type));
+	item->SetPosition(Vec3(pos.x, 0.0f, pos.z));
+	item->phase = combatRng.Range(0.0f, 6.0f);
+	item->chunkX = chunkX;
+	item->chunkZ = chunkZ;
+	item->spawnIndex = spawnIndex;
 }
 
-void Game::PickUp(WorldItem& item)
+void Game::PickUp(ItemActor& item)
 {
 	const ItemInfo& info = GetItemInfo(item.type);
 	ShowMessage(info.pickupText, 3.5f);
@@ -540,49 +556,6 @@ void Game::ConfirmStats()
 	ShowMessage(buf, 3.0f);
 }
 
-void Game::DrawEnemies()
-{
-	for (size_t i = 0; i < enemies.size(); ++i)
-	{
-		const Enemy& e = enemies[i];
-		const EnemyInfo& info = GetEnemyInfo(e.type);
-
-		float scale = 1.0f + 0.06f * (float)(e.level - 1);
-		float squash = e.alive ? 1.0f : 0.2f + 0.8f * Saturatef(e.stateTimer / kDyingTime);
-
-		DrawParams params;
-		params.phase = (float)(e.spawnIndex + 1) * 1.7f + e.home.x;
-		params.flash = e.flash;
-
-		// A reddening windup is the tell to roll.
-		if (e.state == ENEMY_WINDUP)
-		{
-			float w = 1.0f - Saturatef(e.stateTimer / info.windup);
-			params.tint = Vec3(1.0f, 1.0f - 0.55f * w, 1.0f - 0.55f * w);
-			params.emissive = 0.25f * w;
-		}
-
-		Mat4 model = Mul(Mul(MatTranslate(e.pos), MatRotateY(e.yaw)), MatScale(Vec3(scale, scale * squash, scale)));
-		if (e.alive) renderer->DrawShadow(e.pos, info.radius * 1.1f * scale);
-		renderer->DrawModel(info.model, model, params);
-	}
-}
-
-void Game::DrawItems()
-{
-	for (size_t i = 0; i < worldItems.size(); ++i)
-	{
-		const WorldItem& item = worldItems[i];
-
-		DrawParams params;
-		params.phase = item.phase;
-		params.emissive = 0.35f;
-
-		renderer->DrawShadow(item.pos, 0.3f);
-		renderer->DrawModel(GetItemInfo(item.type).model, item.pos, 0.0f, Vec3(1.2f, 1.2f, 1.2f), params);
-	}
-}
-
 void Game::DrawPopups()
 {
 	for (size_t i = 0; i < popups.size(); ++i)
@@ -602,14 +575,15 @@ void Game::DrawCombatHud()
 	const int w = renderer->GetWidth();
 	const int h = renderer->GetHeight();
 
+	std::vector<EnemyActor*> enemies = LiveEnemies();
 	for (size_t i = 0; i < enemies.size(); ++i)
 	{
-		const Enemy& e = enemies[i];
+		const EnemyActor& e = *enemies[i];
 		if (!e.alive || e.health >= e.maxHealth) continue;
 
 		const EnemyInfo& info = GetEnemyInfo(e.type);
 		float sx, sy;
-		if (!renderer->WorldToScreen(e.pos + Vec3(0.0f, 1.3f + info.radius, 0.0f), sx, sy)) continue;
+		if (!renderer->WorldToScreen(e.Position() + Vec3(0.0f, 1.3f + info.radius, 0.0f), sx, sy)) continue;
 		renderer->DrawBarPx(sx - 22.0f, sy - 4.0f, 44.0f, 5.0f, e.health / e.maxHealth,
 							Vec3(0.80f, 0.30f, 0.25f), Vec3(0.95f, 0.75f, 0.35f));
 	}

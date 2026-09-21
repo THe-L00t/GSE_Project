@@ -180,7 +180,7 @@ void Game::Render()
 	renderer->SetFrame(timeOfDay, sporeExposure, view, time);
 	camera->Apply(renderer);
 
-	if (level == LEVEL_ROUTE) DrawRoute();
+	if (level == LEVEL_ROUTE) PrepareChunkView();
 
 	player->UpdatePose(deathTimer);
 	scene.Draw(renderer, view);

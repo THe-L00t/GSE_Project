@@ -46,49 +46,6 @@ enum RouteGuide
 	GUIDE_EXPLORE
 };
 
-enum EnemyState
-{
-	ENEMY_IDLE,
-	ENEMY_CHASE,
-	ENEMY_WINDUP,
-	ENEMY_STRIKE,
-	ENEMY_RECOVER,
-	ENEMY_DYING
-};
-
-struct Enemy
-{
-	int   type = ENEMY_SPORE_MITE;
-	int   level = 1;
-	Vec3  pos;
-	Vec3  home;
-	Vec3  moveTarget;
-	Vec3  strikeDir;
-	Vec3  knockback;
-	float yaw = 0.0f;
-	float health = 1.0f;
-	float maxHealth = 1.0f;
-	int   state = ENEMY_IDLE;
-	float stateTimer = 0.0f;
-	bool  strikeHit = false;
-	bool  alive = true;
-	float flash = 0.0f;
-	int   chunkX = 0;
-	int   chunkZ = 0;
-	int   spawnIndex = -1;  // index into the owning chunk's spawns, -1 when scripted
-};
-
-struct WorldItem
-{
-	int   type = ITEM_HERB;
-	Vec3  pos;
-	float phase = 0.0f;
-	bool  taken = false;
-	int   chunkX = 0;
-	int   chunkZ = 0;
-	int   spawnIndex = -1;  // index into the owning chunk's items, -1 for drops and scripted items
-};
-
 struct Popup
 {
 	Vec3  pos;
@@ -159,25 +116,28 @@ private:
 	void UpdateChunkActivation();
 	void ActivateChunk(int cx, int cz);
 	void DeactivateChunk(ChunkState& state);
+	ChunkActor* EnsureChunk(int cx, int cz);
+	void PrepareChunkView();
 	void ResolveRouteCollisions(Vec3& pos, float radius);
-	void DrawRoute();
 	void DrawRouteHud();
 	void DrawGuideCard();
 
 	// GameCombat.cpp: attacks, creatures, items and growth
+	std::vector<EnemyActor*> LiveEnemies() const;
+	std::vector<ItemActor*>  LiveItems() const;
 	void Attack();
-	void DamageEnemy(Enemy& e, float amount, const Vec3& push);
-	void KillEnemy(Enemy& e);
+	void DamageEnemy(EnemyActor& e, float amount, const Vec3& push);
+	void KillEnemy(EnemyActor& e);
 	void DamagePlayer(float amount, const Vec3& push);
 	void FallAsleep(const char* reason);
 	void WakeAtSafePoint();
 	void UpdateEnemies(float dt);
-	void UpdateEnemy(Enemy& e, float dt);
+	void UpdateEnemy(EnemyActor& e, float dt);
 	void UpdateItems();
 	void UpdateCombatTimers(float dt);
 	void SpawnEnemy(int type, int enemyLevel, const Vec3& pos, int chunkX, int chunkZ, int spawnIndex);
 	void DropItem(int type, const Vec3& pos, int chunkX, int chunkZ, int spawnIndex);
-	void PickUp(WorldItem& item);
+	void PickUp(ItemActor& item);
 	void EquipWeapon();
 	void UseHerb();
 	void UseWater();
@@ -187,8 +147,6 @@ private:
 	void CloseStatPanel();
 	void HandleStatPanelKey(unsigned char key);
 	void ConfirmStats();
-	void DrawEnemies();
-	void DrawItems();
 	void DrawCombatHud();
 	void DrawPopups();
 	void DrawStatPanel();
@@ -218,8 +176,12 @@ private:
 	ChunkMap routeMap;
 	int   playerChunkX = 0;
 	int   playerChunkZ = 0;
-	Vec3  safePoint;
-	Vec3  lanternPos;
+	Actor*        chunkGroup = nullptr;
+	Actor*        itemGroup = nullptr;
+	Actor*        enemyGroup = nullptr;
+	LanternActor* lantern = nullptr;
+	Actor*        safePoint = nullptr;   // where the long sleep ends
+	std::unordered_map<uint64_t, ChunkActor*> chunkActors;
 	std::unordered_map<uint64_t, ChunkState> chunkStates;
 	int   guide = GUIDE_TAKE_PIPE;
 	int   guideBaseline = 0;      // counter value when the current guide step began
@@ -231,9 +193,7 @@ private:
 	float levelUpTimer = 0.0f;
 	Rng   combatRng{ 0x5EED5EEDULL };
 
-	std::vector<Enemy>     enemies;
-	std::vector<WorldItem> worldItems;
-	std::vector<Popup>     popups;
+	std::vector<Popup> popups;
 
 	bool  statPanelOpen = false;
 	int   statCursor = 0;
