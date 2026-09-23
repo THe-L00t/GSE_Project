@@ -307,6 +307,13 @@ void Renderer::BeginFrame()
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
+int Renderer::TakeDrawCalls()
+{
+	int count = drawCalls;
+	drawCalls = 0;
+	return count;
+}
+
 void Renderer::SetCamera(const Mat4& view, const Mat4& proj, const Vec3& eye, float pxPerUnit)
 {
 	viewProj = Mul(proj, view);
@@ -376,6 +383,7 @@ void Renderer::DrawMesh(int id)
 	glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, stride, (void*)(sizeof(float) * 9));
 
 	glDrawArrays(GL_TRIANGLES, 0, meshes[id].count);
+	++drawCalls;
 
 	glDisableVertexAttribArray(0);
 	glDisableVertexAttribArray(1);
@@ -456,6 +464,7 @@ void Renderer::DrawSpores(const Vec3& center, const Vec3& field, const Vec3& col
 	glDepthMask(GL_FALSE);
 
 	glDrawArrays(GL_POINTS, 0, sporeCount);
+	++drawCalls;
 
 	glDepthMask(GL_TRUE);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -499,6 +508,7 @@ void Renderer::DrawOverlayQuad(float rx, float ry, float rw, float rh, const Ove
 	glVertexAttribPointer(overlay.positionAttrib, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, 0);
 
 	glDrawArrays(GL_TRIANGLES, 0, 6);
+	++drawCalls;
 
 	glDisableVertexAttribArray(overlay.positionAttrib);
 }
@@ -608,6 +618,7 @@ void Renderer::DrawSolidRect(float x, float y, float z, float size, float r, flo
 	glVertexAttribPointer(attribPosition, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, 0);
 
 	glDrawArrays(GL_TRIANGLES, 0, 6);
+	++drawCalls;
 
 	glDisableVertexAttribArray(attribPosition);
 }

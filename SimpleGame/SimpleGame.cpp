@@ -22,6 +22,10 @@ Game*     g_Game = NULL;
 bool g_Keys[256] = { false };
 int  g_PrevTime = 0;
 
+int g_StatsStart = 0;
+int g_StatsFrames = 0;
+int g_StatsDrawCalls = 0;
+
 static unsigned char NormalizeKey(unsigned char key)
 {
 	if (key >= 'A' && key <= 'Z') return key - 'A' + 'a';
@@ -32,6 +36,25 @@ void RenderScene(void)
 {
 	if (g_Game) g_Game->Render();
 	glutSwapBuffers();
+
+	if (g_Renderer == NULL) return;
+
+	++g_StatsFrames;
+	g_StatsDrawCalls += g_Renderer->TakeDrawCalls();
+
+	// One line per second; drawing to the console every frame would cost frames itself.
+	int now = glutGet(GLUT_ELAPSED_TIME);
+	int elapsed = now - g_StatsStart;
+	if (elapsed >= 1000)
+	{
+		int fps = (int)(g_StatsFrames * 1000.0f / (float)elapsed + 0.5f);
+		int drawCalls = (g_StatsDrawCalls + g_StatsFrames / 2) / g_StatsFrames;
+		std::cout << "FPS " << fps << " | Draw calls " << drawCalls << "\n";
+
+		g_StatsStart = now;
+		g_StatsFrames = 0;
+		g_StatsDrawCalls = 0;
+	}
 }
 
 void Idle(void)
@@ -163,6 +186,7 @@ int main(int argc, char **argv)
 	glutMouseFunc(MouseInput);
 
 	g_PrevTime = glutGet(GLUT_ELAPSED_TIME);
+	g_StatsStart = g_PrevTime;
 
 	glutMainLoop();
 

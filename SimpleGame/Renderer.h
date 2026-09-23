@@ -37,6 +37,9 @@ public:
 	int  GetWidth() const { return (int)windowSizeX; }
 	int  GetHeight() const { return (int)windowSizeY; }
 
+	// glDraw* calls since the last take; bitmap text is not counted.
+	int  TakeDrawCalls();
+
 	// Projects a world position to pixels, top-left origin. False when it is behind the camera.
 	bool WorldToScreen(const Vec3& pos, float& sx, float& sy) const;
 
@@ -179,4 +182,6 @@ private:
 	float timeOfDay = 0.0f;
 	float sporeExposure = 0.0f;
 	float time = 0.0f;
+
+	int drawCalls = 0;
 };
