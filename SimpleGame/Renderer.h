@@ -48,6 +48,10 @@ public:
 	void SetCamera(const Mat4& view, const Mat4& proj, const Vec3& eye, float pxPerUnit);
 	void SetFrame(float dayTime, float exposure, const Vec3& fogCenter, float seconds);
 
+	// Point lights for the lit shader; the first kMaxLights added each frame are kept.
+	void ClearLights();
+	void AddLight(const Vec3& pos, const Vec3& color, float radius);
+
 	void DrawModel(int id, const Mat4& model, const DrawParams& params);
 	void DrawModel(int id, const Vec3& pos, float yaw, const Vec3& scale, const DrawParams& params);
 	void DrawShadow(const Vec3& pos, float radius);
@@ -94,6 +98,9 @@ private:
 		GLint chunkCenter = -1;
 		GLint chunkSize = -1;
 		GLint damp = -1;
+		GLint lightCount = -1;
+		GLint lightPos = -1;
+		GLint lightColor = -1;
 	};
 
 	struct OverlayLocations
@@ -182,6 +189,12 @@ private:
 	float timeOfDay = 0.0f;
 	float sporeExposure = 0.0f;
 	float time = 0.0f;
+
+	static const int kMaxLights = 8;   // matches kMaxLights in Lit.fs
+	float lightPos[kMaxLights * 4] = {};
+	float lightColor[kMaxLights * 3] = {};
+	int   lightCount = 0;
+	bool  lightsDirty = true;
 
 	int drawCalls = 0;
 };

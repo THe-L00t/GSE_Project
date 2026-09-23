@@ -89,6 +89,7 @@ private:
 	void DrawCommonHud(const char* help);
 	void DrawTitleCard(const char* title, const char* subtitle);
 	void ShowMessage(const char* text, float seconds);
+	void GatherLights(const Vec3& view);
 
 	// GameVillage.cpp: Mulangae Village, the tutorial
 	void BuildVillage();

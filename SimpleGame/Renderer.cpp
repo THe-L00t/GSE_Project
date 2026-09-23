@@ -124,6 +124,9 @@ void Renderer::CacheUniformLocations()
 	lit.chunkCenter = glGetUniformLocation(litShader, "u_ChunkCenter");
 	lit.chunkSize = glGetUniformLocation(litShader, "u_ChunkSize");
 	lit.damp = glGetUniformLocation(litShader, "u_Damp");
+	lit.lightCount = glGetUniformLocation(litShader, "u_LightCount");
+	lit.lightPos = glGetUniformLocation(litShader, "u_LightPos");
+	lit.lightColor = glGetUniformLocation(litShader, "u_LightColor");
 
 	overlay.rect = glGetUniformLocation(overlayShader, "u_Rect");
 	overlay.mode = glGetUniformLocation(overlayShader, "u_Mode");
@@ -342,6 +345,31 @@ void Renderer::SetFrame(float dayTime, float exposure, const Vec3& fogCenter, fl
 	time = seconds;
 }
 
+void Renderer::ClearLights()
+{
+	lightCount = 0;
+	lightsDirty = true;
+}
+
+void Renderer::AddLight(const Vec3& pos, const Vec3& color, float radius)
+{
+	if (lightCount >= kMaxLights) return;
+
+	float* p = &lightPos[lightCount * 4];
+	p[0] = pos.x;
+	p[1] = pos.y;
+	p[2] = pos.z;
+	p[3] = radius;
+
+	float* c = &lightColor[lightCount * 3];
+	c[0] = color.x;
+	c[1] = color.y;
+	c[2] = color.z;
+
+	++lightCount;
+	lightsDirty = true;
+}
+
 void Renderer::BindLit(const Mat4& model, const DrawParams& params, int mode)
 {
 	glUseProgram(litShader);
@@ -364,6 +392,15 @@ void Renderer::BindLit(const Mat4& model, const DrawParams& params, int mode)
 	glUniform3f(lit.fogOrigin, fogOrigin.x, fogOrigin.y, fogOrigin.z);
 	glUniform1f(lit.time, time);
 	glUniform3f(lit.camPos, camPos.x, camPos.y, camPos.z);
+
+	// Uniforms stay with the program, so the light list goes up once per change.
+	if (lightsDirty)
+	{
+		glUniform1i(lit.lightCount, lightCount);
+		glUniform4fv(lit.lightPos, kMaxLights, lightPos);
+		glUniform3fv(lit.lightColor, kMaxLights, lightColor);
+		lightsDirty = false;
+	}
 }
 
 void Renderer::DrawMesh(int id)

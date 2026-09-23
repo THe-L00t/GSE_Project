@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "Game.h"
 
+#include <algorithm>
 #include <cstdio>
 
 // On-screen text stays ASCII: the bitmap fonts freeglut ships cannot draw Hangul.
@@ -182,6 +183,7 @@ void Game::Render()
 	camera->Apply(renderer);
 
 	if (level == LEVEL_ROUTE) PrepareChunkView();
+	GatherLights(view);
 
 	player->UpdatePose(deathTimer);
 	scene.Draw(renderer, view);
@@ -202,6 +204,48 @@ void Game::Render()
 		DrawRouteHud();
 
 	renderer->EndUI();
+}
+
+void Game::GatherLights(const Vec3& view)
+{
+	struct Candidate
+	{
+		Vec3  pos;
+		Vec3  color;
+		float radius;
+		float dist;
+	};
+	std::vector<Candidate> lights;
+
+	std::vector<LanternActor*> lanterns;
+	SceneGraph::Collect(scene.Root(), ACTOR_LANTERN, lanterns);
+	for (size_t i = 0; i < lanterns.size(); ++i)
+	{
+		Vec3 pos = lanterns[i]->WorldPosition() + Vec3(0.0f, 1.45f, 0.0f);
+		lights.push_back({ pos, Vec3(1.00f, 0.70f, 0.38f) * 2.2f, 8.0f, DistXZ(pos, view) });
+	}
+
+	std::vector<SleeperActor*> sleepers;
+	SceneGraph::Collect(scene.Root(), ACTOR_SLEEPER, sleepers);
+	for (size_t i = 0; i < sleepers.size(); ++i)
+	{
+		if (sleepers[i]->mote == nullptr) continue;
+		Vec3 pos = sleepers[i]->mote->WorldPosition() + Vec3(0.0f, 1.05f, 0.2f);
+		lights.push_back({ pos, Vec3(0.45f, 0.95f, 0.78f) * 1.2f, 3.5f, DistXZ(pos, view) });
+	}
+
+	std::vector<ItemActor*> items = LiveItems();
+	for (size_t i = 0; i < items.size(); ++i)
+	{
+		Vec3 pos = items[i]->WorldPosition() + Vec3(0.0f, 0.5f, 0.0f);
+		lights.push_back({ pos, Vec3(0.70f, 0.95f, 0.75f) * 0.6f, 2.5f, DistXZ(pos, view) });
+	}
+
+	std::sort(lights.begin(), lights.end(), [](const Candidate& a, const Candidate& b) { return a.dist < b.dist; });
+
+	renderer->ClearLights();
+	for (size_t i = 0; i < lights.size(); ++i)
+		renderer->AddLight(lights[i].pos, lights[i].color, lights[i].radius);
 }
 
 void Game::DrawObjective(const char* text)

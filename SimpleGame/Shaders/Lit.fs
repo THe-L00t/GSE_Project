@@ -24,6 +24,11 @@ uniform vec2  u_ChunkCenter;
 uniform float u_ChunkSize;      // zero turns neighbour blending off
 uniform vec3  u_Damp;           // x, z, strength
 
+const int kMaxLights = 8;
+uniform int   u_LightCount;
+uniform vec4  u_LightPos[kMaxLights];     // xyz position, w radius
+uniform vec3  u_LightColor[kMaxLights];
+
 layout(location = 0) out vec4 FragColor;
 
 float hash21(vec2 p)
@@ -79,6 +84,30 @@ float BlendedStage(vec2 p)
 	return mix(stage, sz, wz);
 }
 
+// Slow cloud shadows drifting over everything; they keep large flat areas alive.
+float CloudShade(vec2 p)
+{
+	float c = fbm(p * 0.035 + vec2(u_Time * 0.012, u_Time * 0.007));
+	return mix(0.62, 1.0, smoothstep(0.38, 0.62, c));
+}
+
+vec3 PointLights(vec3 pos, vec3 n)
+{
+	vec3 sum = vec3(0.0);
+	for (int i = 0; i < kMaxLights; ++i)
+	{
+		if (i >= u_LightCount) break;
+		vec3 toLight = u_LightPos[i].xyz - pos;
+		float d = length(toLight);
+		float range = u_LightPos[i].w;
+		float falloff = clamp(1.0 - d / range, 0.0, 1.0);
+		falloff *= falloff;
+		float ndl = clamp(dot(n, toLight / max(d, 0.001)) * 0.6 + 0.4, 0.0, 1.0);
+		sum += u_LightColor[i] * falloff * ndl;
+	}
+	return sum;
+}
+
 void main()
 {
 	Env env = EnvAt(u_TimeOfDay);
@@ -126,6 +155,14 @@ void main()
 		base = mix(base, forest, smoothstep(0.55, 1.0, overgrowth) * 0.5 * patchMask);
 		base *= 0.85 + 0.30 * grain;
 
+		// Fine detail: grass tufts off the road, pebbles and cracks on it.
+		float tuft = valueNoise(p * vec2(4.1, 1.3)) * valueNoise(p * vec2(1.2, 3.7));
+		base *= mix(1.0, 0.80 + 0.35 * tuft, 1.0 - road);
+		float pebble = smoothstep(0.78, 0.86, valueNoise(p * 2.6 + 31.0));
+		base = mix(base, base * 1.35 + vec3(0.03), pebble * road * 0.6);
+		float crack = 1.0 - smoothstep(0.0, 0.035, abs(valueNoise(p * 0.9 + 7.0) - 0.5));
+		base *= 1.0 - crack * road * (1.0 - overgrowth) * 0.35;
+
 		// Damp low ground near water reads darker.
 		float damp = (1.0 - smoothstep(6.0, 26.0, length(p - u_Damp.xy))) * u_Damp.z;
 		base = mix(base, base * vec3(0.78, 0.86, 0.92), damp * 0.5);
@@ -141,7 +178,14 @@ void main()
 		n = normalize(vec3(w1 * 0.05 + w3 * 0.03, 1.0, w2 * 0.05 + w3 * 0.03));
 
 		float fres = pow(1.0 - clamp(dot(n, normalize(u_CamPos - v_WorldPos)), 0.0, 1.0), 3.0);
-		base = mix(vec3(0.08, 0.15, 0.17), env.skyColor * 0.9, 0.35 + fres * 0.55);
+
+		// Deeper toward the middle, with a pale lapping band along the shore.
+		float edge = max(abs(v_Local.x), abs(v_Local.z)) * 2.0;
+		vec3 deep = mix(vec3(0.05, 0.11, 0.13), vec3(0.10, 0.18, 0.18), smoothstep(0.4, 1.0, edge));
+		base = mix(deep, env.skyColor * 0.9, 0.35 + fres * 0.55);
+		float lap = 0.5 + 0.5 * sin(edge * 60.0 - u_Time * 1.6);
+		float foam = smoothstep(0.90, 1.0, edge) * (0.55 + 0.45 * lap);
+		base = mix(base, vec3(0.55, 0.62, 0.60), foam * 0.45);
 		gloss = 1.0;
 		emissive = 0.0;
 	}
@@ -151,15 +195,32 @@ void main()
 	float wrap = clamp(ndl * 0.5 + 0.5, 0.0, 1.0);
 	wrap *= wrap;
 
+	float sunVis = CloudShade(v_WorldPos.xz);
+
+	// Models darken toward the ground they stand on, which seats them in the scene.
+	float ao = 1.0;
+	if (u_Mode == 0) ao = mix(0.55, 1.0, smoothstep(0.0, 0.9, v_WorldPos.y));
+
+	// Lanterns and spore lights matter more once the sun is down.
+	float night = 1.0 - smoothstep(0.10, 0.60, env.sunDir.y);
+	vec3 lamp = PointLights(v_WorldPos, n) * (0.45 + 0.55 * night);
+
+	vec3 viewDir = normalize(u_CamPos - v_WorldPos);
 	vec3 ambient = mix(env.groundColor, env.skyColor, n.y * 0.5 + 0.5);
-	vec3 color = base * (ambient + env.sunColor * wrap);
+	vec3 color = base * (ambient * ao + env.sunColor * wrap * sunVis + lamp);
+
+	if (u_Mode == 0)
+	{
+		// Rim light outlines silhouettes against the ground, tinted by the sky.
+		float rim = pow(1.0 - clamp(dot(n, viewDir), 0.0, 1.0), 3.0);
+		color += (env.skyColor * 0.6 + env.sunColor * 0.25) * rim * 0.35 * ao;
+	}
 
 	if (gloss > 0.0)
 	{
-		vec3 viewDir = normalize(u_CamPos - v_WorldPos);
 		vec3 halfDir = normalize(viewDir + env.sunDir);
 		float spec = pow(max(dot(n, halfDir), 0.0), 90.0);
-		color += env.sunColor * spec * 0.9;
+		color += env.sunColor * spec * 0.9 * sunVis;
 	}
 
 	color += base * emissive;
