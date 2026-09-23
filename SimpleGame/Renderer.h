@@ -61,6 +61,7 @@ public:
 	void DrawGround(const Vec3& center, float extent, const GroundParams& params);
 	void DrawWater(const Vec3& center, float sizeX, float sizeZ);
 	void DrawSpores(const Vec3& center, const Vec3& field, const Vec3& color, float densityScale, float size);
+	void DrawAmbientMotes(const Vec3& center);   // fireflies by night, pollen by day
 
 	void BeginUI();
 	void EndUI();
@@ -133,6 +134,7 @@ private:
 		GLint color = -1;
 		GLint densityScale = -1;
 		GLint timeOfDay = -1;
+		GLint style = -1;
 		GLint seedAttrib = -1;
 		GLint randAttrib = -1;
 	};
@@ -173,6 +175,7 @@ private:
 
 	void BindLit(const Mat4& model, const DrawParams& params, int mode);
 	void DrawMesh(int id);
+	void DrawMotes(int style, int first, int count, const Vec3& center, const Vec3& field, const Vec3& color, float densityScale, float size);
 	void DrawPixelQuad(float x, float y, float w, float h, const OverlayParams& params);
 	void DrawOverlayQuad(float rx, float ry, float rw, float rh, const OverlayParams& params);
 

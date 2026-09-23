@@ -259,6 +259,7 @@ void Renderer::CacheUniformLocations()
 	particle.color = glGetUniformLocation(particleShader, "u_Color");
 	particle.densityScale = glGetUniformLocation(particleShader, "u_DensityScale");
 	particle.timeOfDay = glGetUniformLocation(particleShader, "u_TimeOfDay");
+	particle.style = glGetUniformLocation(particleShader, "u_Style");
 	particle.seedAttrib = glGetAttribLocation(particleShader, "a_Seed");
 	particle.randAttrib = glGetAttribLocation(particleShader, "a_Rand");
 
@@ -668,9 +669,24 @@ void Renderer::DrawWater(const Vec3& center, float sizeX, float sizeZ)
 
 void Renderer::DrawSpores(const Vec3& center, const Vec3& field, const Vec3& color, float densityScale, float size)
 {
+	DrawMotes(0, 0, sporeCount, center, field, color, densityScale, size);
+}
+
+void Renderer::DrawAmbientMotes(const Vec3& center)
+{
+	// Slices of the spore seed buffer; each style animates its own way in Particle.vs.
+	DrawMotes(1, 0, 260, center, Vec3(56.0f, 3.2f, 56.0f), Vec3(0.85f, 1.00f, 0.45f), 1.0f, 0.09f);
+	DrawMotes(2, 1000, 1400, center, Vec3(60.0f, 9.0f, 60.0f), Vec3(0.95f, 0.92f, 0.78f), 0.35f, 0.05f);
+}
+
+void Renderer::DrawMotes(int style, int first, int count, const Vec3& center, const Vec3& field, const Vec3& color, float densityScale, float size)
+{
 	if (densityScale <= 0.001f) return;
+	if (first + count > sporeCount) count = sporeCount - first;
+	if (count <= 0) return;
 
 	glUseProgram(particleShader);
+	glUniform1i(particle.style, style);
 
 	glUniformMatrix4fv(particle.viewProj, 1, GL_FALSE, viewProj.m);
 	glUniform3f(particle.center, center.x, center.y, center.z);
@@ -695,7 +711,7 @@ void Renderer::DrawSpores(const Vec3& center, const Vec3& field, const Vec3& col
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 	glDepthMask(GL_FALSE);
 
-	glDrawArrays(GL_POINTS, 0, sporeCount);
+	glDrawArrays(GL_POINTS, first, count);
 	++drawCalls;
 
 	glDepthMask(GL_TRUE);

@@ -191,6 +191,7 @@ void Game::Render()
 	// Spores last: additive, and they should sit over everything.
 	renderer->DrawSpores(Vec3(view.x, 0.0f, view.z), Vec3(70.0f, 16.0f, 70.0f),
 						 Vec3(0.55f, 0.95f, 0.80f), 0.55f, 0.13f);
+	renderer->DrawAmbientMotes(Vec3(view.x, 0.0f, view.z));
 
 	renderer->EndScene();
 	renderer->BeginUI();
