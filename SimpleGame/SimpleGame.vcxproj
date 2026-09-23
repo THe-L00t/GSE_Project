@@ -199,6 +199,8 @@
     <None Include="Shaders\Overlay.vs" />
     <None Include="Shaders\Particle.fs" />
     <None Include="Shaders\Particle.vs" />
+    <None Include="Shaders\Post.fs" />
+    <None Include="Shaders\Post.vs" />
     <None Include="Shaders\SolidRect.fs" />
     <None Include="Shaders\SolidRect.vs" />
   </ItemGroup>

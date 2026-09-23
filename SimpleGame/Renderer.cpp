@@ -32,10 +32,12 @@ void Renderer::Initialize(int sizeX, int sizeY)
 	litShader       = CompileShaders("Shaders/Lit.vs",       "Shaders/Lit.fs");
 	particleShader  = CompileShaders("Shaders/Particle.vs",  "Shaders/Particle.fs");
 	overlayShader   = CompileShaders("Shaders/Overlay.vs",   "Shaders/Overlay.fs");
+	postShader      = CompileShaders("Shaders/Post.vs",      "Shaders/Post.fs");
 
 	CreateVertexBufferObjects();
 	CacheUniformLocations();
 	LoadModels();
+	CreateTargets(sizeX, sizeY);
 
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LEQUAL);
@@ -61,6 +63,113 @@ void Renderer::Resize(int sizeX, int sizeY)
 	windowSizeX = sizeX;
 	windowSizeY = sizeY;
 	glViewport(0, 0, sizeX, sizeY);
+
+	if (sizeX != targetWidth || sizeY != targetHeight)
+		CreateTargets(sizeX, sizeY);
+}
+
+void Renderer::CreateTargets(int sizeX, int sizeY)
+{
+	DeleteTargets();
+	if (postShader == 0 || sizeX <= 0 || sizeY <= 0) return;
+
+	targetWidth = sizeX;
+	targetHeight = sizeY;
+
+	glGenTextures(1, &sceneTex);
+	glBindTexture(GL_TEXTURE_2D, sceneTex);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, sizeX, sizeY, 0, GL_RGBA, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	glGenRenderbuffers(1, &sceneDepth);
+	glBindRenderbuffer(GL_RENDERBUFFER, sceneDepth);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, sizeX, sizeY);
+
+	glGenFramebuffers(1, &sceneFbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, sceneFbo);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sceneTex, 0);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, sceneDepth);
+	bool ok = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+
+	// 4x MSAA smooths the long diagonal edges the quarter view is full of.
+	GLint maxSamples = 0;
+	glGetIntegerv(GL_MAX_SAMPLES, &maxSamples);
+	samples = maxSamples < 4 ? (int)maxSamples : 4;
+	if (samples > 1)
+	{
+		glGenRenderbuffers(1, &msColor);
+		glBindRenderbuffer(GL_RENDERBUFFER, msColor);
+		glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_RGBA16F, sizeX, sizeY);
+
+		glGenRenderbuffers(1, &msDepth);
+		glBindRenderbuffer(GL_RENDERBUFFER, msDepth);
+		glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_DEPTH_COMPONENT24, sizeX, sizeY);
+
+		glGenFramebuffers(1, &msFbo);
+		glBindFramebuffer(GL_FRAMEBUFFER, msFbo);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, msColor);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, msDepth);
+
+		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		{
+			glDeleteFramebuffers(1, &msFbo);
+			glDeleteRenderbuffers(1, &msColor);
+			glDeleteRenderbuffers(1, &msDepth);
+			msFbo = msColor = msDepth = 0;
+			samples = 0;
+		}
+	}
+
+	bloomWidth = sizeX / 4 > 1 ? sizeX / 4 : 1;
+	bloomHeight = sizeY / 4 > 1 ? sizeY / 4 : 1;
+	for (int i = 0; i < 2; ++i)
+	{
+		glGenTextures(1, &bloomTex[i]);
+		glBindTexture(GL_TEXTURE_2D, bloomTex[i]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, bloomWidth, bloomHeight, 0, GL_RGBA, GL_FLOAT, NULL);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+		glGenFramebuffers(1, &bloomFbo[i]);
+		glBindFramebuffer(GL_FRAMEBUFFER, bloomFbo[i]);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bloomTex[i], 0);
+		ok = ok && glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+	}
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+	postReady = ok;
+	std::cout << "Post: " << (postReady ? "HDR target ready" : "unavailable, drawing straight to the window")
+		<< ", MSAA x" << (samples > 1 ? samples : 1) << "\n";
+}
+
+void Renderer::DeleteTargets()
+{
+	if (msFbo) glDeleteFramebuffers(1, &msFbo);
+	if (msColor) glDeleteRenderbuffers(1, &msColor);
+	if (msDepth) glDeleteRenderbuffers(1, &msDepth);
+	if (sceneFbo) glDeleteFramebuffers(1, &sceneFbo);
+	if (sceneTex) glDeleteTextures(1, &sceneTex);
+	if (sceneDepth) glDeleteRenderbuffers(1, &sceneDepth);
+	for (int i = 0; i < 2; ++i)
+	{
+		if (bloomFbo[i]) glDeleteFramebuffers(1, &bloomFbo[i]);
+		if (bloomTex[i]) glDeleteTextures(1, &bloomTex[i]);
+		bloomFbo[i] = bloomTex[i] = 0;
+	}
+
+	msFbo = msColor = msDepth = 0;
+	sceneFbo = sceneTex = sceneDepth = 0;
+	samples = 0;
+	targetWidth = targetHeight = 0;
+	postReady = false;
 }
 
 void Renderer::CreateVertexBufferObjects()
@@ -152,6 +261,16 @@ void Renderer::CacheUniformLocations()
 	particle.timeOfDay = glGetUniformLocation(particleShader, "u_TimeOfDay");
 	particle.seedAttrib = glGetAttribLocation(particleShader, "a_Seed");
 	particle.randAttrib = glGetAttribLocation(particleShader, "a_Rand");
+
+	post.mode = glGetUniformLocation(postShader, "u_Mode");
+	post.source = glGetUniformLocation(postShader, "u_Source");
+	post.bloom = glGetUniformLocation(postShader, "u_Bloom");
+	post.texel = glGetUniformLocation(postShader, "u_Texel");
+	post.direction = glGetUniformLocation(postShader, "u_Direction");
+	post.bloomStrength = glGetUniformLocation(postShader, "u_BloomStrength");
+	post.sporeExposure = glGetUniformLocation(postShader, "u_SporeExposure");
+	post.time = glGetUniformLocation(postShader, "u_Time");
+	post.positionAttrib = glGetAttribLocation(postShader, "a_Position");
 }
 
 void Renderer::LoadModels()
@@ -300,6 +419,12 @@ GLuint Renderer::CompileShaders(const char* filenameVS, const char* filenameFS)
 
 void Renderer::BeginFrame()
 {
+	if (postReady)
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, samples > 1 ? msFbo : sceneFbo);
+		glViewport(0, 0, targetWidth, targetHeight);
+	}
+
 	// The ground plane always fills the orthographic view, so the clear colour never shows.
 	glClearColor(0.05f, 0.06f, 0.07f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -308,6 +433,76 @@ void Renderer::BeginFrame()
 	glDepthMask(GL_TRUE);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+}
+
+void Renderer::EndScene()
+{
+	if (!postReady) return;
+
+	if (samples > 1)
+	{
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, msFbo);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, sceneFbo);
+		glBlitFramebuffer(0, 0, targetWidth, targetHeight, 0, 0, targetWidth, targetHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+	}
+
+	glDisable(GL_DEPTH_TEST);
+	glDepthMask(GL_FALSE);
+	glDisable(GL_BLEND);
+
+	glUseProgram(postShader);
+	glUniform1i(post.source, 0);
+	glUniform1i(post.bloom, 1);
+	glUniform1f(post.bloomStrength, 0.65f);
+	glUniform1f(post.sporeExposure, sporeExposure);
+	glUniform1f(post.time, time);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vboScreen);
+	glEnableVertexAttribArray(post.positionAttrib);
+	glVertexAttribPointer(post.positionAttrib, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, 0);
+
+	const float bw = (float)bloomWidth;
+	const float bh = (float)bloomHeight;
+	DrawPostPass(bloomFbo[0], bloomWidth, bloomHeight, 0, sceneTex, (float)targetWidth, (float)targetHeight);
+
+	// Two rounds of separable blur, the second twice as wide, give a soft broad glow.
+	for (int round = 0; round < 2; ++round)
+	{
+		float spread = (float)(round + 1);
+		glUniform2f(post.direction, spread / bw, 0.0f);
+		DrawPostPass(bloomFbo[1], bloomWidth, bloomHeight, 1, bloomTex[0], bw, bh);
+		glUniform2f(post.direction, 0.0f, spread / bh);
+		DrawPostPass(bloomFbo[0], bloomWidth, bloomHeight, 1, bloomTex[1], bw, bh);
+	}
+
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, bloomTex[0]);
+	glActiveTexture(GL_TEXTURE0);
+	DrawPostPass(0, (int)windowSizeX, (int)windowSizeY, 2, sceneTex, (float)targetWidth, (float)targetHeight);
+
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glDisableVertexAttribArray(post.positionAttrib);
+
+	glEnable(GL_BLEND);
+	glDepthMask(GL_TRUE);
+	glEnable(GL_DEPTH_TEST);
+}
+
+void Renderer::DrawPostPass(GLuint target, int width, int height, int mode, GLuint source, float sourceWidth, float sourceHeight)
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, target);
+	glViewport(0, 0, width, height);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, source);
+	glUniform1i(post.mode, mode);
+	glUniform2f(post.texel, 1.0f / sourceWidth, 1.0f / sourceHeight);
+
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+	++drawCalls;
 }
 
 int Renderer::TakeDrawCalls()

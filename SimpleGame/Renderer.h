@@ -44,7 +44,10 @@ public:
 	bool WorldToScreen(const Vec3& pos, float& sx, float& sy) const;
 
 	// Sun, palette, fog and spore density are evaluated in Shaders/Env.glsl from these values.
+	// The scene renders into an HDR multisampled target; EndScene resolves it through
+	// bloom and tone mapping to the window, after which the UI draws on top.
 	void BeginFrame();
+	void EndScene();
 	void SetCamera(const Mat4& view, const Mat4& proj, const Vec3& eye, float pxPerUnit);
 	void SetFrame(float dayTime, float exposure, const Vec3& fogCenter, float seconds);
 
@@ -134,6 +137,19 @@ private:
 		GLint randAttrib = -1;
 	};
 
+	struct PostLocations
+	{
+		GLint mode = -1;
+		GLint source = -1;
+		GLint bloom = -1;
+		GLint texel = -1;
+		GLint direction = -1;
+		GLint bloomStrength = -1;
+		GLint sporeExposure = -1;
+		GLint time = -1;
+		GLint positionAttrib = -1;
+	};
+
 	struct OverlayParams
 	{
 		int   mode = 0;
@@ -160,6 +176,10 @@ private:
 	void DrawPixelQuad(float x, float y, float w, float h, const OverlayParams& params);
 	void DrawOverlayQuad(float rx, float ry, float rw, float rh, const OverlayParams& params);
 
+	void CreateTargets(int sizeX, int sizeY);
+	void DeleteTargets();
+	void DrawPostPass(GLuint target, int width, int height, int mode, GLuint source, float sourceWidth, float sourceHeight);
+
 	bool initialized = false;
 
 	unsigned int windowSizeX = 0;
@@ -176,10 +196,28 @@ private:
 	GLuint litShader = 0;
 	GLuint particleShader = 0;
 	GLuint overlayShader = 0;
+	GLuint postShader = 0;
+
+	// Scene targets. sceneTex is the resolved HDR image; msFbo exists only when multisampling is available.
+	GLuint msFbo = 0;
+	GLuint msColor = 0;
+	GLuint msDepth = 0;
+	int    samples = 0;
+	GLuint sceneFbo = 0;
+	GLuint sceneTex = 0;
+	GLuint sceneDepth = 0;
+	GLuint bloomFbo[2] = { 0, 0 };
+	GLuint bloomTex[2] = { 0, 0 };
+	int    bloomWidth = 0;
+	int    bloomHeight = 0;
+	int    targetWidth = 0;
+	int    targetHeight = 0;
+	bool   postReady = false;
 
 	LitLocations         lit;
 	OverlayLocations     overlay;
 	ParticleLocations    particle;
+	PostLocations        post;
 	std::vector<GpuMesh> meshes;
 
 	Mat4  viewProj;
