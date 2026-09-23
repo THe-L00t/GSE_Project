@@ -23,7 +23,10 @@ enum ActorKind
 	ACTOR_LANTERN,
 	ACTOR_CHUNK,
 	ACTOR_ENEMY,
-	ACTOR_ITEM
+	ACTOR_ITEM,
+	ACTOR_NPC,
+	ACTOR_FORAGE,
+	ACTOR_DEER
 };
 
 // Drawn one pass per layer, so every ground is down before the blob shadows that sit on it.

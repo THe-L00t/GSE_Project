@@ -26,15 +26,31 @@ void Game::StartRoute()
 {
 	level = LEVEL_ROUTE;
 	levelTimer = 0.0f;
-	endingTimer = -1.0f;
+	transitionTimer = -1.0f;
+	sleepTimer = -1.0f;
+	dayCardTimer = -1.0f;
+	routeIntroHaze = 1.0f;
+	sporeVisual = 0.55f;
+	timeScale = 1.0f;
+	tutorial = TUT_DONE;
 	letterOpen = false;
+	packOpen = false;
+	survivalShown = true;
+	dialogLines.clear();
+	dialogIndex = 0;
+	dialogNext = -1;
 	prompt.clear();
 
 	levelNode->Destroy();
 	water = nullptr;
 	letter = nullptr;
 	villageExit = nullptr;
+	grandmaNpc = nullptr;
+	grandmaSleeper = nullptr;
+	deer = nullptr;
 	targetSleeper = nullptr;
+	targetForage = nullptr;
+	targetSpot = SPOT_NONE;
 
 	// Chunks first and creatures last: the order they are drawn in.
 	levelNode = worldNode->AddChild(new Actor(ACTOR_NODE));
@@ -70,6 +86,8 @@ void Game::StartRoute()
 
 void Game::UpdateRoute(float dt, const bool* keys)
 {
+	routeIntroHaze = Maxf(routeIntroHaze - dt / 4.0f, 0.0f);
+
 	if (deathTimer >= 0.0f)
 	{
 		deathTimer += dt;
@@ -92,7 +110,7 @@ void Game::UpdateRoute(float dt, const bool* keys)
 
 	// Deeper, more overgrown chunks carry thicker spores. Nature Insight slows it; thirst speeds it up.
 	const ChunkActor* here = EnsureChunk(playerChunkX, playerChunkZ);
-	float rate = 0.012f * (float)here->stage * NatureGuard(natureInsight) * (water <= 0.0f ? 1.6f : 1.0f);
+	float rate = 0.012f * (float)here->stage * NatureGuard(natureInsight) * (waterMeter <= 0.0f ? 1.6f : 1.0f);
 	if (player->rollTimer > 0.0f) rate = 0.0f;
 
 	// The lantern clears the air and mends wounds.

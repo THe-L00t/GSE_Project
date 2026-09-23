@@ -91,7 +91,7 @@ void Game::UpdatePlayer(float dt, const bool* keys)
 	}
 	else if (wishLen > 0.001f)
 	{
-		float speed = kWalkSpeed * MoveSpeedScale(stats) * (p.swingTimer > 0.0f ? 0.7f : 1.0f) * (food <= 0.0f ? 0.85f : 1.0f);
+		float speed = kWalkSpeed * MoveSpeedScale(stats) * (p.swingTimer > 0.0f ? 0.7f : 1.0f) * (foodMeter <= 0.0f ? 0.85f : 1.0f);
 		pos = pos + wish * (speed * dt);
 		p.SetYaw(atan2f(wish.x, wish.z));
 		p.walkPhase += dt * 9.0f;
@@ -120,6 +120,12 @@ void Game::OnKeyDown(unsigned char key)
 		return;
 	}
 
+	if (packOpen)
+	{
+		HandlePackKey(key);
+		return;
+	}
+
 	if (HandleMenuKey(key)) return;
 
 	if (key == 27) // ESC
@@ -127,6 +133,15 @@ void Game::OnKeyDown(unsigned char key)
 		quit = true;
 		return;
 	}
+
+	if (key == 'e')
+	{
+		if (level == LEVEL_VILLAGE) TryInteract();
+		return;
+	}
+
+	// While someone is talking or a letter is open, only E moves things on.
+	if (DialogOpen() || letterOpen) return;
 
 	if (key == 'i')
 	{
@@ -154,15 +169,9 @@ void Game::OnKeyDown(unsigned char key)
 		return;
 	}
 
-	if (key == 'e')
-	{
-		if (level == LEVEL_VILLAGE) TryInteract();
-		return;
-	}
-
 	if (key == ' ')
 	{
-		if (letterOpen || deathTimer >= 0.0f) return;
+		if (deathTimer >= 0.0f || sleepTimer >= 0.0f || transitionTimer >= 0.0f) return;
 		if (player->rollTimer > 0.0f || player->rollCooldown > 0.0f) return;
 
 		player->rollTimer = kRollTime;
@@ -193,7 +202,18 @@ void Game::OnMouseDown()
 
 void Game::SkipToRoute()
 {
-	if (level != LEVEL_ROUTE) StartRoute();
+	if (level == LEVEL_ROUTE) return;
+
+	// Skipping the tutorial still sends you off with what the village would have given.
+	if (tutorial < TUT_LEAVE)
+	{
+		if (inventory[ITEM_CLEAN_WATER] < 2) inventory[ITEM_CLEAN_WATER] = 2;
+		if (inventory[ITEM_BERRIES] < 2) inventory[ITEM_BERRIES] = 2;
+		if (inventory[ITEM_HERB] < 1) inventory[ITEM_HERB] = 1;
+		torchOwned = true;
+		relicFound[RELIC_TORCH] = true;
+	}
+	StartRoute();
 }
 
 void Game::ShowMessage(const char* text, float seconds)
@@ -224,13 +244,14 @@ void Game::Render()
 
 	// Spores last: additive, and they should sit over everything.
 	renderer->DrawSpores(Vec3(view.x, 0.0f, view.z), Vec3(70.0f, 16.0f, 70.0f),
-						 Vec3(0.55f, 0.95f, 0.80f), 0.55f, 0.13f);
+						 Vec3(0.55f, 0.95f, 0.80f), sporeVisual, 0.13f);
 	renderer->DrawAmbientMotes(Vec3(view.x, 0.0f, view.z));
 
 	renderer->EndScene();
 	renderer->BeginUI();
 
-	float haze = 0.08f + sporeExposure * 0.34f;
+	// Entering Route 32, the fog lifts off the road.
+	float haze = 0.08f + sporeExposure * 0.34f + routeIntroHaze * 0.7f;
 	float vignette = 0.28f + sporeExposure * 0.42f;
 	renderer->DrawAtmosphere(vignette, haze, Vec3(0.42f, 0.70f, 0.62f));
 
@@ -276,6 +297,15 @@ void Game::GatherLights(const Vec3& view)
 		if (sleepers[i]->mote == nullptr) continue;
 		Vec3 pos = sleepers[i]->mote->WorldPosition() + Vec3(0.0f, 1.05f, 0.2f);
 		lights.push_back({ pos, Vec3(0.45f, 0.95f, 0.78f) * 1.2f, 3.5f, DistXZ(pos, view) });
+	}
+
+	std::vector<DeerActor*> deers;
+	SceneGraph::Collect(scene.Root(), ACTOR_DEER, deers);
+	for (size_t i = 0; i < deers.size(); ++i)
+	{
+		Vec3 facing(sinf(deers[i]->Yaw()), 0.0f, cosf(deers[i]->Yaw()));
+		Vec3 pos = deers[i]->WorldPosition() + facing * 0.7f + Vec3(0.0f, 2.4f, 0.0f);
+		lights.push_back({ pos, Vec3(0.95f, 0.85f, 0.50f) * 1.6f, 6.0f, DistXZ(pos, view) });
 	}
 
 	std::vector<ItemActor*> items = LiveItems();

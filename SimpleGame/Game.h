@@ -21,12 +21,41 @@ const Vec3 kHudInk(0.90f, 0.93f, 0.90f);
 const Vec3 kHudDim(0.62f, 0.68f, 0.65f);
 const Vec3 kHudAccent(0.60f, 0.92f, 0.80f);
 
-enum QuestStage
+// Mulangae Village over a day and a half. Comments give the step of the design (ContentDesign.md 2).
+enum TutorialStep
 {
-	QUEST_FIND_GRANDMOTHER = 0,
-	QUEST_READ_LETTER,
-	QUEST_LEAVE_VILLAGE,
-	QUEST_DONE
+	TUT_WAKE,             // 1 morning: grandmother's first words
+	TUT_FETCH_WATER,      // 1-2 walk to the well and draw water
+	TUT_BRING_WATER,      // 2 back to grandmother
+	TUT_FORAGE,           // 3 radishes and red berries
+	TUT_BRING_FOOD,       // 3
+	TUT_EAT,              // 3 she watches you eat
+	TUT_FETCH_TORCH,      // 4 the shed
+	TUT_BRING_TORCH,      // 4
+	TUT_DUSK,             // 5 evening falls, go home
+	TUT_WATCH_DEER,       // 5
+	TUT_BEDTIME,          // 5
+	TUT_FIND_GRANDMOTHER, // 6 the next morning
+	TUT_READ_LETTER,      // 6
+	TUT_PACK,             // 7 choose what goes in the bag
+	TUT_LEAVE,            // 7 walk south out of the village
+	TUT_DONE
+};
+
+// What the interaction key would act on in the village.
+enum VillageSpot
+{
+	SPOT_NONE,
+	SPOT_DIALOG,
+	SPOT_LETTER_OPEN,
+	SPOT_GRANDMA,
+	SPOT_LETTER,
+	SPOT_DOOR,
+	SPOT_WELL,
+	SPOT_SHED,
+	SPOT_DEER,
+	SPOT_FORAGE,
+	SPOT_SLEEPER
 };
 
 enum LevelId
@@ -97,15 +126,31 @@ private:
 	void AddHouse(const Vec3& pos, float w, float h, float d, float yaw, int model);
 	void AddTree(const Vec3& pos, float scale);
 	void AddFence(const Vec3& from, const Vec3& to);
-	void AddSleeper(const Vec3& pos, float yaw, bool grandma, float phase);
+	SleeperActor* AddSleeper(const Vec3& pos, float yaw, bool grandma, float phase);
+	void AddForage(int kind, const Vec3& pos);
 	void UpdateVillage(float dt, const bool* keys);
+	void UpdateVillageStory(float dt);
+	void UpdateDeer(float dt);
 	void ResolveVillageCollisions();
 	void UpdateInteractionTarget();
 	void TryInteract();
+	void TalkToGrandmother();
+	void SetTutorial(int next);
+	void Say(const char* const* lines, int count, int next);
+	void AdvanceDialog();
+	bool DialogOpen() const { return dialogIndex < dialogLines.size(); }
+	void Pick(ForageActor& f);
+	void WakeNextMorning();
+	void OpenPack();
+	void HandlePackKey(unsigned char key);
+	void ConfirmPack();
 	void DrawVillageHud();
+	void DrawDialog();
 	void DrawLetterPanel();
-	void DrawEndingCard();
-	const char* ObjectiveText() const;
+	void DrawPackPanel();
+	void DrawVillageFades();
+	void ObjectiveText(char* buf, size_t size) const;
+	void VillageHelp(char* buf, size_t size) const;
 
 	// GameRoute.cpp: Route 32, grown chunk by chunk from the world seed
 	void StartRoute();
@@ -180,14 +225,40 @@ private:
 	WaterActor*   water = nullptr;
 	PropActor*    letter = nullptr;
 	ExitActor*    villageExit = nullptr;
-	int   stage = QUEST_FIND_GRANDMOTHER;
+	NpcActor*     grandmaNpc = nullptr;      // awake, the first day
+	SleeperActor* grandmaSleeper = nullptr;  // asleep, the next morning
+	DeerActor*    deer = nullptr;
+	Vec3  homeDoor;
+	Vec3  wellPos;
+	Vec3  shedDoor;
+	int   tutorial = TUT_WAKE;
+	int   day = 1;
+	int   radishes = 0;
+	int   redBerries = 0;
+	int   mealsBaseline = 0;
+	bool  deerWatched = false;
+	bool  riceEaten = false;
+	bool  sleepAfterDialog = false;
 	int   fragments = 0;
 	int   fragmentGoal = 3;
 	bool  letterOpen = false;
-	bool  letterFound = false;
-	float endingTimer = -1.0f;
+	float sleepTimer = -1.0f;         // >= 0 while the night passes
+	float transitionTimer = -1.0f;    // >= 0 while leaving the village
+	float dayCardTimer = -1.0f;       // >= 0 while "the next morning" shows
+	float routeIntroHaze = 0.0f;      // the fog that lifts as Route 32 opens
+	float sporeVisual = 0.55f;        // density of the drawn spore field
+	int   targetSpot = SPOT_NONE;
 	SleeperActor* targetSleeper = nullptr;
-	bool  targetLetter = false;
+	ForageActor*  targetForage = nullptr;
+
+	std::vector<std::string> dialogLines;
+	size_t dialogIndex = 0;
+	int    dialogNext = -1;           // tutorial step to enter once the dialog closes
+
+	int   packHave[ITEM_TYPE_COUNT] = {};
+	int   packTake[ITEM_TYPE_COUNT] = {};
+	bool  packTorch = true;
+	int   packCursor = 0;
 
 	ChunkMap routeMap;
 	int   playerChunkX = 0;
@@ -207,9 +278,9 @@ private:
 	int   inventory[ITEM_TYPE_COUNT] = {};
 
 	static const int kBagCapacity = 8;
-	float water = 60.0f;          // [0,100]
-	float food = 35.0f;           // [0,100]
-	float warmth = 100.0f;        // [0,100], only once warmthActive
+	float waterMeter = 60.0f;     // [0,100]
+	float foodMeter = 35.0f;      // [0,100]
+	float warmthMeter = 100.0f;   // [0,100], only once warmthActive
 	bool  survivalShown = false;  // the tutorial brings the meters in at the well
 	bool  warmthActive = false;
 	float routeTime = 0.0f;       // seconds spent on Route 32

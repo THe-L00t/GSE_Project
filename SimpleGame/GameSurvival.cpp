@@ -44,21 +44,21 @@ void Game::UpdateSurvival(float dt)
 
 	routeTime += dt;
 
-	float oldWater = water;
-	float oldFood = food;
-	water = Maxf(water - kWaterDrain * dt, 0.0f);
-	food = Maxf(food - kFoodDrain * dt, 0.0f);
+	float oldWater = waterMeter;
+	float oldFood = foodMeter;
+	waterMeter = Maxf(waterMeter - kWaterDrain * dt, 0.0f);
+	foodMeter = Maxf(foodMeter - kFoodDrain * dt, 0.0f);
 
-	if (Crossed(oldWater, water, kLowMark)) ShowMessage("Your mouth is dry. Drink (R), or find water.", 4.0f);
-	if (Crossed(oldWater, water, 0.01f)) ShowMessage("You are parched. The spores reach you faster.", 4.0f);
-	if (Crossed(oldFood, food, kLowMark)) ShowMessage("Your stomach growls. Eat something (F).", 4.0f);
-	if (Crossed(oldFood, food, 0.01f)) ShowMessage("Hunger slows your steps and your swings.", 4.0f);
+	if (Crossed(oldWater, waterMeter, kLowMark)) ShowMessage("Your mouth is dry. Drink (R), or find water.", 4.0f);
+	if (Crossed(oldWater, waterMeter, 0.01f)) ShowMessage("You are parched. The spores reach you faster.", 4.0f);
+	if (Crossed(oldFood, foodMeter, kLowMark)) ShowMessage("Your stomach growls. Eat something (F).", 4.0f);
+	if (Crossed(oldFood, foodMeter, 0.01f)) ShowMessage("Hunger slows your steps and your swings.", 4.0f);
 
 	// Warmth only starts to matter once a whole day has passed out on the road.
 	if (!warmthActive && routeTime > dayLength)
 	{
 		warmthActive = true;
-		warmth = 100.0f;
+		warmthMeter = 100.0f;
 		ShowMessage("The nights are getting colder. Stay near light after dark.", 6.0f);
 	}
 	if (!warmthActive) return;
@@ -66,15 +66,15 @@ void Game::UpdateSurvival(float dt)
 	bool night = timeOfDay < 0.22f || timeOfDay > 0.78f;
 	bool nearLantern = lantern && DistXZ(player->Position(), lantern->WorldPosition()) < lantern->zoneRadius;
 
-	float oldWarmth = warmth;
+	float oldWarmth = warmthMeter;
 	if (night && !nearLantern)
-		warmth = Maxf(warmth - kColdDrain * dt, 0.0f);
+		warmthMeter = Maxf(warmthMeter - kColdDrain * dt, 0.0f);
 	else
-		warmth = Minf(warmth + kWarmRecover * dt, 100.0f);
+		warmthMeter = Minf(warmthMeter + kWarmRecover * dt, 100.0f);
 
-	if (Crossed(oldWarmth, warmth, kLowMark)) ShowMessage("You are shivering. Find the lantern, or wait for the sun.", 4.0f);
+	if (Crossed(oldWarmth, warmthMeter, kLowMark)) ShowMessage("You are shivering. Find the lantern, or wait for the sun.", 4.0f);
 
-	if (warmth <= 0.0f)
+	if (warmthMeter <= 0.0f)
 	{
 		health -= dt;
 		if (health <= 0.0f) FallAsleep("The cold takes you. You sink into a long sleep...");
@@ -96,14 +96,14 @@ void Game::EatFood()
 		ShowMessage("You have nothing to eat.", 2.0f);
 		return;
 	}
-	if (food >= 98.0f)
+	if (foodMeter >= 98.0f)
 	{
 		ShowMessage("You are not hungry.", 1.5f);
 		return;
 	}
 
 	--inventory[pick];
-	food = Minf(food + FoodValue(pick), 100.0f);
+	foodMeter = Minf(foodMeter + FoodValue(pick), 100.0f);
 	++mealsEaten;
 
 	char buf[96];
@@ -122,7 +122,7 @@ void Game::DrinkWater()
 	}
 
 	--inventory[ITEM_CLEAN_WATER];
-	water = Minf(water + kFlaskWater, 100.0f);
+	waterMeter = Minf(waterMeter + kFlaskWater, 100.0f);
 	sporeExposure = Maxf(sporeExposure - kFlaskClear, 0.0f);
 	ShowMessage("You drink. The water rinses the spores out.", 2.5f);
 }
@@ -220,9 +220,9 @@ void Game::DrawSurvivalHud()
 
 	Row rows[3] =
 	{
-		{ "WATER", water, Vec3(0.55f, 0.35f, 0.25f), Vec3(0.40f, 0.70f, 0.85f) },
-		{ "FOOD", food, Vec3(0.55f, 0.35f, 0.25f), Vec3(0.85f, 0.75f, 0.40f) },
-		{ "WARMTH", warmth, Vec3(0.35f, 0.45f, 0.75f), Vec3(0.95f, 0.65f, 0.40f) },
+		{ "WATER", waterMeter, Vec3(0.55f, 0.35f, 0.25f), Vec3(0.40f, 0.70f, 0.85f) },
+		{ "FOOD", foodMeter, Vec3(0.55f, 0.35f, 0.25f), Vec3(0.85f, 0.75f, 0.40f) },
+		{ "WARMTH", warmthMeter, Vec3(0.35f, 0.45f, 0.75f), Vec3(0.95f, 0.65f, 0.40f) },
 	};
 	int rowCount = warmthActive ? 3 : 2;
 

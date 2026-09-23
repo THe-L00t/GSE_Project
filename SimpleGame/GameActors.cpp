@@ -157,6 +157,45 @@ void SleeperActor::Draw(const DrawContext& dc) const
 	dc.renderer->DrawModel(isGrandma ? MODEL_SLEEPER_ELDER : MODEL_SLEEPER, WorldMatrix(), params);
 }
 
+NpcActor::NpcActor()
+	: Actor(ACTOR_NPC)
+{
+	model = MODEL_GRANDMA;
+	collider.shape = COLLIDER_CIRCLE;
+	collider.radius = 0.4f;
+}
+
+void NpcActor::Draw(const DrawContext& dc) const
+{
+	DrawParams params;
+	params.phase = phase;
+
+	dc.renderer->DrawShadow(WorldPosition(), 0.4f);
+	dc.renderer->DrawModel(model, WorldMatrix(), params);
+}
+
+ForageActor::ForageActor(int forageKind)
+	: PropActor(ACTOR_FORAGE, MODEL_VEGETABLE), forage(forageKind)
+{
+	if (forage == FORAGE_RED_BERRY) model = MODEL_BERRY_RED;
+	else if (forage == FORAGE_PALE_BERRY) model = MODEL_BERRY_PALE;
+}
+
+DeerActor::DeerActor()
+	: Actor(ACTOR_DEER)
+{
+}
+
+void DeerActor::Draw(const DrawContext& dc) const
+{
+	DrawParams params;
+	params.phase = stepPhase;
+	params.emissive = 0.15f;
+
+	dc.renderer->DrawShadow(WorldPosition(), 0.7f);
+	dc.renderer->DrawModel(MODEL_DEER, WorldMatrix(), params);
+}
+
 ExitActor::ExitActor()
 	: Actor(ACTOR_EXIT)
 {

@@ -66,7 +66,7 @@ void Game::Attack()
 
 	Vec3 playerPos = player->Position();
 	Vec3 facing(sinf(player->Yaw()), 0.0f, cosf(player->Yaw()));
-	float power = AttackPower(stats, player->weapon ? player->weapon->power : 0.0f) * (food <= 0.0f ? 0.8f : 1.0f);
+	float power = AttackPower(stats, player->weapon ? player->weapon->power : 0.0f) * (foodMeter <= 0.0f ? 0.8f : 1.0f);
 	float reach = player->weapon ? player->weapon->reach : kBareHandReach;
 
 	std::vector<EnemyActor*> enemies = LiveEnemies();

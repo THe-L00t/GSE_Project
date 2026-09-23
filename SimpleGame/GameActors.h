@@ -121,6 +121,50 @@ public:
 	PropActor* mote = nullptr;    // the dream fragment, until it is taken
 };
 
+// Grandmother while she is still awake: she stands, breathes and talks.
+class NpcActor : public Actor
+{
+public:
+	NpcActor();
+
+	void Draw(const DrawContext& dc) const override;
+
+	int   model = 0;
+	float phase = 0.0f;
+};
+
+enum ForageKind
+{
+	FORAGE_RADISH,
+	FORAGE_RED_BERRY,
+	FORAGE_PALE_BERRY
+};
+
+// Something growing that can be picked. A picked berry bush stays as a plain bush.
+class ForageActor : public PropActor
+{
+public:
+	explicit ForageActor(int forageKind);
+
+	int  forage = FORAGE_RADISH;
+	bool picked = false;
+};
+
+// Its antlers glow; it walks toward a goal and, when leading, waits for the player.
+class DeerActor : public Actor
+{
+public:
+	DeerActor();
+
+	void Draw(const DrawContext& dc) const override;
+
+	Vec3  goal;
+	float speed = 1.3f;
+	bool  leading = false;
+	bool  arrived = false;
+	float stepPhase = 0.0f;
+};
+
 // The player leaves the level once past this line, heading +Z.
 class ExitActor : public Actor
 {
