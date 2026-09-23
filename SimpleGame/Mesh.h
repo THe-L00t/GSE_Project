@@ -12,7 +12,8 @@ enum ShapeType
 	SHAPE_ELLIPSOID,
 	SHAPE_CONE,
 	SHAPE_DISC,
-	SHAPE_PLANE
+	SHAPE_PLANE,
+	SHAPE_PRISM       // triangular prism, ridge along x at the top, for pitched roofs
 };
 
 // Bit flags animated in Shaders/Lit.vs.

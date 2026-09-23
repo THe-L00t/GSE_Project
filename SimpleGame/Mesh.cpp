@@ -11,9 +11,9 @@ namespace
 	const uint32_t kMeshCacheVersion = 1;
 	const char kMeshMagic[4] = { 'S', 'G', 'M', 'D' };
 
-	const int kCircleSegments = 16;
-	const int kSphereStacks = 8;
-	const int kSphereSlices = 16;
+	const int kCircleSegments = 24;
+	const int kSphereStacks = 12;
+	const int kSphereSlices = 24;
 
 	struct MeshCacheHeader
 	{
@@ -229,6 +229,32 @@ namespace
 		w.Triangle(p00, p10, p11, up, up, up);
 		w.Triangle(p00, p11, p01, up, up, up);
 	}
+
+	void AddPrism(PartWriter& w)
+	{
+		// Each slope rises 1 over a run of 0.5, which sets its normal.
+		const Vec3 front = Normalize(Vec3(0.0f, 0.5f, 1.0f));
+		const Vec3 back = Normalize(Vec3(0.0f, 0.5f, -1.0f));
+		const Vec3 down(0.0f, -1.0f, 0.0f);
+		const Vec3 left(-1.0f, 0.0f, 0.0f);
+		const Vec3 right(1.0f, 0.0f, 0.0f);
+
+		Vec3 bl0(-0.5f, -0.5f, 0.5f);
+		Vec3 br0(0.5f, -0.5f, 0.5f);
+		Vec3 bl1(-0.5f, -0.5f, -0.5f);
+		Vec3 br1(0.5f, -0.5f, -0.5f);
+		Vec3 tl(-0.5f, 0.5f, 0.0f);
+		Vec3 tr(0.5f, 0.5f, 0.0f);
+
+		w.Triangle(bl0, br0, tr, front, front, front);
+		w.Triangle(bl0, tr, tl, front, front, front);
+		w.Triangle(br1, bl1, tl, back, back, back);
+		w.Triangle(br1, tl, tr, back, back, back);
+		w.Triangle(bl0, bl1, br1, down, down, down);
+		w.Triangle(bl0, br1, br0, down, down, down);
+		w.Triangle(bl1, bl0, tl, left, left, left);
+		w.Triangle(br0, br1, tr, right, right, right);
+	}
 }
 
 ModelRecipe& ModelRecipe::Add(int shape, const Vec3& center, const Vec3& size, const Vec3& color, int anim)
@@ -287,6 +313,7 @@ MeshData BuildMesh(const ModelRecipe& recipe)
 		case SHAPE_CONE:      AddCone(writer); break;
 		case SHAPE_DISC:      AddDisc(writer); break;
 		case SHAPE_PLANE:     AddPlane(writer); break;
+		case SHAPE_PRISM:     AddPrism(writer); break;
 		default:              AddBox(writer); break;
 		}
 	}
