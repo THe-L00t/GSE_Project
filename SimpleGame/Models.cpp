@@ -14,6 +14,8 @@ namespace
 		"mite", "husk", "boar",
 		"herb", "water_flask", "relic",
 		"shadow", "ground",
+		"grandma", "shed", "garden_bed", "vegetable", "berry_red", "berry_pale", "deer",
+		"canned_food", "bus_stop", "ginkgo", "pole",
 	};
 
 	const Vec3 kMoss(0.24f, 0.38f, 0.24f);
@@ -89,6 +91,22 @@ namespace
 		r.Add(SHAPE_BOX, Vec3(-0.506f, 0.42f, 0.18f), Vec3(0.02f, 0.72f, 0.20f), kDarkMoss);
 		r.Add(SHAPE_ELLIPSOID, Vec3(-0.45f, 0.05f, 0.30f), Vec3(0.26f, 0.14f, 0.44f), kMoss);
 		r.Add(SHAPE_ELLIPSOID, Vec3(0.46f, 0.04f, -0.40f), Vec3(0.22f, 0.10f, 0.30f), kDarkMoss);
+	}
+
+	void AddBerryBush(ModelRecipe& r, const Vec3& berry)
+	{
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 0.10f, 0.0f), Vec3(1.0f, 0.25f, 0.9f), Vec3(0.13f, 0.22f, 0.15f), ANIM_SWAY);
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 0.36f, 0.0f), Vec3(0.95f, 0.70f, 0.85f), Vec3(0.18f, 0.29f, 0.19f), ANIM_SWAY);
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.30f, 0.30f, 0.20f), Vec3(0.55f, 0.50f, 0.55f), Vec3(0.21f, 0.32f, 0.20f), ANIM_SWAY);
+		r.Add(SHAPE_ELLIPSOID, Vec3(-0.28f, 0.28f, -0.15f), Vec3(0.50f, 0.45f, 0.50f), Vec3(0.16f, 0.27f, 0.18f), ANIM_SWAY);
+
+		const float spots[7][3] =
+		{
+			{ 0.32f, 0.52f, 0.30f }, { -0.30f, 0.46f, 0.22f }, { 0.05f, 0.66f, 0.18f }, { 0.40f, 0.36f, -0.10f },
+			{ -0.38f, 0.34f, -0.25f }, { 0.12f, 0.58f, -0.32f }, { -0.10f, 0.40f, 0.42f },
+		};
+		for (int i = 0; i < 7; ++i)
+			r.Add(SHAPE_ELLIPSOID, Vec3(spots[i][0], spots[i][1], spots[i][2]), Vec3(0.09f, 0.09f, 0.09f), berry, ANIM_SWAY);
 	}
 }
 
@@ -484,6 +502,167 @@ ModelRecipe BuildRecipe(int id)
 
 	case MODEL_GROUND:
 		r.Add(SHAPE_PLANE, Vec3(0.0f, 0.0f, 0.0f), Vec3(1.0f, 1.0f, 1.0f), Vec3(1.0f, 1.0f, 1.0f));
+		break;
+
+	case MODEL_GRANDMA:
+	{
+		const Vec3 skirt(0.30f, 0.26f, 0.30f);
+		const Vec3 cardigan(0.52f, 0.44f, 0.36f);
+		const Vec3 apron(0.62f, 0.60f, 0.54f);
+		const Vec3 hair(0.80f, 0.79f, 0.76f);
+
+		r.Add(SHAPE_BOX, Vec3(-0.10f, 0.05f, 0.05f), Vec3(0.14f, 0.10f, 0.24f), Vec3(0.20f, 0.17f, 0.15f));
+		r.Add(SHAPE_BOX, Vec3(0.10f, 0.05f, 0.05f), Vec3(0.14f, 0.10f, 0.24f), Vec3(0.20f, 0.17f, 0.15f));
+		r.Add(SHAPE_CONE, Vec3(0.0f, 0.40f, 0.0f), Vec3(0.62f, 0.70f, 0.52f), skirt, ANIM_BREATHE);
+		r.Add(SHAPE_CYLINDER, Vec3(0.0f, 0.86f, -0.03f), Vec3(0.46f, 0.46f, 0.38f), cardigan, ANIM_BREATHE)
+			.Rotated(Vec3(0.18f, 0.0f, 0.0f));
+		r.Add(SHAPE_BOX, Vec3(0.0f, 0.55f, 0.20f), Vec3(0.36f, 0.55f, 0.03f), apron, ANIM_BREATHE);
+		for (int i = 0; i < 2; ++i)
+		{
+			float side = (i == 0) ? -1.0f : 1.0f;
+			r.Add(SHAPE_CYLINDER, Vec3(side * 0.20f, 0.78f, 0.12f), Vec3(0.12f, 0.36f, 0.12f), cardigan * 0.92f, ANIM_BREATHE)
+				.Rotated(Vec3(0.9f, 0.0f, side * -0.2f));
+			r.Add(SHAPE_ELLIPSOID, Vec3(side * 0.07f, 0.70f, 0.30f), Vec3(0.10f, 0.09f, 0.10f), skin, ANIM_BREATHE);
+			r.Add(SHAPE_ELLIPSOID, Vec3(side * 0.07f, 1.20f, 0.20f), Vec3(0.04f, 0.03f, 0.02f), Vec3(0.10f, 0.08f, 0.08f), ANIM_BREATHE);
+		}
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 1.17f, 0.08f), Vec3(0.34f, 0.36f, 0.34f), skin, ANIM_BREATHE);
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 1.25f, 0.02f), Vec3(0.37f, 0.28f, 0.37f), hair, ANIM_BREATHE);
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 1.30f, -0.17f), Vec3(0.18f, 0.18f, 0.18f), hair * 0.95f, ANIM_BREATHE);
+		break;
+	}
+
+	case MODEL_SHED:
+	{
+		const Vec3 plank(0.33f, 0.27f, 0.21f);
+		const Vec3 tin(0.36f, 0.30f, 0.26f);
+
+		r.Add(SHAPE_BOX, Vec3(0.0f, 0.03f, 0.0f), Vec3(1.04f, 0.06f, 1.04f), Vec3(0.28f, 0.28f, 0.27f));
+		r.Add(SHAPE_BOX, Vec3(0.0f, 0.45f, 0.0f), Vec3(1.0f, 0.9f, 1.0f), plank);
+		for (int i = 0; i < 5; ++i)
+			r.Add(SHAPE_BOX, Vec3(-0.40f + 0.2f * (float)i, 0.45f, 0.502f), Vec3(0.015f, 0.9f, 0.01f), plank * 0.7f);
+		r.Add(SHAPE_BOX, Vec3(0.0f, 0.33f, 0.505f), Vec3(0.34f, 0.66f, 0.02f), Vec3(0.07f, 0.06f, 0.05f));
+		r.Add(SHAPE_BOX, Vec3(0.30f, 0.33f, 0.62f), Vec3(0.30f, 0.66f, 0.03f), plank * 0.85f).Rotated(Vec3(0.0f, -0.9f, 0.0f));
+		r.Add(SHAPE_PRISM, Vec3(0.0f, 1.04f, 0.0f), Vec3(1.0f, 0.28f, 1.0f), plank * 0.9f);
+		r.Add(SHAPE_BOX, Vec3(0.0f, 1.07f, 0.26f), Vec3(1.12f, 0.03f, 0.64f), tin).Rotated(Vec3(0.51f, 0.0f, 0.0f));
+		r.Add(SHAPE_BOX, Vec3(0.0f, 1.07f, -0.26f), Vec3(1.12f, 0.03f, 0.64f), tin * 0.85f).Rotated(Vec3(-0.51f, 0.0f, 0.0f));
+		r.Add(SHAPE_BOX, Vec3(-0.35f, 1.10f, 0.20f), Vec3(0.30f, 0.035f, 0.30f), rust).Rotated(Vec3(0.51f, 0.0f, 0.0f));
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.30f, 1.12f, -0.22f), Vec3(0.34f, 0.06f, 0.28f), moss, ANIM_PULSE).Rotated(Vec3(-0.51f, 0.0f, 0.0f));
+		r.Add(SHAPE_BOX, Vec3(-0.62f, 0.25f, 0.20f), Vec3(0.22f, 0.50f, 0.22f), Vec3(0.30f, 0.24f, 0.18f));
+		r.Add(SHAPE_CYLINDER, Vec3(-0.62f, 0.55f, -0.25f), Vec3(0.26f, 0.44f, 0.26f), Vec3(0.26f, 0.30f, 0.30f));
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.55f, 0.06f, -0.45f), Vec3(0.30f, 0.14f, 0.40f), kDarkMoss);
+		break;
+	}
+
+	case MODEL_GARDEN_BED:
+		r.Add(SHAPE_BOX, Vec3(0.0f, 0.08f, 0.0f), Vec3(1.0f, 0.16f, 1.0f), Vec3(0.24f, 0.19f, 0.14f));
+		r.Add(SHAPE_BOX, Vec3(0.0f, 0.165f, 0.0f), Vec3(0.12f, 0.01f, 0.96f), Vec3(0.18f, 0.14f, 0.10f));
+		r.Add(SHAPE_BOX, Vec3(-0.53f, 0.07f, 0.0f), Vec3(0.06f, 0.14f, 1.04f), Vec3(0.30f, 0.26f, 0.20f));
+		r.Add(SHAPE_BOX, Vec3(0.53f, 0.07f, 0.0f), Vec3(0.06f, 0.14f, 1.04f), Vec3(0.30f, 0.26f, 0.20f));
+		break;
+
+	case MODEL_VEGETABLE:
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 0.05f, 0.0f), Vec3(0.22f, 0.22f, 0.22f), Vec3(0.86f, 0.84f, 0.78f));
+		for (int i = 0; i < 5; ++i)
+		{
+			float a = (float)i * 1.2566f;
+			r.Add(SHAPE_ELLIPSOID, Vec3(sinf(a) * 0.08f, 0.26f, cosf(a) * 0.08f), Vec3(0.09f, 0.34f, 0.05f), Vec3(0.30f, 0.52f, 0.28f), ANIM_SWAY)
+				.Rotated(Vec3(cosf(a) * 0.4f, 0.0f, -sinf(a) * 0.4f));
+		}
+		break;
+
+	case MODEL_BERRY_RED:
+		AddBerryBush(r, Vec3(0.78f, 0.20f, 0.20f));
+		break;
+
+	case MODEL_BERRY_PALE:
+		AddBerryBush(r, Vec3(0.86f, 0.86f, 0.80f));
+		break;
+
+	case MODEL_DEER:
+	{
+		const Vec3 coat(0.42f, 0.36f, 0.30f);
+		const Vec3 glow(0.95f, 0.88f, 0.55f);
+
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 1.05f, 0.0f), Vec3(0.55f, 0.55f, 1.25f), coat, ANIM_BREATHE);
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 1.00f, 0.0f), Vec3(0.45f, 0.35f, 1.10f), coat * 1.25f, ANIM_BREATHE);
+		for (int leg = 0; leg < 4; ++leg)
+		{
+			float side = (leg % 2 == 0) ? 1.0f : -1.0f;
+			float front = (leg < 2) ? 1.0f : -1.0f;
+			r.Add(SHAPE_CYLINDER, Vec3(side * 0.16f, 0.42f, front * 0.42f), Vec3(0.08f, 0.84f, 0.08f), coat * 0.8f);
+		}
+		r.Add(SHAPE_CYLINDER, Vec3(0.0f, 1.45f, 0.58f), Vec3(0.18f, 0.60f, 0.18f), coat).Rotated(Vec3(0.5f, 0.0f, 0.0f));
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 1.78f, 0.80f), Vec3(0.22f, 0.24f, 0.40f), coat * 1.05f);
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 1.72f, 1.00f), Vec3(0.10f, 0.08f, 0.06f), Vec3(0.10f, 0.09f, 0.08f));
+		r.Add(SHAPE_CONE, Vec3(-0.12f, 1.92f, 0.72f), Vec3(0.08f, 0.16f, 0.05f), coat).Rotated(Vec3(0.0f, 0.0f, 0.6f));
+		r.Add(SHAPE_CONE, Vec3(0.12f, 1.92f, 0.72f), Vec3(0.08f, 0.16f, 0.05f), coat).Rotated(Vec3(0.0f, 0.0f, -0.6f));
+		for (int i = 0; i < 2; ++i)
+		{
+			float side = (i == 0) ? -1.0f : 1.0f;
+			r.Add(SHAPE_CYLINDER, Vec3(side * 0.12f, 2.12f, 0.74f), Vec3(0.04f, 0.45f, 0.04f), Vec3(0.60f, 0.55f, 0.45f))
+				.Rotated(Vec3(-0.3f, 0.0f, side * -0.4f));
+			r.Add(SHAPE_CYLINDER, Vec3(side * 0.26f, 2.34f, 0.66f), Vec3(0.03f, 0.30f, 0.03f), Vec3(0.60f, 0.55f, 0.45f))
+				.Rotated(Vec3(0.3f, 0.0f, side * -0.9f));
+			r.Add(SHAPE_ELLIPSOID, Vec3(side * 0.22f, 2.34f, 0.70f), Vec3(0.09f, 0.09f, 0.09f), glow, ANIM_PULSE);
+			r.Add(SHAPE_ELLIPSOID, Vec3(side * 0.38f, 2.44f, 0.62f), Vec3(0.08f, 0.08f, 0.08f), glow, ANIM_PULSE);
+		}
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 1.18f, -0.62f), Vec3(0.12f, 0.16f, 0.10f), Vec3(0.86f, 0.84f, 0.78f));
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 1.32f, -0.10f), Vec3(0.30f, 0.10f, 0.60f), moss, ANIM_PULSE);
+		break;
+	}
+
+	case MODEL_CANNED_FOOD:
+		r.Add(SHAPE_CYLINDER, Vec3(0.0f, 0.22f, 0.0f), Vec3(0.26f, 0.32f, 0.26f), Vec3(0.60f, 0.62f, 0.62f), pickup);
+		r.Add(SHAPE_CYLINDER, Vec3(0.0f, 0.22f, 0.0f), Vec3(0.265f, 0.20f, 0.265f), Vec3(0.85f, 0.55f, 0.30f), pickup | ANIM_PULSE);
+		r.Add(SHAPE_CYLINDER, Vec3(0.0f, 0.385f, 0.0f), Vec3(0.24f, 0.01f, 0.24f), Vec3(0.70f, 0.72f, 0.72f), pickup);
+		break;
+
+	case MODEL_BUS_STOP:
+	{
+		const Vec3 frame(0.30f, 0.34f, 0.34f);
+
+		r.Add(SHAPE_BOX, Vec3(0.0f, 0.03f, 0.0f), Vec3(3.2f, 0.06f, 1.5f), Vec3(0.34f, 0.34f, 0.32f));
+		r.Add(SHAPE_BOX, Vec3(0.0f, 1.2f, -0.65f), Vec3(3.0f, 2.2f, 0.06f), Vec3(0.20f, 0.26f, 0.27f));
+		r.Add(SHAPE_BOX, Vec3(-0.6f, 1.4f, -0.61f), Vec3(1.1f, 0.8f, 0.02f), Vec3(0.55f, 0.50f, 0.40f));
+		r.Add(SHAPE_BOX, Vec3(-1.5f, 1.2f, 0.0f), Vec3(0.08f, 2.4f, 0.08f), frame);
+		r.Add(SHAPE_BOX, Vec3(1.5f, 1.2f, 0.0f), Vec3(0.08f, 2.4f, 0.08f), frame);
+		r.Add(SHAPE_BOX, Vec3(0.0f, 2.42f, -0.1f), Vec3(3.4f, 0.08f, 1.5f), frame * 0.8f).Rotated(Vec3(-0.06f, 0.0f, 0.0f));
+		r.Add(SHAPE_BOX, Vec3(0.0f, 0.45f, -0.40f), Vec3(2.4f, 0.08f, 0.40f), Vec3(0.34f, 0.27f, 0.20f));
+		r.Add(SHAPE_BOX, Vec3(-1.0f, 0.22f, -0.40f), Vec3(0.08f, 0.44f, 0.36f), frame);
+		r.Add(SHAPE_BOX, Vec3(1.0f, 0.22f, -0.40f), Vec3(0.08f, 0.44f, 0.36f), frame);
+		r.Add(SHAPE_CYLINDER, Vec3(1.9f, 1.3f, 0.5f), Vec3(0.08f, 2.6f, 0.08f), frame);
+		r.Add(SHAPE_CYLINDER, Vec3(1.9f, 2.5f, 0.5f), Vec3(0.55f, 0.06f, 0.55f), Vec3(0.30f, 0.45f, 0.55f)).Rotated(Vec3(kPi * 0.5f, 0.0f, 0.0f));
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.3f, 2.5f, -0.1f), Vec3(2.0f, 0.2f, 1.2f), moss, ANIM_PULSE);
+		r.Add(SHAPE_BOX, Vec3(0.9f, 1.4f, -0.61f), Vec3(1.0f, 1.6f, 0.02f), kDarkMoss);
+		r.Add(SHAPE_ELLIPSOID, Vec3(-1.4f, 0.2f, 0.5f), Vec3(0.9f, 0.4f, 0.7f), moss, ANIM_SWAY);
+		break;
+	}
+
+	case MODEL_GINKGO:
+	{
+		const Vec3 leafA(0.78f, 0.66f, 0.24f);
+		const Vec3 leafB(0.86f, 0.74f, 0.30f);
+
+		r.Add(SHAPE_CONE, Vec3(0.0f, 0.3f, 0.0f), Vec3(1.2f, 0.6f, 1.2f), bark * 0.9f);
+		r.Add(SHAPE_CYLINDER, Vec3(0.0f, 1.8f, 0.0f), Vec3(0.55f, 3.6f, 0.55f), bark);
+		r.Add(SHAPE_CYLINDER, Vec3(0.5f, 3.2f, 0.1f), Vec3(0.16f, 1.4f, 0.16f), bark, ANIM_SWAY).Rotated(Vec3(0.0f, 0.0f, -0.6f));
+		r.Add(SHAPE_CYLINDER, Vec3(-0.45f, 3.5f, -0.1f), Vec3(0.15f, 1.3f, 0.15f), bark, ANIM_SWAY).Rotated(Vec3(0.0f, 0.0f, 0.6f));
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 4.2f, 0.0f), Vec3(3.4f, 2.4f, 3.4f), leafA, ANIM_SWAY);
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.9f, 4.8f, 0.5f), Vec3(2.0f, 1.6f, 2.0f), leafB, ANIM_SWAY);
+		r.Add(SHAPE_ELLIPSOID, Vec3(-0.8f, 5.0f, -0.6f), Vec3(2.1f, 1.7f, 2.1f), leafA * 0.92f, ANIM_SWAY);
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 5.9f, 0.1f), Vec3(1.8f, 1.5f, 1.8f), leafB, ANIM_SWAY);
+		r.Add(SHAPE_DISC, Vec3(0.0f, 0.02f, 0.0f), Vec3(5.0f, 1.0f, 5.0f), leafA * 0.85f);
+		break;
+	}
+
+	case MODEL_POLE:
+		r.Add(SHAPE_CYLINDER, Vec3(0.0f, 2.8f, 0.0f), Vec3(0.24f, 5.6f, 0.24f), Vec3(0.30f, 0.26f, 0.21f));
+		r.Add(SHAPE_BOX, Vec3(0.0f, 5.2f, 0.0f), Vec3(1.8f, 0.10f, 0.12f), Vec3(0.26f, 0.22f, 0.18f));
+		r.Add(SHAPE_CYLINDER, Vec3(-0.7f, 5.32f, 0.0f), Vec3(0.08f, 0.14f, 0.08f), Vec3(0.55f, 0.58f, 0.55f));
+		r.Add(SHAPE_CYLINDER, Vec3(0.7f, 5.32f, 0.0f), Vec3(0.08f, 0.14f, 0.08f), Vec3(0.55f, 0.58f, 0.55f));
+		r.Add(SHAPE_CYLINDER, Vec3(0.7f, 3.9f, 0.3f), Vec3(0.025f, 2.9f, 0.025f), kMetal).Rotated(Vec3(0.2f, 0.0f, 0.0f));
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 1.2f, 0.0f), Vec3(0.40f, 2.4f, 0.40f), kDarkMoss, ANIM_SWAY);
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 0.1f, 0.0f), Vec3(0.9f, 0.3f, 0.9f), moss);
 		break;
 
 	default:
