@@ -34,8 +34,8 @@ void Game::Update(float dt, const bool* keys)
 {
 	if (messageTimer > 0.0f) messageTimer -= dt;
 
-	// The stat panel pauses the world so the choice can be made calmly.
-	if (statPanelOpen) return;
+	// Panels pause the world so choices can be made calmly.
+	if (MenuOpen()) return;
 
 	time += dt;
 	levelTimer += dt;
@@ -49,6 +49,7 @@ void Game::Update(float dt, const bool* keys)
 	else
 		UpdateRoute(dt, keys);
 
+	UpdateSurvival(dt);
 	UpdateCamera(dt);
 	scene.RemoveDestroyed();
 }
@@ -90,7 +91,7 @@ void Game::UpdatePlayer(float dt, const bool* keys)
 	}
 	else if (wishLen > 0.001f)
 	{
-		float speed = kWalkSpeed * MoveSpeedScale(stats) * (p.swingTimer > 0.0f ? 0.7f : 1.0f);
+		float speed = kWalkSpeed * MoveSpeedScale(stats) * (p.swingTimer > 0.0f ? 0.7f : 1.0f) * (food <= 0.0f ? 0.85f : 1.0f);
 		pos = pos + wish * (speed * dt);
 		p.SetYaw(atan2f(wish.x, wish.z));
 		p.walkPhase += dt * 9.0f;
@@ -119,9 +120,37 @@ void Game::OnKeyDown(unsigned char key)
 		return;
 	}
 
+	if (HandleMenuKey(key)) return;
+
 	if (key == 27) // ESC
 	{
 		quit = true;
+		return;
+	}
+
+	if (key == 'i')
+	{
+		bagOpen = true;
+		return;
+	}
+	if (key == 'b')
+	{
+		journalOpen = true;
+		return;
+	}
+	if (key == 'l')
+	{
+		ToggleTorch();
+		return;
+	}
+	if (key == 'f')
+	{
+		EatFood();
+		return;
+	}
+	if (key == 'r')
+	{
+		DrinkWater();
 		return;
 	}
 
@@ -154,7 +183,6 @@ void Game::OnKeyDown(unsigned char key)
 
 	if (key == 'j') Attack();
 	else if (key == 'q') UseHerb();
-	else if (key == 'r') UseWater();
 	else if (key == 'c') OpenStatPanel();
 }
 
@@ -224,6 +252,14 @@ void Game::GatherLights(const Vec3& view)
 		float dist;
 	};
 	std::vector<Candidate> lights;
+
+	// The torch always makes the cut: it is the light you are holding.
+	if (torchOn)
+	{
+		Vec3 facing(sinf(player->Yaw()), 0.0f, cosf(player->Yaw()));
+		Vec3 pos = player->Position() + facing * 1.6f + Vec3(0.0f, 1.3f, 0.0f);
+		lights.push_back({ pos, Vec3(1.00f, 0.92f, 0.75f) * 2.0f, 8.0f, -1.0f });
+	}
 
 	std::vector<LanternActor*> lanterns;
 	SceneGraph::Collect(scene.Root(), ACTOR_LANTERN, lanterns);

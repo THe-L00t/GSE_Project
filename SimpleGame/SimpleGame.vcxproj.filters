@@ -95,6 +95,9 @@
     <ClCompile Include="GameCombat.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="GameSurvival.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
     <ClCompile Include="Rpg.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>

@@ -137,11 +137,10 @@ private:
 	void UpdateItems();
 	void UpdateCombatTimers(float dt);
 	void SpawnEnemy(int type, int enemyLevel, const Vec3& pos, int chunkX, int chunkZ, int spawnIndex);
-	void DropItem(int type, const Vec3& pos, int chunkX, int chunkZ, int spawnIndex);
+	ItemActor* DropItem(int type, const Vec3& pos, int chunkX, int chunkZ, int spawnIndex);
 	void PickUp(ItemActor& item);
 	void EquipWeapon();
 	void UseHerb();
-	void UseWater();
 	void GrantXp(int amount);
 	void AddPopup(const Vec3& pos, const char* text, const Vec3& color);
 	void OpenStatPanel();
@@ -151,6 +150,22 @@ private:
 	void DrawCombatHud();
 	void DrawPopups();
 	void DrawStatPanel();
+
+	// GameSurvival.cpp: water, food, warmth, the bag, the relic journal and the torch
+	bool MenuOpen() const;
+	void UpdateSurvival(float dt);
+	void EatFood();
+	void DrinkWater();
+	void ToggleTorch();
+	int  BagCount() const;
+	bool BagHasRoom() const { return BagCount() < kBagCapacity; }
+	void FindRelic(int id);
+	int  UnfoundRelic();
+	void AddInsight(int amount, const char* text);
+	bool HandleMenuKey(unsigned char key);
+	void DrawSurvivalHud();
+	void DrawBagPanel();
+	void DrawJournalPanel();
 
 	Renderer* renderer = nullptr;
 	int   level = LEVEL_VILLAGE;
@@ -189,7 +204,25 @@ private:
 
 	CharacterStats stats;
 	float health = 76.0f;
-	int   inventory[ITEM_TYPE_COUNT] = { 0, 0, 0, 0 };
+	int   inventory[ITEM_TYPE_COUNT] = {};
+
+	static const int kBagCapacity = 8;
+	float water = 60.0f;          // [0,100]
+	float food = 35.0f;           // [0,100]
+	float warmth = 100.0f;        // [0,100], only once warmthActive
+	bool  survivalShown = false;  // the tutorial brings the meters in at the well
+	bool  warmthActive = false;
+	float routeTime = 0.0f;       // seconds spent on Route 32
+	int   natureInsight = 0;
+	bool  relicFound[kRelicCount] = {};
+	bool  torchOwned = false;
+	bool  torchOn = false;
+	float torchBattery = 100.0f;
+	bool  bagOpen = false;
+	bool  journalOpen = false;
+	bool  packOpen = false;       // the departure: choosing what goes in the bag
+	int   mealsEaten = 0;
+	bool  enemySeen[ENEMY_TYPE_COUNT] = {};
 	float deathTimer = -1.0f;     // >= 0 while sinking into the long sleep
 	float levelUpTimer = 0.0f;
 	Rng   combatRng{ 0x5EED5EEDULL };
@@ -201,7 +234,7 @@ private:
 	int   pendingPoints[STAT_COUNT] = { 0, 0, 0, 0 };
 
 	int   kills[ENEMY_TYPE_COUNT] = { 0, 0, 0 };
-	int   pickups[ITEM_TYPE_COUNT] = { 0, 0, 0, 0 };
+	int   pickups[ITEM_TYPE_COUNT] = {};
 	int   herbsUsed = 0;
 	int   statConfirmations = 0;
 

@@ -90,10 +90,9 @@ void Game::UpdateRoute(float dt, const bool* keys)
 	UpdateCombatTimers(dt);
 	UpdateGuide();
 
-	// Deeper, more overgrown chunks carry thicker spores. Insight and dream fragments slow it.
+	// Deeper, more overgrown chunks carry thicker spores. Nature Insight slows it; thirst speeds it up.
 	const ChunkActor* here = EnsureChunk(playerChunkX, playerChunkZ);
-	float fragmentGuard = Maxf(1.0f - 0.18f * (float)fragments, 0.3f);
-	float rate = 0.012f * (float)here->stage * fragmentGuard * SporeResistance(stats);
+	float rate = 0.012f * (float)here->stage * NatureGuard(natureInsight) * (water <= 0.0f ? 1.6f : 1.0f);
 	if (player->rollTimer > 0.0f) rate = 0.0f;
 
 	// The lantern clears the air and mends wounds.
@@ -394,9 +393,12 @@ void Game::DrawRouteHud()
 	DrawGuideCard();
 	DrawCombatHud();
 	DrawPopups();
-	DrawCommonHud("WASD move   SPACE roll   J/Click attack   Q herb   R water   C stats   ESC quit");
-	DrawTitleCard("ROUTE 32", "where the road teaches you to grow");
+	DrawSurvivalHud();
+	DrawCommonHud("WASD move  SPACE roll  J attack  Q herb  R drink  F eat  L torch  I bag  B journal  C stats  E use");
+	DrawTitleCard("ROUTE 32", "the first outside");
 	DrawStatPanel();
+	DrawBagPanel();
+	DrawJournalPanel();
 }
 
 void Game::DrawGuideCard()

@@ -175,6 +175,7 @@ public:
 	float stateTimer = 0.0f;
 	bool  strikeHit = false;
 	bool  alive = true;
+	bool  provoked = false;   // struck or startled: gives chase much further
 	float flash = 0.0f;
 	int   chunkX = 0;
 	int   chunkZ = 0;
@@ -193,4 +194,6 @@ public:
 	int   chunkX = 0;
 	int   chunkZ = 0;
 	int   spawnIndex = -1;  // index into the owning chunk's items, -1 for drops and scripted items
+	int   relicId = -1;     // the journal entry a relic fills; -1 picks one not yet found
+	bool  landmark = false; // placed by the level; never forgotten when left behind
 };

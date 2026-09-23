@@ -7,7 +7,7 @@ enum StatId
 	STAT_STRENGTH,
 	STAT_VITALITY,
 	STAT_AGILITY,
-	STAT_INSIGHT,
+	STAT_SENSES,
 	STAT_COUNT
 };
 
@@ -29,7 +29,11 @@ float MaxHealth(const CharacterStats& stats);
 float AttackPower(const CharacterStats& stats, float weaponBonus);
 float MoveSpeedScale(const CharacterStats& stats);
 float AttackCooldown(const CharacterStats& stats);
-float SporeResistance(const CharacterStats& stats);   // multiplier on spore exposure gain
+float XpScale(const CharacterStats& stats);       // Senses: more XP from every source
+float FindScale(const CharacterStats& stats);     // Senses: creatures drop more
+
+// Spore resistance belongs to Nature Insight alone: a multiplier on spore exposure gain.
+float NatureGuard(int natureInsight);
 
 enum ItemType
 {
@@ -37,8 +41,34 @@ enum ItemType
 	ITEM_CLEAN_WATER,
 	ITEM_RELIC,
 	ITEM_RUSTY_PIPE,
+	ITEM_BERRIES,
+	ITEM_VEGETABLE,
+	ITEM_CANNED_FOOD,
 	ITEM_TYPE_COUNT
 };
+
+// How much of the food meter one item fills; zero for anything that is not food.
+float FoodValue(int itemType);
+
+// Items that take a slot in the bag.
+bool TakesBagSlot(int itemType);
+
+const int kRelicCount = 8;
+
+enum RelicId
+{
+	RELIC_TORCH,
+	RELIC_PEACHES,
+	RELIC_WATCH,
+	RELIC_RADIO,
+	RELIC_TICKET,
+	RELIC_PHOTO,
+	RELIC_PHONE,
+	RELIC_BADGE
+};
+
+const char* RelicName(int id);
+const char* RelicText(int id);
 
 struct ItemInfo
 {
@@ -74,6 +104,7 @@ struct EnemyInfo
 	float herbChance;
 	float waterChance;
 	float relicChance;
+	const char* lore;    // shown the first time the creature is met
 };
 
 const EnemyInfo& GetEnemyInfo(int type);

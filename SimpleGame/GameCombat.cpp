@@ -16,8 +16,7 @@ namespace
 	const float kPopupTime = 0.9f;
 	const float kRespawnDelay = 90.0f;
 	const float kHerbHeal = 0.4f;        // fraction of max health
-	const float kWaterClear = 0.45f;
-	const float kRelicXp = 12.0f;
+	const float kLoreRange = 9.0f;
 
 	const Vec3 kXpColor(0.75f, 0.95f, 0.55f);
 	const Vec3 kHurtColor(1.0f, 0.45f, 0.40f);
@@ -67,7 +66,7 @@ void Game::Attack()
 
 	Vec3 playerPos = player->Position();
 	Vec3 facing(sinf(player->Yaw()), 0.0f, cosf(player->Yaw()));
-	float power = AttackPower(stats, player->weapon ? player->weapon->power : 0.0f);
+	float power = AttackPower(stats, player->weapon ? player->weapon->power : 0.0f) * (food <= 0.0f ? 0.8f : 1.0f);
 	float reach = player->weapon ? player->weapon->reach : kBareHandReach;
 
 	std::vector<EnemyActor*> enemies = LiveEnemies();
@@ -94,6 +93,7 @@ void Game::DamageEnemy(EnemyActor& e, float amount, const Vec3& push)
 	const EnemyInfo& info = GetEnemyInfo(e.type);
 	e.health -= amount;
 	e.flash = 1.0f;
+	e.provoked = true;
 	e.knockback = FlatDirection(push) * (e.type == ENEMY_MOSS_BOAR ? 2.5f : 6.0f);
 
 	char text[16];
@@ -129,9 +129,10 @@ void Game::KillEnemy(EnemyActor& e)
 			state.respawnAt[e.spawnIndex] = time + kRespawnDelay;
 	}
 
-	if (combatRng.Chance(info.herbChance)) DropItem(ITEM_HERB, e.Position() + Vec3(0.4f, 0.0f, 0.2f), 0, 0, -1);
-	if (combatRng.Chance(info.waterChance)) DropItem(ITEM_CLEAN_WATER, e.Position() + Vec3(-0.4f, 0.0f, 0.1f), 0, 0, -1);
-	if (combatRng.Chance(info.relicChance)) DropItem(ITEM_RELIC, e.Position() + Vec3(0.0f, 0.0f, -0.4f), 0, 0, -1);
+	float find = FindScale(stats);
+	if (combatRng.Chance(info.herbChance * find)) DropItem(ITEM_HERB, e.Position() + Vec3(0.4f, 0.0f, 0.2f), 0, 0, -1);
+	if (combatRng.Chance(info.waterChance * find)) DropItem(ITEM_CLEAN_WATER, e.Position() + Vec3(-0.4f, 0.0f, 0.1f), 0, 0, -1);
+	if (combatRng.Chance(info.relicChance * find)) DropItem(ITEM_RELIC, e.Position() + Vec3(0.0f, 0.0f, -0.4f), 0, 0, -1);
 
 	GrantXp(EnemyXpAt(info, e.level));
 }
@@ -189,6 +190,17 @@ void Game::UpdateEnemies(float dt)
 	for (size_t i = 0; i < enemies.size(); ++i)
 		UpdateEnemy(*enemies[i], dt);
 
+	// Each kind of creature is explained once, the first time it comes close.
+	for (size_t i = 0; i < enemies.size(); ++i)
+	{
+		const EnemyActor& e = *enemies[i];
+		if (!e.alive || enemySeen[e.type]) continue;
+		if (DistXZ(e.Position(), player->Position()) > kLoreRange) continue;
+
+		enemySeen[e.type] = true;
+		ShowMessage(GetEnemyInfo(e.type).lore, 5.5f);
+	}
+
 	// Keep creatures from stacking into one another.
 	for (size_t i = 0; i < enemies.size(); ++i)
 	{
@@ -240,12 +252,18 @@ void Game::UpdateEnemy(EnemyActor& e, float dt)
 			e.stateTimer = combatRng.Range(2.0f, 4.5f);
 		}
 		MoveToward(pos, yaw, e.moveTarget, speed * 0.35f, dt);
-		if (playerAwake && dist < info.aggroRange) e.state = ENEMY_CHASE;
+		if (playerAwake && dist < info.aggroRange)
+		{
+			e.state = ENEMY_CHASE;
+			e.provoked = true;
+		}
 		break;
 
 	case ENEMY_CHASE:
-		if (!playerAwake || dist > info.aggroRange * 1.8f || DistXZ(pos, e.home) > 22.0f)
+		// A provoked creature chases well past its notice range; the boar is only ever provoked.
+		if (!playerAwake || dist > Maxf(info.aggroRange * 1.8f, e.provoked ? 16.0f : 0.0f) || DistXZ(pos, e.home) > 22.0f)
 		{
+			e.provoked = false;
 			e.state = ENEMY_IDLE;
 			e.moveTarget = e.home;
 			e.stateTimer = 3.0f;
@@ -322,8 +340,8 @@ void Game::UpdateItems()
 	{
 		ItemActor& item = *items[i];
 
-		// Drops that fall far behind are forgotten. The pipe stays: the guide waits for it.
-		if (item.spawnIndex < 0 && item.type != ITEM_RUSTY_PIPE && DistXZ(player->Position(), item.Position()) > 60.0f)
+		// Drops that fall far behind are forgotten. The pipe and landmark finds stay: the guide waits for them.
+		if (item.spawnIndex < 0 && !item.landmark && item.type != ITEM_RUSTY_PIPE && DistXZ(player->Position(), item.Position()) > 60.0f)
 		{
 			item.Destroy();
 			continue;
@@ -331,6 +349,13 @@ void Game::UpdateItems()
 
 		if (deathTimer < 0.0f && DistXZ(player->Position(), item.Position()) < kPickupRange)
 		{
+			// A full bag leaves the find where it lies.
+			if (TakesBagSlot(item.type) && !BagHasRoom())
+			{
+				if (messageTimer <= 0.0f) ShowMessage("Your bag is full. Eat, drink or use something first.", 2.5f);
+				continue;
+			}
+
 			item.Destroy();
 			PickUp(item);
 		}
@@ -372,7 +397,7 @@ void Game::SpawnEnemy(int type, int enemyLevel, const Vec3& pos, int chunkX, int
 	e->spawnIndex = spawnIndex;
 }
 
-void Game::DropItem(int type, const Vec3& pos, int chunkX, int chunkZ, int spawnIndex)
+ItemActor* Game::DropItem(int type, const Vec3& pos, int chunkX, int chunkZ, int spawnIndex)
 {
 	ItemActor* item = itemGroup->AddChild(new ItemActor(type));
 	item->SetPosition(Vec3(pos.x, 0.0f, pos.z));
@@ -380,12 +405,13 @@ void Game::DropItem(int type, const Vec3& pos, int chunkX, int chunkZ, int spawn
 	item->chunkX = chunkX;
 	item->chunkZ = chunkZ;
 	item->spawnIndex = spawnIndex;
+	return item;
 }
 
 void Game::PickUp(ItemActor& item)
 {
 	const ItemInfo& info = GetItemInfo(item.type);
-	ShowMessage(info.pickupText, 3.5f);
+	if (item.type != ITEM_RELIC) ShowMessage(info.pickupText, 3.5f);
 	++pickups[item.type];
 
 	if (item.spawnIndex >= 0)
@@ -401,7 +427,11 @@ void Game::PickUp(ItemActor& item)
 		EquipWeapon();
 		break;
 	case ITEM_RELIC:
-		GrantXp((int)kRelicXp);
+		FindRelic(item.relicId);
+		break;
+	case ITEM_CANNED_FOOD:
+		++inventory[item.type];
+		FindRelic(RELIC_PEACHES);
 		break;
 	default:
 		++inventory[item.type];
@@ -440,23 +470,10 @@ void Game::UseHerb()
 	AddPopup(player->Position() + Vec3(0.0f, 2.0f, 0.0f), text, kHealColor);
 }
 
-void Game::UseWater()
-{
-	if (deathTimer >= 0.0f) return;
-
-	if (inventory[ITEM_CLEAN_WATER] <= 0)
-	{
-		ShowMessage("No clean water left.", 2.0f);
-		return;
-	}
-
-	--inventory[ITEM_CLEAN_WATER];
-	sporeExposure = Maxf(sporeExposure - kWaterClear, 0.0f);
-	ShowMessage("The water rinses the spores out. Breathing comes easier.", 2.5f);
-}
-
 void Game::GrantXp(int amount)
 {
+	amount = (int)((float)amount * XpScale(stats) + 0.5f);
+
 	char text[16];
 	sprintf_s(text, sizeof(text), "+%d XP", amount);
 	AddPopup(player->Position() + Vec3(0.0f, 2.4f, 0.0f), text, kXpColor);
@@ -607,8 +624,9 @@ void Game::DrawCombatHud()
 	renderer->DrawBarPx(104.0f, 148.0f, 228.0f, 8.0f, (float)stats.xp / (float)need,
 						Vec3(0.40f, 0.55f, 0.75f), Vec3(0.60f, 0.85f, 0.95f));
 
-	sprintf_s(buf, sizeof(buf), "%s    Herb x%d [Q]    Water x%d [R]",
-			  player->weapon ? "Rusty pipe" : "Bare hands", inventory[ITEM_HERB], inventory[ITEM_CLEAN_WATER]);
+	int meals = inventory[ITEM_BERRIES] + inventory[ITEM_VEGETABLE] + inventory[ITEM_CANNED_FOOD];
+	sprintf_s(buf, sizeof(buf), "%s   Herb %d [Q]  Water %d [R]  Food %d [F]",
+			  player->weapon ? "Pipe" : "Hands", inventory[ITEM_HERB], inventory[ITEM_CLEAN_WATER], meals);
 	renderer->DrawTexts(32, 176, buf, kHudDim, false);
 
 	if (stats.unspentPoints > 0)
@@ -694,7 +712,7 @@ void Game::DrawStatPanel()
 
 	sprintf_s(buf, sizeof(buf), "Move speed     %3d%% ->  %3d%%", (int)(MoveSpeedScale(stats) * 100.0f + 0.5f), (int)(MoveSpeedScale(preview) * 100.0f + 0.5f));
 	renderer->DrawTexts(x, y, buf, kHudInk, false);
-	sprintf_s(buf, sizeof(buf), "Spore guard %4d%% -> %4d%%", (int)(100.0f / SporeResistance(stats) + 0.5f), (int)(100.0f / SporeResistance(preview) + 0.5f));
+	sprintf_s(buf, sizeof(buf), "XP gain     %4d%% -> %4d%%", (int)(XpScale(stats) * 100.0f + 0.5f), (int)(XpScale(preview) * 100.0f + 0.5f));
 	renderer->DrawTexts(x + 300, y, buf, kHudInk, false);
 
 	if (level == LEVEL_ROUTE && (guide == GUIDE_ASSIGN_STATS || guide == GUIDE_ASSIGN_AGAIN))

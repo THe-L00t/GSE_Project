@@ -153,8 +153,7 @@ void Game::UpdateVillage(float dt, const bool* keys)
 	}
 
 	// Nature Insight slows exposure; the water's edge clears it.
-	float insight = Maxf(1.0f - 0.18f * (float)fragments, 0.3f);
-	float rate = 0.028f * insight;
+	float rate = 0.028f * NatureGuard(natureInsight);
 
 	if (water->ShoreDistance(player->Position()) < water->clearRange) rate = -0.075f;
 
@@ -267,9 +266,7 @@ void Game::TryInteract()
 		s.mote->Destroy();
 		s.mote = nullptr;
 		++fragments;
-		char buf[128];
-		sprintf_s(buf, sizeof(buf), "A dream fragment: the first spring, seen from someone else's eyes.  Nature Insight %d", fragments);
-		ShowMessage(buf, 5.0f);
+		AddInsight(1, "A dream fragment: the first spring, seen from someone else's eyes.");
 	}
 	else
 	{

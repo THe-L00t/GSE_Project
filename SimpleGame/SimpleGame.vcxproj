@@ -177,6 +177,7 @@
     <ClCompile Include="GameActors.cpp" />
     <ClCompile Include="GameCombat.cpp" />
     <ClCompile Include="GameRoute.cpp" />
+    <ClCompile Include="GameSurvival.cpp" />
     <ClCompile Include="GameVillage.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Models.cpp" />
