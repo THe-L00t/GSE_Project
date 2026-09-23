@@ -139,6 +139,9 @@
     <None Include="Shaders\Post.fs">
       <Filter>소스 파일\Shaders</Filter>
     </None>
+    <None Include="Shaders\Shadow.fs">
+      <Filter>소스 파일\Shaders</Filter>
+    </None>
     <None Include="Shaders\Env.glsl">
       <Filter>소스 파일\Shaders</Filter>
     </None>

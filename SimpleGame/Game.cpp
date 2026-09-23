@@ -186,6 +186,12 @@ void Game::Render()
 	GatherLights(view);
 
 	player->UpdatePose(deathTimer);
+
+	// The same scene twice: once as depth from the sun, then lit with those shadows.
+	renderer->BeginShadowPass(view);
+	scene.Draw(renderer, view);
+	renderer->EndShadowPass();
+
 	scene.Draw(renderer, view);
 
 	// Spores last: additive, and they should sit over everything.

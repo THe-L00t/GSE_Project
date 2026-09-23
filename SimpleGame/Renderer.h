@@ -48,6 +48,11 @@ public:
 	// bloom and tone mapping to the window, after which the UI draws on top.
 	void BeginFrame();
 	void EndScene();
+
+	// Between these, DrawModel writes depth into the sun's shadow map and every other draw is skipped.
+	// Call after SetFrame, since the sun follows the time of day.
+	void BeginShadowPass(const Vec3& focus);
+	void EndShadowPass();
 	void SetCamera(const Mat4& view, const Mat4& proj, const Vec3& eye, float pxPerUnit);
 	void SetFrame(float dayTime, float exposure, const Vec3& fogCenter, float seconds);
 
@@ -105,6 +110,18 @@ private:
 		GLint lightCount = -1;
 		GLint lightPos = -1;
 		GLint lightColor = -1;
+		GLint shadowMap = -1;
+		GLint lightViewProj = -1;
+		GLint shadowOn = -1;
+	};
+
+	struct ShadowLocations
+	{
+		GLint viewProj = -1;
+		GLint model = -1;
+		GLint normalMat = -1;
+		GLint phase = -1;
+		GLint time = -1;
 	};
 
 	struct OverlayLocations
@@ -181,6 +198,8 @@ private:
 
 	void CreateTargets(int sizeX, int sizeY);
 	void DeleteTargets();
+	void BindSceneTarget();
+	void CreateShadowMap();
 	void DrawPostPass(GLuint target, int width, int height, int mode, GLuint source, float sourceWidth, float sourceHeight);
 
 	bool initialized = false;
@@ -217,7 +236,17 @@ private:
 	int    targetHeight = 0;
 	bool   postReady = false;
 
+	static const int kShadowSize = 2048;
+	GLuint shadowShader = 0;
+	GLuint shadowFbo = 0;
+	GLuint shadowTex = 0;
+	bool   shadowReady = false;
+	bool   shadowPass = false;     // inside BeginShadowPass / EndShadowPass
+	bool   shadowActive = false;   // this frame's shadow map is valid
+	Mat4   lightViewProj;
+
 	LitLocations         lit;
+	ShadowLocations      shadow;
 	OverlayLocations     overlay;
 	ParticleLocations    particle;
 	PostLocations        post;

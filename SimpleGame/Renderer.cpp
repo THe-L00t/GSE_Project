@@ -33,11 +33,13 @@ void Renderer::Initialize(int sizeX, int sizeY)
 	particleShader  = CompileShaders("Shaders/Particle.vs",  "Shaders/Particle.fs");
 	overlayShader   = CompileShaders("Shaders/Overlay.vs",   "Shaders/Overlay.fs");
 	postShader      = CompileShaders("Shaders/Post.vs",      "Shaders/Post.fs");
+	shadowShader    = CompileShaders("Shaders/Lit.vs",       "Shaders/Shadow.fs");
 
 	CreateVertexBufferObjects();
 	CacheUniformLocations();
 	LoadModels();
 	CreateTargets(sizeX, sizeY);
+	CreateShadowMap();
 
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LEQUAL);
@@ -150,6 +152,112 @@ void Renderer::CreateTargets(int sizeX, int sizeY)
 		<< ", MSAA x" << (samples > 1 ? samples : 1) << "\n";
 }
 
+void Renderer::CreateShadowMap()
+{
+	if (shadowShader == 0 || litShader == 0) return;
+
+	glGenTextures(1, &shadowTex);
+	glBindTexture(GL_TEXTURE_2D, shadowTex);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, kShadowSize, kShadowSize, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glGenFramebuffers(1, &shadowFbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, shadowFbo);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowTex, 0);
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+	shadowReady = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	// The shadow map lives on texture unit 2, clear of the post-process units.
+	glUseProgram(litShader);
+	glUniform1i(lit.shadowMap, 2);
+	glUseProgram(0);
+
+	std::cout << "Shadows: " << (shadowReady ? "sun shadow map ready" : "unavailable") << "\n";
+}
+
+void Renderer::BindSceneTarget()
+{
+	if (postReady)
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, samples > 1 ? msFbo : sceneFbo);
+		glViewport(0, 0, targetWidth, targetHeight);
+	}
+	else
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(0, 0, (GLsizei)windowSizeX, (GLsizei)windowSizeY);
+	}
+}
+
+void Renderer::BeginShadowPass(const Vec3& focus)
+{
+	if (!shadowReady) return;
+
+	// Same sun as EnvAt in Env.glsl, held above a floor so dawn and night shadows stay a sensible length.
+	float ang = (timeOfDay - 0.25f) * 2.0f * kPi;
+	float rise = Maxf(sinf(ang), -0.15f) * 0.9f + 0.18f;
+	Vec3 sun = Normalize(Vec3(cosf(ang) * 0.75f, Maxf(rise, 0.30f), 0.42f));
+
+	const float half = 30.0f;
+	const float depth = 60.0f;
+	Mat4 view = MatLookAt(sun * 100.0f, Vec3(0.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f));
+
+	// Snap the focus to whole shadow texels so edges hold still while the camera glides.
+	const float* m = view.m;
+	float lx = m[0] * focus.x + m[4] * focus.y + m[8] * focus.z + m[12];
+	float ly = m[1] * focus.x + m[5] * focus.y + m[9] * focus.z + m[13];
+	float lz = m[2] * focus.x + m[6] * focus.y + m[10] * focus.z + m[14];
+	float texel = half * 2.0f / (float)kShadowSize;
+	lx = floorf(lx / texel) * texel;
+	ly = floorf(ly / texel) * texel;
+
+	Mat4 proj = MatOrtho(lx - half, lx + half, ly - half, ly + half, -lz - depth, -lz + depth);
+	lightViewProj = Mul(proj, view);
+
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture(GL_TEXTURE0);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, shadowFbo);
+	glViewport(0, 0, kShadowSize, kShadowSize);
+	glEnable(GL_DEPTH_TEST);
+	glDepthMask(GL_TRUE);
+	glClear(GL_DEPTH_BUFFER_BIT);
+
+	// Slope-scaled offset keeps the lit side of each surface from shadowing itself.
+	glEnable(GL_POLYGON_OFFSET_FILL);
+	glPolygonOffset(2.0f, 4.0f);
+
+	glUseProgram(shadowShader);
+	glUniformMatrix4fv(shadow.viewProj, 1, GL_FALSE, lightViewProj.m);
+	glUniform1f(shadow.time, time);
+
+	shadowPass = true;
+}
+
+void Renderer::EndShadowPass()
+{
+	if (!shadowPass) return;
+
+	shadowPass = false;
+	shadowActive = true;
+	glDisable(GL_POLYGON_OFFSET_FILL);
+
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, shadowTex);
+	glActiveTexture(GL_TEXTURE0);
+
+	BindSceneTarget();
+}
+
 void Renderer::DeleteTargets()
 {
 	if (msFbo) glDeleteFramebuffers(1, &msFbo);
@@ -236,6 +344,15 @@ void Renderer::CacheUniformLocations()
 	lit.lightCount = glGetUniformLocation(litShader, "u_LightCount");
 	lit.lightPos = glGetUniformLocation(litShader, "u_LightPos");
 	lit.lightColor = glGetUniformLocation(litShader, "u_LightColor");
+	lit.shadowMap = glGetUniformLocation(litShader, "u_ShadowMap");
+	lit.lightViewProj = glGetUniformLocation(litShader, "u_LightViewProj");
+	lit.shadowOn = glGetUniformLocation(litShader, "u_ShadowOn");
+
+	shadow.viewProj = glGetUniformLocation(shadowShader, "u_ViewProj");
+	shadow.model = glGetUniformLocation(shadowShader, "u_Model");
+	shadow.normalMat = glGetUniformLocation(shadowShader, "u_NormalMat");
+	shadow.phase = glGetUniformLocation(shadowShader, "u_Phase");
+	shadow.time = glGetUniformLocation(shadowShader, "u_Time");
 
 	overlay.rect = glGetUniformLocation(overlayShader, "u_Rect");
 	overlay.mode = glGetUniformLocation(overlayShader, "u_Mode");
@@ -420,11 +537,8 @@ GLuint Renderer::CompileShaders(const char* filenameVS, const char* filenameFS)
 
 void Renderer::BeginFrame()
 {
-	if (postReady)
-	{
-		glBindFramebuffer(GL_FRAMEBUFFER, samples > 1 ? msFbo : sceneFbo);
-		glViewport(0, 0, targetWidth, targetHeight);
-	}
+	BindSceneTarget();
+	shadowActive = false;
 
 	// The ground plane always fills the orthographic view, so the clear colour never shows.
 	glClearColor(0.05f, 0.06f, 0.07f, 1.0f);
@@ -588,6 +702,8 @@ void Renderer::BindLit(const Mat4& model, const DrawParams& params, int mode)
 	glUniform3f(lit.fogOrigin, fogOrigin.x, fogOrigin.y, fogOrigin.z);
 	glUniform1f(lit.time, time);
 	glUniform3f(lit.camPos, camPos.x, camPos.y, camPos.z);
+	glUniformMatrix4fv(lit.lightViewProj, 1, GL_FALSE, lightViewProj.m);
+	glUniform1f(lit.shadowOn, shadowActive ? 1.0f : 0.0f);
 
 	// Uniforms stay with the program, so the light list goes up once per change.
 	if (lightsDirty)
@@ -626,6 +742,17 @@ void Renderer::DrawMesh(int id)
 
 void Renderer::DrawModel(int id, const Mat4& model, const DrawParams& params)
 {
+	if (shadowPass)
+	{
+		float normalMat[9];
+		MatNormal3x3(model, normalMat);
+		glUniformMatrix4fv(shadow.model, 1, GL_FALSE, model.m);
+		glUniformMatrix3fv(shadow.normalMat, 1, GL_FALSE, normalMat);
+		glUniform1f(shadow.phase, params.phase);
+		DrawMesh(id);
+		return;
+	}
+
 	BindLit(model, params, 0);
 	DrawMesh(id);
 }
@@ -638,6 +765,8 @@ void Renderer::DrawModel(int id, const Vec3& pos, float yaw, const Vec3& scale, 
 
 void Renderer::DrawShadow(const Vec3& pos, float radius)
 {
+	if (shadowPass) return;
+
 	Mat4 model = Mul(MatTranslate(Vec3(pos.x, 0.0f, pos.z)), MatScale(Vec3(radius * 2.0f, 1.0f, radius * 2.0f)));
 
 	glDepthMask(GL_FALSE);
@@ -648,6 +777,8 @@ void Renderer::DrawShadow(const Vec3& pos, float radius)
 
 void Renderer::DrawGround(const Vec3& center, float extent, const GroundParams& params)
 {
+	if (shadowPass) return;
+
 	Mat4 model = Mul(MatTranslate(Vec3(center.x, 0.0f, center.z)), MatScale(Vec3(extent, 1.0f, extent)));
 	BindLit(model, DrawParams(), 1);
 
@@ -662,6 +793,8 @@ void Renderer::DrawGround(const Vec3& center, float extent, const GroundParams& 
 
 void Renderer::DrawWater(const Vec3& center, float sizeX, float sizeZ)
 {
+	if (shadowPass) return;
+
 	Mat4 model = Mul(MatTranslate(center), MatScale(Vec3(sizeX, 1.0f, sizeZ)));
 	BindLit(model, DrawParams(), 2);
 	DrawMesh(MODEL_GROUND);
@@ -681,7 +814,7 @@ void Renderer::DrawAmbientMotes(const Vec3& center)
 
 void Renderer::DrawMotes(int style, int first, int count, const Vec3& center, const Vec3& field, const Vec3& color, float densityScale, float size)
 {
-	if (densityScale <= 0.001f) return;
+	if (shadowPass || densityScale <= 0.001f) return;
 	if (first + count > sporeCount) count = sporeCount - first;
 	if (count <= 0) return;
 

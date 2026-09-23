@@ -29,6 +29,10 @@ uniform int   u_LightCount;
 uniform vec4  u_LightPos[kMaxLights];     // xyz position, w radius
 uniform vec3  u_LightColor[kMaxLights];
 
+uniform sampler2DShadow u_ShadowMap;
+uniform mat4  u_LightViewProj;
+uniform float u_ShadowOn;
+
 layout(location = 0) out vec4 FragColor;
 
 float hash21(vec2 p)
@@ -91,6 +95,28 @@ float CloudShade(vec2 p)
 	return mix(0.62, 1.0, smoothstep(0.38, 0.62, c));
 }
 
+// Sun visibility from the shadow map: 3x3 hardware-filtered taps, faded out at the map's border.
+float SunShadow(vec3 pos, vec3 n)
+{
+	if (u_ShadowOn < 0.5) return 1.0;
+
+	vec4 lp = u_LightViewProj * vec4(pos + n * 0.05, 1.0);
+	vec3 sc = lp.xyz / lp.w * 0.5 + 0.5;
+	if (sc.x <= 0.0 || sc.x >= 1.0 || sc.y <= 0.0 || sc.y >= 1.0 || sc.z >= 1.0) return 1.0;
+
+	vec2 texel = 1.0 / vec2(textureSize(u_ShadowMap, 0));
+	float lit = 0.0;
+	for (int y = -1; y <= 1; ++y)
+	{
+		for (int x = -1; x <= 1; ++x)
+			lit += texture(u_ShadowMap, vec3(sc.xy + vec2(float(x), float(y)) * texel * 1.5, sc.z - 0.0005));
+	}
+	lit /= 9.0;
+
+	float border = min(min(sc.x, 1.0 - sc.x), min(sc.y, 1.0 - sc.y));
+	return mix(1.0, lit, smoothstep(0.0, 0.06, border));
+}
+
 vec3 PointLights(vec3 pos, vec3 n)
 {
 	vec3 sum = vec3(0.0);
@@ -121,7 +147,9 @@ void main()
 	if (u_Mode == 3)
 	{
 		float r = length(v_Local.xz) * 2.0;
-		float alpha = (1.0 - smoothstep(0.3, 1.0, r)) * 0.38 * (1.0 - fog);
+		// With real shadows the blob only needs to add a soft contact darkening.
+		float strength = mix(0.38, 0.22, u_ShadowOn);
+		float alpha = (1.0 - smoothstep(0.3, 1.0, r)) * strength * (1.0 - fog);
 		FragColor = vec4(0.0, 0.0, 0.0, alpha);
 		return;
 	}
@@ -195,7 +223,7 @@ void main()
 	float wrap = clamp(ndl * 0.5 + 0.5, 0.0, 1.0);
 	wrap *= wrap;
 
-	float sunVis = CloudShade(v_WorldPos.xz);
+	float sunVis = CloudShade(v_WorldPos.xz) * SunShadow(v_WorldPos, n);
 
 	// Models darken toward the ground they stand on, which seats them in the scene.
 	float ao = 1.0;
