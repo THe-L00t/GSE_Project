@@ -194,6 +194,7 @@ public:
 	int      cx = 0;
 	int      cz = 0;
 	int      stage = 1;
+	float    modernity = 1.0f;
 	uint64_t hash = 0;
 	int      lastTick = 0;           // last update that looked the chunk up
 	bool     hasNeighborStages = false;

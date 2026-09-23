@@ -62,6 +62,28 @@ void Game::StartRoute()
 	itemGroup = levelNode->AddChild(new Actor(ACTOR_NODE));
 	enemyGroup = levelNode->AddChild(new Actor(ACTOR_NODE));
 
+	reservoir = levelNode->AddChild(new WaterActor(kReservoirSizeX, kReservoirSizeZ));
+	reservoir->SetPosition(Vec3(kReservoirCenter.x, 0.03f, kReservoirCenter.z));
+	reservoirFound = false;
+	townReached = false;
+	townCardTimer = -1.0f;
+	deerLeaveTimer = -1.0f;
+	routeTime = 0.0f;
+	warmthActive = false;
+
+	// The finds the road is built around. They wait however long the player takes.
+	if (!relicFound[RELIC_PEACHES])
+	{
+		ItemActor* can = DropItem(ITEM_CANNED_FOOD, Vec3(RoadCenter(kBusStopZ) + 3.7f, 0.0f, kBusStopZ), 0, 0, -1);
+		can->landmark = true;
+	}
+	if (!relicFound[RELIC_BADGE])
+	{
+		ItemActor* badge = DropItem(ITEM_RELIC, Vec3(RoadCenter(kTownGateZ) + 8.5f, 0.0f, kTownGateZ + 4.0f), 0, 0, -1);
+		badge->relicId = RELIC_BADGE;
+		badge->landmark = true;
+	}
+
 	uint64_t seed = kRouteSeed != 0 ? kRouteSeed : MixSeed((uint64_t)std::time(nullptr));
 	routeMap.Reset(seed);
 	chunkActors.clear();
@@ -106,12 +128,17 @@ void Game::UpdateRoute(float dt, const bool* keys)
 	UpdateEnemies(dt);
 	UpdateItems();
 	UpdateCombatTimers(dt);
+	UpdateLandmarks(dt);
+	UpdateRouteDeer(dt);
 	UpdateGuide();
 
 	// Deeper, more overgrown chunks carry thicker spores. Nature Insight slows it; thirst speeds it up.
 	const ChunkActor* here = EnsureChunk(playerChunkX, playerChunkZ);
 	float rate = 0.012f * (float)here->stage * NatureGuard(natureInsight) * (waterMeter <= 0.0f ? 1.6f : 1.0f);
 	if (player->rollTimer > 0.0f) rate = 0.0f;
+
+	// Open water clears the air, as the reservoir did at home.
+	if (reservoir->ShoreDistance(player->Position()) < reservoir->clearRange) rate = -0.075f;
 
 	// The lantern clears the air and mends wounds.
 	if (DistXZ(player->Position(), lantern->WorldPosition()) < lantern->zoneRadius && deathTimer < 0.0f)
@@ -165,8 +192,20 @@ void Game::SetGuide(int next)
 		ShowMessage("Level up again. Try putting these points somewhere new.", 5.0f);
 		break;
 
+	case GUIDE_BUS_STOP:
+		ShowMessage("Something is sheltered at the bus stop down the road.", 5.0f);
+		break;
+
+	case GUIDE_FIND_WATER:
+		ShowMessage("Your flasks will not last. Grandmother said the lantern deer know where water is.", 6.0f);
+		break;
+
+	case GUIDE_REACH_TOWN:
+		ShowMessage("Ginkgo Town lies further south. Follow what is left of the road.", 5.0f);
+		break;
+
 	case GUIDE_EXPLORE:
-		ShowMessage("The road opens. Every step grows new land from the ground behind you.", 6.0f);
+		ShowMessage("The road goes on. The further you walk, the less of the old world is left.", 6.0f);
 		break;
 
 	default:
@@ -194,11 +233,23 @@ void Game::UpdateGuide()
 
 	case GUIDE_FIGHT_BOAR:
 		if (kills[ENEMY_MOSS_BOAR] - guideBaseline >= 1)
-			SetGuide(stats.unspentPoints > 0 ? GUIDE_ASSIGN_AGAIN : GUIDE_EXPLORE);
+			SetGuide(stats.unspentPoints > 0 ? GUIDE_ASSIGN_AGAIN : GUIDE_BUS_STOP);
 		break;
 
 	case GUIDE_ASSIGN_AGAIN:
-		if (statConfirmations > guideBaseline || stats.unspentPoints == 0) SetGuide(GUIDE_EXPLORE);
+		if (statConfirmations > guideBaseline || stats.unspentPoints == 0) SetGuide(GUIDE_BUS_STOP);
+		break;
+
+	case GUIDE_BUS_STOP:
+		if (relicFound[RELIC_PEACHES] || reservoirFound || townReached) SetGuide(GUIDE_FIND_WATER);
+		break;
+
+	case GUIDE_FIND_WATER:
+		if (reservoirFound || townReached) SetGuide(GUIDE_REACH_TOWN);
+		break;
+
+	case GUIDE_REACH_TOWN:
+		if (townReached) SetGuide(GUIDE_EXPLORE);
 		break;
 
 	default:
@@ -226,8 +277,20 @@ void Game::GuideText(char* buf, size_t size) const
 	case GUIDE_ASSIGN_AGAIN:
 		sprintf_s(buf, size, "Level %d. Spend the new points - try a different stat.", stats.level);
 		break;
+	case GUIDE_BUS_STOP:
+		sprintf_s(buf, size, "Look in the bus stop further down the road.");
+		break;
+	case GUIDE_FIND_WATER:
+		if (timeOfDay < 0.22f || timeOfDay > 0.78f)
+			sprintf_s(buf, size, "Find water. Follow the lantern deer if it appears.");
+		else
+			sprintf_s(buf, size, "Find water. The lantern deer come out after dark (T hurries time).");
+		break;
+	case GUIDE_REACH_TOWN:
+		sprintf_s(buf, size, "Reach Ginkgo Town, south along the road.");
+		break;
 	default:
-		sprintf_s(buf, size, "Walk Route 32. The land grows in every direction.");
+		sprintf_s(buf, size, "Walk on. The land grows in every direction, and forgets the old world.");
 		break;
 	}
 }
@@ -380,6 +443,119 @@ void Game::ResolveRouteCollisions(Vec3& pos, float radius)
 	}
 
 	PushOutOfCircle(pos, radius, lantern->WorldPosition(), lantern->collider.radius);
+	PushOutOfBox(pos, radius, reservoir->WorldPosition(), reservoir->collider.halfX, reservoir->collider.halfZ);
+}
+
+void Game::UpdateLandmarks(float dt)
+{
+	const Vec3& pos = player->Position();
+
+	if (!reservoirFound && reservoir->ShoreDistance(pos) < 3.0f)
+	{
+		reservoirFound = true;
+		AddInsight(1, "Water, hidden where the land dips.");
+	}
+
+	if (!townReached && pos.z > kTownGateZ && fabsf(pos.x - RoadCenter(pos.z)) < 16.0f)
+	{
+		townReached = true;
+		townCardTimer = 0.0f;
+		ShowMessage("You reached Ginkgo Town. The road goes on, if you want it to.", 6.0f);
+	}
+
+	if (townCardTimer >= 0.0f)
+	{
+		townCardTimer += dt;
+		if (townCardTimer > 8.0f) townCardTimer = -1.0f;
+	}
+
+	prompt.clear();
+	if (deathTimer < 0.0f && reservoir->ShoreDistance(pos) < 1.8f) prompt = "[E]  Drink and fill your flasks";
+}
+
+void Game::UpdateRouteDeer(float dt)
+{
+	bool night = timeOfDay < 0.22f || timeOfDay > 0.78f;
+
+	if (!deer)
+	{
+		// Only while it is needed: after dark, with the water still unfound.
+		if (guide != GUIDE_FIND_WATER || !night || reservoirFound || deathTimer >= 0.0f) return;
+
+		Vec3 toWater(kReservoirCenter.x - player->Position().x, 0.0f, kReservoirCenter.z - player->Position().z);
+		float len = Length(toWater);
+		Vec3 dir = len > 0.01f ? toWater * (1.0f / len) : Vec3(0.0f, 0.0f, 1.0f);
+
+		deer = levelNode->AddChild(new DeerActor());
+		deer->SetPosition(player->Position() + dir * 6.0f);
+		deer->SetYaw(atan2f(dir.x, dir.z));
+		deer->goal = kReservoirCenter + Vec3(-kReservoirSizeX * 0.5f - 1.5f, 0.0f, 0.0f);
+		deer->speed = 2.4f;
+		deer->leading = true;
+		ShowMessage("A lantern deer steps out of the dark, and waits for you.", 5.0f);
+		return;
+	}
+
+	Vec3 pos = deer->Position();
+
+	// Its work done, or the night over, it walks off and is gone.
+	if (deerLeaveTimer < 0.0f && (reservoirFound || (!night && !deer->arrived)))
+	{
+		deerLeaveTimer = 0.0f;
+		if (!reservoirFound) ShowMessage("With the dawn, the deer is gone.", 3.0f);
+	}
+	if (deerLeaveTimer >= 0.0f)
+	{
+		deerLeaveTimer += dt;
+		deer->SetPosition(pos + Vec3(1.8f * dt, 0.0f, 0.6f * dt));
+		deer->SetYaw(atan2f(1.8f, 0.6f));
+		deer->stepPhase += dt * 4.0f;
+		if (deerLeaveTimer > 6.0f)
+		{
+			deer->Destroy();
+			deer = nullptr;
+			deerLeaveTimer = -1.0f;
+		}
+		return;
+	}
+
+	Vec3 toGoal(deer->goal.x - pos.x, 0.0f, deer->goal.z - pos.z);
+	float goalDist = Length(toGoal);
+	float playerDist = DistXZ(pos, player->Position());
+
+	if (goalDist < 0.5f)
+	{
+		deer->arrived = true;
+		return;
+	}
+
+	// Leading: it keeps just ahead, and turns to wait when the player falls behind.
+	if (playerDist > 9.0f)
+	{
+		Vec3 toPlayer = player->Position() - pos;
+		deer->SetYaw(atan2f(toPlayer.x, toPlayer.z));
+		return;
+	}
+
+	float step = Minf(deer->speed * dt, goalDist);
+	deer->SetPosition(pos + toGoal * (step / goalDist));
+	deer->SetYaw(atan2f(toGoal.x, toGoal.z));
+	deer->stepPhase += dt * 5.0f;
+}
+
+void Game::TryRouteInteract()
+{
+	if (deathTimer >= 0.0f || reservoir->ShoreDistance(player->Position()) >= 1.8f) return;
+
+	waterMeter = 100.0f;
+	int room = kBagCapacity - BagCount();
+	int fill = room < 3 ? room : 3;
+	if (fill < 0) fill = 0;
+	inventory[ITEM_CLEAN_WATER] += fill;
+
+	char buf[96];
+	sprintf_s(buf, sizeof(buf), "You drink deep and fill %d flask%s.", fill, fill == 1 ? "" : "s");
+	ShowMessage(buf, 3.0f);
 }
 
 void Game::DrawRouteHud()
@@ -391,21 +567,22 @@ void Game::DrawRouteHud()
 	DrawObjective(objective);
 
 	const ChunkActor* here = EnsureChunk(playerChunkX, playerChunkZ);
-	char lines[4][96];
+	char lines[5][96];
 	sprintf_s(lines[0], sizeof(lines[0]), "Seed  %016llX", (unsigned long long)routeMap.WorldSeed());
 	sprintf_s(lines[1], sizeof(lines[1]), "Chunk (%d, %d)  stage %d", here->cx, here->cz, here->stage);
 	sprintf_s(lines[2], sizeof(lines[2]), "Chunk hash  %016llX", (unsigned long long)here->hash);
 	sprintf_s(lines[3], sizeof(lines[3]), "Chunks grown  %d", routeMap.GeneratedCount());
+	sprintf_s(lines[4], sizeof(lines[4]), "Old world left  %d%%", (int)(here->modernity * 100.0f + 0.5f));
 
 	int boxW = 0;
-	for (int i = 0; i < 4; ++i)
+	for (int i = 0; i < 5; ++i)
 	{
 		int tw = renderer->TextWidth(lines[i], false);
 		if (tw > boxW) boxW = tw;
 	}
 
-	renderer->DrawRectPx((float)(w - boxW - 46), 18.0f, (float)(boxW + 28), 96.0f, kHudPanel, 0.38f);
-	for (int i = 0; i < 4; ++i)
+	renderer->DrawRectPx((float)(w - boxW - 46), 18.0f, (float)(boxW + 28), 116.0f, kHudPanel, 0.38f);
+	for (int i = 0; i < 5; ++i)
 		renderer->DrawTexts(w - boxW - 32, 40 + i * 20, lines[i], i == 0 ? kHudInk : kHudDim, false);
 
 	DrawGuideCard();
@@ -414,6 +591,7 @@ void Game::DrawRouteHud()
 	DrawSurvivalHud();
 	DrawCommonHud("WASD move  SPACE roll  J attack  Q herb  R drink  F eat  L torch  I bag  B journal  C stats  E use");
 	DrawTitleCard("ROUTE 32", "the first outside");
+	DrawTitleCardAt("GINKGO TOWN", "the end of the first road", townCardTimer);
 	DrawStatPanel();
 	DrawBagPanel();
 	DrawJournalPanel();

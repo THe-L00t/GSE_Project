@@ -64,7 +64,8 @@ enum LevelId
 	LEVEL_ROUTE
 };
 
-// The opening of Route 32 walks through fighting, levelling up and assigning stats.
+// Route 32, the first outside: fight and grow, keep the body going, let nature show the way,
+// carry the old world, and reach Ginkgo Town (ContentDesign.md 3).
 enum RouteGuide
 {
 	GUIDE_TAKE_PIPE,
@@ -72,6 +73,9 @@ enum RouteGuide
 	GUIDE_ASSIGN_STATS,
 	GUIDE_FIGHT_BOAR,
 	GUIDE_ASSIGN_AGAIN,
+	GUIDE_BUS_STOP,
+	GUIDE_FIND_WATER,
+	GUIDE_REACH_TOWN,
 	GUIDE_EXPLORE
 };
 
@@ -117,6 +121,7 @@ private:
 	void DrawObjective(const char* text);
 	void DrawCommonHud(const char* help);
 	void DrawTitleCard(const char* title, const char* subtitle);
+	void DrawTitleCardAt(const char* title, const char* subtitle, float t);
 	void ShowMessage(const char* text, float seconds);
 	void GatherLights(const Vec3& view);
 
@@ -165,6 +170,9 @@ private:
 	ChunkActor* EnsureChunk(int cx, int cz);
 	void PrepareChunkView();
 	void ResolveRouteCollisions(Vec3& pos, float radius);
+	void UpdateLandmarks(float dt);
+	void UpdateRouteDeer(float dt);
+	void TryRouteInteract();
 	void DrawRouteHud();
 	void DrawGuideCard();
 
@@ -268,6 +276,11 @@ private:
 	Actor*        enemyGroup = nullptr;
 	LanternActor* lantern = nullptr;
 	Actor*        safePoint = nullptr;   // where the long sleep ends
+	WaterActor*   reservoir = nullptr;   // hidden east of the road; the lantern deer knows the way
+	bool  reservoirFound = false;
+	bool  townReached = false;
+	float townCardTimer = -1.0f;
+	float deerLeaveTimer = -1.0f;
 	std::unordered_map<uint64_t, ChunkActor*> chunkActors;
 	std::unordered_map<uint64_t, ChunkState> chunkStates;
 	int   guide = GUIDE_TAKE_PIPE;

@@ -11,6 +11,17 @@ const float kChunkSize = 24.0f;
 // Must match roadCenter() in Shaders/Lit.fs so props line up with the painted road.
 inline float RoadCenter(float z) { return sinf(z * 0.05f) * 3.0f; }
 
+// Fixed places on Route 32 (ContentDesign.md 3.2). The chunk map keeps its random props clear of them.
+const int   kBusStopChunkZ = 2;
+const float kBusStopZ = 48.0f;
+const int   kReservoirChunkX = 1;
+const int   kReservoirChunkZ = 4;
+const Vec3  kReservoirCenter(20.0f, 0.0f, 96.0f);
+const float kReservoirSizeX = 12.0f;
+const float kReservoirSizeZ = 9.0f;
+const int   kTownChunkZ = 6;
+const float kTownGateZ = 140.0f;
+
 struct ChunkProp
 {
 	int   model = 0;
@@ -41,6 +52,7 @@ struct Chunk
 	uint64_t seed = 0;
 	uint64_t hash = 0;       // hash of the generated content; seeds the chunks grown from here
 	int      stage = 1;      // naturalisation stage 1..3
+	float    modernity = 1.0f; // 1 near the village, 0 far out: how much of the old world is left
 	std::vector<ChunkProp>  props;
 	std::vector<ChunkSpawn> spawns;
 	std::vector<ChunkItem>  items;

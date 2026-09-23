@@ -212,7 +212,7 @@ LanternActor::LanternActor()
 }
 
 ChunkActor::ChunkActor(const Chunk& chunk)
-	: Actor(ACTOR_CHUNK), cx(chunk.cx), cz(chunk.cz), stage(chunk.stage), hash(chunk.hash)
+	: Actor(ACTOR_CHUNK), cx(chunk.cx), cz(chunk.cz), stage(chunk.stage), modernity(chunk.modernity), hash(chunk.hash)
 {
 	// Stays at the origin, so its props keep the map's world coordinates exactly.
 	layer = LAYER_GROUND;
@@ -248,6 +248,7 @@ void ChunkActor::Draw(const DrawContext& dc) const
 	for (int i = 0; i < 4; ++i)
 		ground.neighborStage[i] = neighborStage[i];
 	ground.chunkSize = kChunkSize;
+	ground.road = modernity;
 
 	// A hair of overlap hides cracks between neighbouring ground quads.
 	dc.renderer->DrawGround(ChunkMap::ChunkCenter(cx, cz), kChunkSize + 0.02f, ground);

@@ -341,6 +341,7 @@ void Renderer::CacheUniformLocations()
 	lit.chunkCenter = glGetUniformLocation(litShader, "u_ChunkCenter");
 	lit.chunkSize = glGetUniformLocation(litShader, "u_ChunkSize");
 	lit.damp = glGetUniformLocation(litShader, "u_Damp");
+	lit.road = glGetUniformLocation(litShader, "u_Road");
 	lit.lightCount = glGetUniformLocation(litShader, "u_LightCount");
 	lit.lightPos = glGetUniformLocation(litShader, "u_LightPos");
 	lit.lightColor = glGetUniformLocation(litShader, "u_LightColor");
@@ -787,6 +788,7 @@ void Renderer::DrawGround(const Vec3& center, float extent, const GroundParams& 
 	glUniform2f(lit.chunkCenter, center.x, center.z);
 	glUniform1f(lit.chunkSize, params.chunkSize);
 	glUniform3f(lit.damp, params.dampCenter.x, params.dampCenter.z, params.dampStrength);
+	glUniform1f(lit.road, params.road);
 
 	DrawMesh(MODEL_GROUND);
 }

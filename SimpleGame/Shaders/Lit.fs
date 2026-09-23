@@ -23,6 +23,7 @@ uniform vec4  u_NeighborStage;  // -x, +x, -z, +z
 uniform vec2  u_ChunkCenter;
 uniform float u_ChunkSize;      // zero turns neighbour blending off
 uniform vec3  u_Damp;           // x, z, strength
+uniform float u_Road;           // 1 near the village; the road wears away to 0 far out
 
 const int kMaxLights = 8;
 uniform int   u_LightCount;
@@ -173,7 +174,7 @@ void main()
 		vec3 grass    = vec3(0.24, 0.34, 0.24);
 		vec3 forest   = vec3(0.13, 0.22, 0.15);
 
-		float road = (1.0 - smoothstep(1.9, 3.2, abs(p.x - roadCenter(p.y)))) * (1.0 - overgrowth * 0.6);
+		float road = (1.0 - smoothstep(1.9, 3.2, abs(p.x - roadCenter(p.y)))) * (1.0 - overgrowth * 0.6) * u_Road;
 		vec3 soil = mix(grass, moss, smoothstep(0.35 - overgrowth * 0.3, 0.75 - overgrowth * 0.3, patchMask));
 		vec3 track = mix(dirt, concrete, smoothstep(0.4, 0.7, grain) * (1.0 - overgrowth));
 

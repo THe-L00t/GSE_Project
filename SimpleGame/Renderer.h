@@ -24,6 +24,7 @@ struct GroundParams
 	float chunkSize = 0.0f;                                  // zero turns neighbour blending off
 	Vec3  dampCenter;
 	float dampStrength = 0.0f;
+	float road = 1.0f;                                       // how much of the painted road survives
 };
 
 class Renderer
@@ -107,6 +108,7 @@ private:
 		GLint chunkCenter = -1;
 		GLint chunkSize = -1;
 		GLint damp = -1;
+		GLint road = -1;
 		GLint lightCount = -1;
 		GLint lightPos = -1;
 		GLint lightColor = -1;

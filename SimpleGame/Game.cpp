@@ -137,6 +137,7 @@ void Game::OnKeyDown(unsigned char key)
 	if (key == 'e')
 	{
 		if (level == LEVEL_VILLAGE) TryInteract();
+		else TryRouteInteract();
 		return;
 	}
 
@@ -361,14 +362,19 @@ void Game::DrawCommonHud(const char* help)
 
 void Game::DrawTitleCard(const char* title, const char* subtitle)
 {
-	if (levelTimer >= kTitleDuration) return;
+	DrawTitleCardAt(title, subtitle, levelTimer);
+}
+
+void Game::DrawTitleCardAt(const char* title, const char* subtitle, float t)
+{
+	if (t < 0.0f || t >= kTitleDuration) return;
 
 	const int w = renderer->GetWidth();
 	const int h = renderer->GetHeight();
 
 	float alpha = 1.0f;
-	if (levelTimer < 1.0f) alpha = levelTimer;
-	else if (levelTimer > kTitleDuration - 2.0f) alpha = Saturatef((kTitleDuration - levelTimer) * 0.5f);
+	if (t < 1.0f) alpha = t;
+	else if (t > kTitleDuration - 2.0f) alpha = Saturatef((kTitleDuration - t) * 0.5f);
 
 	int w1 = renderer->TextWidth(title, true);
 	int w2 = renderer->TextWidth(subtitle, false);

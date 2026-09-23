@@ -25,22 +25,102 @@ namespace
 		float minScale;
 		float maxScale;
 		float weight[3];   // by naturalisation stage 1..3
+		bool  modern;      // left by the old world: thins out as modernity falls
 	};
 
 	const PropKind kPropKinds[] =
 	{
-		{ MODEL_TREE, 1.6f, 0.25f, 0.85f, 1.30f, { 3.0f, 4.0f, 5.0f } },
-		{ MODEL_PINE, 1.4f, 0.20f, 0.80f, 1.40f, { 1.0f, 3.0f, 4.0f } },
-		{ MODEL_BUSH, 0.9f, 0.00f, 0.70f, 1.30f, { 3.0f, 3.0f, 3.0f } },
-		{ MODEL_ROCK, 0.9f, 0.60f, 0.70f, 1.50f, { 2.0f, 2.0f, 2.0f } },
-		{ MODEL_RUIN, 2.0f, 1.00f, 0.80f, 1.10f, { 2.0f, 1.0f, 0.0f } },
-		{ MODEL_CAR,  2.2f, 1.30f, 1.00f, 1.00f, { 1.5f, 0.5f, 0.0f } },
+		{ MODEL_TREE, 1.6f, 0.25f, 0.85f, 1.30f, { 3.0f, 4.0f, 5.0f }, false },
+		{ MODEL_PINE, 1.4f, 0.20f, 0.80f, 1.40f, { 1.0f, 3.0f, 4.0f }, false },
+		{ MODEL_BUSH, 0.9f, 0.00f, 0.70f, 1.30f, { 3.0f, 3.0f, 3.0f }, false },
+		{ MODEL_ROCK, 0.9f, 0.60f, 0.70f, 1.50f, { 2.0f, 2.0f, 2.0f }, false },
+		{ MODEL_RUIN, 2.0f, 1.00f, 0.80f, 1.10f, { 2.0f, 1.0f, 0.0f }, true },
+		{ MODEL_CAR,  2.2f, 1.30f, 1.00f, 1.00f, { 1.5f, 0.5f, 0.0f }, true },
+		{ MODEL_POLE, 0.8f, 0.25f, 0.90f, 1.10f, { 1.5f, 0.8f, 0.2f }, true },
 	};
 	const int kPropKindCount = (int)(sizeof(kPropKinds) / sizeof(kPropKinds[0]));
 
 	// The start of Route 32 keeps a clearing for the opening.
 	const Vec3 kClearingCenter(0.0f, 0.0f, -3.0f);
 	const float kClearingRadius = 9.0f;
+
+	// A place a chunk's random layout must leave alone.
+	struct KeepOut
+	{
+		Vec3  center;
+		float radius = 0.0f;   // zero keeps nothing out
+	};
+
+	KeepOut LandmarkKeepOut(int cx, int cz)
+	{
+		KeepOut k;
+		if (cx == 0 && cz == kBusStopChunkZ)
+		{
+			k.center = Vec3(RoadCenter(kBusStopZ) + 5.0f, 0.0f, kBusStopZ);
+			k.radius = 5.0f;
+		}
+		else if (cx == kReservoirChunkX && cz == kReservoirChunkZ)
+		{
+			k.center = kReservoirCenter;
+			k.radius = 8.5f;
+		}
+		else if (cx == 0 && cz == kTownChunkZ)
+		{
+			k.center = Vec3(RoadCenter(kTownGateZ), 0.0f, kTownGateZ + 3.0f);
+			k.radius = 11.0f;
+		}
+		return k;
+	}
+
+	// Modernity: whole within three rings of the village, gone by ring twelve.
+	float ModernityAt(int ring)
+	{
+		float m = 1.0f - (float)(ring - 3) / 9.0f;
+		return m < 0.0f ? 0.0f : (m > 1.0f ? 1.0f : m);
+	}
+
+	void AddFixedProp(Chunk& c, std::vector<float>& footprints, int model, const Vec3& pos, float yaw, float scale, float radius)
+	{
+		ChunkProp prop;
+		prop.model = model;
+		prop.pos = pos;
+		prop.yaw = yaw;
+		prop.scale = scale;
+		prop.radius = radius;
+		c.props.push_back(prop);
+		footprints.push_back(radius > 0.0f ? radius + 1.0f : 1.0f);
+	}
+
+	void AddLandmarks(Chunk& c, std::vector<float>& footprints)
+	{
+		const float halfPi = kPi * 0.5f;
+
+		if (c.cx == 0 && c.cz == kBusStopChunkZ)
+		{
+			// The bus shelter faces the road; a car died beside it long ago.
+			AddFixedProp(c, footprints, MODEL_BUS_STOP, Vec3(RoadCenter(kBusStopZ) + 5.2f, 0.0f, kBusStopZ), -halfPi, 1.0f, 1.6f);
+			AddFixedProp(c, footprints, MODEL_CAR, Vec3(RoadCenter(kBusStopZ + 6.0f) + 4.6f, 0.0f, kBusStopZ + 6.0f), 0.25f, 1.0f, 1.3f);
+			AddFixedProp(c, footprints, MODEL_POLE, Vec3(RoadCenter(kBusStopZ - 5.0f) + 4.0f, 0.0f, kBusStopZ - 5.0f), 0.0f, 1.0f, 0.25f);
+		}
+		else if (c.cx == kReservoirChunkX && c.cz == kReservoirChunkZ)
+		{
+			// Reeds and stones around the hidden water; the water itself is placed by the level.
+			AddFixedProp(c, footprints, MODEL_BUSH, kReservoirCenter + Vec3(-7.2f, 0.0f, 3.5f), 0.4f, 1.2f, 0.0f);
+			AddFixedProp(c, footprints, MODEL_BUSH, kReservoirCenter + Vec3(6.8f, 0.0f, -4.0f), 1.3f, 1.0f, 0.0f);
+			AddFixedProp(c, footprints, MODEL_ROCK, kReservoirCenter + Vec3(-6.5f, 0.0f, -4.4f), 2.0f, 1.1f, 0.6f);
+			AddFixedProp(c, footprints, MODEL_PINE, kReservoirCenter + Vec3(7.5f, 0.0f, 5.5f), 0.0f, 1.3f, 0.25f);
+		}
+		else if (c.cx == 0 && c.cz == kTownChunkZ)
+		{
+			// Ginkgo Town's gate: two gold trees either side of the road and the old school wall.
+			float road = RoadCenter(kTownGateZ);
+			AddFixedProp(c, footprints, MODEL_GINKGO, Vec3(road - 6.5f, 0.0f, kTownGateZ), 0.0f, 1.0f, 0.35f);
+			AddFixedProp(c, footprints, MODEL_GINKGO, Vec3(road + 6.5f, 0.0f, kTownGateZ + 1.0f), 1.2f, 1.1f, 0.35f);
+			AddFixedProp(c, footprints, MODEL_RUIN, Vec3(road + 10.5f, 0.0f, kTownGateZ + 6.0f), halfPi, 1.1f, 1.0f);
+			AddFixedProp(c, footprints, MODEL_SIGN, Vec3(road + 4.2f, 0.0f, kTownGateZ - 3.0f), 0.0f, 1.0f, 0.0f);
+			AddFixedProp(c, footprints, MODEL_POLE, Vec3(road - 4.2f, 0.0f, kTownGateZ - 6.0f), 0.0f, 1.0f, 0.25f);
+		}
+	}
 
 	struct GrowStep
 	{
@@ -49,16 +129,22 @@ namespace
 		int dir;
 	};
 
-	const PropKind& PickPropKind(Rng& rng, int stage)
+	float KindWeight(const PropKind& kind, int stage, float modernity)
+	{
+		float scale = kind.modern ? modernity : 1.0f + 0.5f * (1.0f - modernity);
+		return kind.weight[stage - 1] * scale;
+	}
+
+	const PropKind& PickPropKind(Rng& rng, int stage, float modernity)
 	{
 		float total = 0.0f;
 		for (int i = 0; i < kPropKindCount; ++i)
-			total += kPropKinds[i].weight[stage - 1];
+			total += KindWeight(kPropKinds[i], stage, modernity);
 
 		float roll = rng.Unit() * total;
 		for (int i = 0; i < kPropKindCount; ++i)
 		{
-			roll -= kPropKinds[i].weight[stage - 1];
+			roll -= KindWeight(kPropKinds[i], stage, modernity);
 			if (roll < 0.0f) return kPropKinds[i];
 		}
 		return kPropKinds[0];
@@ -68,6 +154,7 @@ namespace
 					  bool avoidRoad, bool avoidClearing, Vec3& out)
 	{
 		Vec3 center = ChunkMap::ChunkCenter(c.cx, c.cz);
+		KeepOut keep = LandmarkKeepOut(c.cx, c.cz);
 
 		for (int attempt = 0; attempt < 8; ++attempt)
 		{
@@ -79,6 +166,7 @@ namespace
 
 			if (avoidRoad && fabsf(pos.x - RoadCenter(pos.z)) < 3.4f + footprint) continue;
 			if (avoidClearing && DistXZ(pos, kClearingCenter) < kClearingRadius + footprint) continue;
+			if (keep.radius > 0.0f && DistXZ(pos, keep.center) < keep.radius + footprint) continue;
 
 			bool blocked = false;
 			for (size_t j = 0; j < c.props.size() && !blocked; ++j)
@@ -242,13 +330,15 @@ Chunk ChunkMap::Generate(int cx, int cz, uint64_t seed, int parentDir) const
 	c.stage = 1 + ring / 3 + (rng.Chance(0.3f) ? 1 : 0);
 	if (origin) c.stage = 1;
 	if (c.stage > 3) c.stage = 3;
+	c.modernity = ModernityAt(ring);
 
 	std::vector<float> footprints;
+	AddLandmarks(c, footprints);
 
 	int count = 8 + rng.RangeInt(0, 6) + (c.stage - 1) * 3;
 	for (int i = 0; i < count; ++i)
 	{
-		const PropKind& kind = PickPropKind(rng, c.stage);
+		const PropKind& kind = PickPropKind(rng, c.stage, c.modernity);
 		float scale = rng.Range(kind.minScale, kind.maxScale) * (c.stage == 3 ? 1.25f : 1.0f);
 		float footprint = kind.spacing * scale;
 
@@ -286,9 +376,10 @@ Chunk ChunkMap::Generate(int cx, int cz, uint64_t seed, int parentDir) const
 
 		if (rng.Chance(0.55f))
 		{
+			// Relics grow rarer as the old world thins out.
 			float roll = rng.Unit();
 			ChunkItem item;
-			item.itemType = roll < 0.6f ? ITEM_HERB : (roll < 0.9f ? ITEM_CLEAN_WATER : ITEM_RELIC);
+			item.itemType = roll < 0.6f ? ITEM_HERB : (roll < 1.0f - 0.1f * c.modernity ? ITEM_CLEAN_WATER : ITEM_RELIC);
 			if (FindOpenSpot(rng, c, footprints, 0.6f, false, false, item.pos))
 				c.items.push_back(item);
 		}
