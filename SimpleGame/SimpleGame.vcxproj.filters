@@ -63,6 +63,9 @@
     <ClInclude Include="GameActors.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="Font.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -110,6 +113,9 @@
     <ClCompile Include="GameActors.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="Font.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\SolidRect.fs">
@@ -146,6 +152,12 @@
       <Filter>소스 파일\Shaders</Filter>
     </None>
     <None Include="Shaders\Env.glsl">
+      <Filter>소스 파일\Shaders</Filter>
+    </None>
+    <None Include="Shaders\Text.vs">
+      <Filter>소스 파일\Shaders</Filter>
+    </None>
+    <None Include="Shaders\Text.fs">
       <Filter>소스 파일\Shaders</Filter>
     </None>
   </ItemGroup>

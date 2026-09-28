@@ -1,8 +1,6 @@
 #include "stdafx.h"
 #include "Renderer.h"
 
-#include "Dependencies\freeglut.h"
-
 #include <cstring>
 #include <vector>
 
@@ -34,10 +32,15 @@ void Renderer::Initialize(int sizeX, int sizeY)
 	overlayShader   = CompileShaders("Shaders/Overlay.vs",   "Shaders/Overlay.fs");
 	postShader      = CompileShaders("Shaders/Post.vs",      "Shaders/Post.fs");
 	shadowShader    = CompileShaders("Shaders/Lit.vs",       "Shaders/Shadow.fs");
+	textShader      = CompileShaders("Shaders/Text.vs",      "Shaders/Text.fs");
 
 	CreateVertexBufferObjects();
 	CacheUniformLocations();
 	LoadModels();
+
+	fonts[0].Load("Fonts/NanumGothic-Regular.ttf", 16.0f);
+	fonts[1].Load("Fonts/NanumGothic-Bold.ttf", 22.0f);
+
 	CreateTargets(sizeX, sizeY);
 	CreateShadowMap();
 
@@ -319,6 +322,8 @@ void Renderer::CreateVertexBufferObjects()
 	glGenBuffers(1, &vboSpores);
 	glBindBuffer(GL_ARRAY_BUFFER, vboSpores);
 	glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(spores.size() * sizeof(float)), &spores[0], GL_STATIC_DRAW);
+
+	glGenBuffers(1, &vboText);
 }
 
 void Renderer::CacheUniformLocations()
@@ -390,6 +395,9 @@ void Renderer::CacheUniformLocations()
 	post.sporeExposure = glGetUniformLocation(postShader, "u_SporeExposure");
 	post.time = glGetUniformLocation(postShader, "u_Time");
 	post.positionAttrib = glGetAttribLocation(postShader, "a_Position");
+
+	textScreen = glGetUniformLocation(textShader, "u_Screen");
+	textAtlas = glGetUniformLocation(textShader, "u_Atlas");
 }
 
 void Renderer::LoadModels()
@@ -866,12 +874,15 @@ void Renderer::BeginUI()
 
 void Renderer::EndUI()
 {
+	FlushText();
 	glEnable(GL_DEPTH_TEST);
 	glDepthMask(GL_TRUE);
 }
 
 void Renderer::DrawOverlayQuad(float rx, float ry, float rw, float rh, const OverlayParams& params)
 {
+	// Text queued so far belongs under this quad.
+	FlushText();
 	glUseProgram(overlayShader);
 
 	glUniform4f(overlay.rect, rx, ry, rw, rh);
@@ -949,39 +960,88 @@ void Renderer::DrawTexts(int x, int y, const char* text, const Vec3& color, bool
 {
 	if (text == NULL || *text == 0) return;
 
-	void* font = large ? GLUT_BITMAP_HELVETICA_18 : GLUT_BITMAP_9_BY_15;
+	const int face = large ? 1 : 0;
+	Font& font = fonts[face];
+	if (!font.IsLoaded()) return;
 
-	// Bitmap text goes through fixed-function raster state, so the programmable
-	// pipeline is unbound for the duration.
-	glUseProgram(0);
+	std::vector<TextVertex>& queue = textQueue[face];
+	float pen = (float)x;
+	while (*text != 0)
+	{
+		const Glyph& g = font.Get(NextCodepoint(text));
 
-	glMatrixMode(GL_PROJECTION);
-	glPushMatrix();
-	glLoadIdentity();
-	glOrtho(0.0, (double)windowSizeX, 0.0, (double)windowSizeY, -1.0, 1.0);
+		// Whole-pixel corners keep the glyphs crisp.
+		if (g.w > 0)
+		{
+			float x0 = floorf(pen + 0.5f) + (float)g.x0;
+			float y0 = (float)(y + g.y0);
+			float x1 = x0 + (float)g.w;
+			float y1 = y0 + (float)g.h;
 
-	glMatrixMode(GL_MODELVIEW);
-	glPushMatrix();
-	glLoadIdentity();
+			TextVertex a = { x0, y0, g.u0, g.v0, color.x, color.y, color.z };
+			TextVertex b = { x1, y0, g.u1, g.v0, color.x, color.y, color.z };
+			TextVertex c = { x1, y1, g.u1, g.v1, color.x, color.y, color.z };
+			TextVertex d = { x0, y1, g.u0, g.v1, color.x, color.y, color.z };
+			queue.push_back(a);
+			queue.push_back(b);
+			queue.push_back(c);
+			queue.push_back(a);
+			queue.push_back(c);
+			queue.push_back(d);
+		}
 
-	// The raster colour is latched when the raster position is set.
-	glColor3f(color.x, color.y, color.z);
-	glRasterPos2i(x, (int)windowSizeY - y);
-
-	for (const char* c = text; *c != 0; ++c)
-		glutBitmapCharacter(font, *c);
-
-	glPopMatrix();
-	glMatrixMode(GL_PROJECTION);
-	glPopMatrix();
-	glMatrixMode(GL_MODELVIEW);
+		pen += g.advance;
+	}
 }
 
 int Renderer::TextWidth(const char* text, bool large)
 {
 	if (text == NULL) return 0;
-	void* font = large ? GLUT_BITMAP_HELVETICA_18 : GLUT_BITMAP_9_BY_15;
-	return glutBitmapLength(font, (const unsigned char*)text);
+
+	Font& font = fonts[large ? 1 : 0];
+	if (!font.IsLoaded()) return 0;
+
+	float width = 0.0f;
+	while (*text != 0)
+		width += font.Get(NextCodepoint(text)).advance;
+	return (int)ceilf(width);
+}
+
+void Renderer::FlushText()
+{
+	if (textQueue[0].empty() && textQueue[1].empty()) return;
+
+	glUseProgram(textShader);
+	glUniform2f(textScreen, (float)windowSizeX, (float)windowSizeY);
+	glUniform1i(textAtlas, 0);
+	glActiveTexture(GL_TEXTURE0);
+
+	const GLsizei stride = (GLsizei)sizeof(TextVertex);
+	glBindBuffer(GL_ARRAY_BUFFER, vboText);
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
+	glEnableVertexAttribArray(2);
+
+	for (int face = 0; face < 2; ++face)
+	{
+		std::vector<TextVertex>& queue = textQueue[face];
+		if (queue.empty()) continue;
+
+		glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(queue.size() * sizeof(TextVertex)), &queue[0], GL_STREAM_DRAW);
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, stride, (void*)0);
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, (void*)(sizeof(float) * 2));
+		glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, stride, (void*)(sizeof(float) * 4));
+
+		glBindTexture(GL_TEXTURE_2D, fonts[face].Texture());
+		glDrawArrays(GL_TRIANGLES, 0, (GLsizei)queue.size());
+		++drawCalls;
+		queue.clear();
+	}
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glDisableVertexAttribArray(0);
+	glDisableVertexAttribArray(1);
+	glDisableVertexAttribArray(2);
 }
 
 void Renderer::DrawSolidRect(float x, float y, float z, float size, float r, float g, float b, float a)
@@ -990,6 +1050,7 @@ void Renderer::DrawSolidRect(float x, float y, float z, float size, float r, flo
 
 	GetGLPosition(x, y, &newX, &newY);
 
+	FlushText();
 	glUseProgram(solidRectShader);
 
 	glUniform4f(glGetUniformLocation(solidRectShader, "u_Trans"), newX, newY, 0, size);

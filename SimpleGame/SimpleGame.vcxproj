@@ -163,6 +163,7 @@
     <ClInclude Include="ChunkMap.h" />
     <ClInclude Include="Collision.h" />
     <ClInclude Include="Dependencies\stb_truetype.h" />
+    <ClInclude Include="Font.h" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="GameActors.h" />
     <ClInclude Include="Math3D.h" />
@@ -178,6 +179,7 @@
   <ItemGroup>
     <ClCompile Include="Actor.cpp" />
     <ClCompile Include="ChunkMap.cpp" />
+    <ClCompile Include="Font.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="GameActors.cpp" />
     <ClCompile Include="GameCombat.cpp" />
@@ -213,6 +215,8 @@
     <None Include="Shaders\Shadow.fs" />
     <None Include="Shaders\SolidRect.fs" />
     <None Include="Shaders\SolidRect.vs" />
+    <None Include="Shaders\Text.fs" />
+    <None Include="Shaders\Text.vs" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

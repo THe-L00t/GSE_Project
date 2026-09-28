@@ -7,6 +7,7 @@
 #include <iostream>
 
 #include "Dependencies\glew.h"
+#include "Font.h"
 #include "Math3D.h"
 
 struct DrawParams
@@ -38,7 +39,7 @@ public:
 	int  GetWidth() const { return (int)windowSizeX; }
 	int  GetHeight() const { return (int)windowSizeY; }
 
-	// glDraw* calls since the last take; bitmap text is not counted.
+	// glDraw* calls since the last take.
 	int  TakeDrawCalls();
 
 	// Projects a world position to pixels, top-left origin. False when it is behind the camera.
@@ -75,6 +76,8 @@ public:
 	void DrawBarPx(float x, float y, float w, float h, float fill, const Vec3& low, const Vec3& high);
 	void DrawAtmosphere(float vignette, float haze, const Vec3& hazeColor);
 	void DrawFade(const Vec3& color, float alpha);
+
+	// UTF-8 text with y on the baseline. Consecutive strings share one draw until another UI draw.
 	void DrawTexts(int x, int y, const char* text, const Vec3& color, bool large);
 	int  TextWidth(const char* text, bool large);
 
@@ -171,6 +174,13 @@ private:
 		GLint positionAttrib = -1;
 	};
 
+	struct TextVertex
+	{
+		float x, y;
+		float u, v;
+		float r, g, b;
+	};
+
 	struct OverlayParams
 	{
 		int   mode = 0;
@@ -197,6 +207,7 @@ private:
 	void DrawMotes(int style, int first, int count, const Vec3& center, const Vec3& field, const Vec3& color, float densityScale, float size);
 	void DrawPixelQuad(float x, float y, float w, float h, const OverlayParams& params);
 	void DrawOverlayQuad(float rx, float ry, float rw, float rh, const OverlayParams& params);
+	void FlushText();
 
 	void CreateTargets(int sizeX, int sizeY);
 	void DeleteTargets();
@@ -221,6 +232,14 @@ private:
 	GLuint particleShader = 0;
 	GLuint overlayShader = 0;
 	GLuint postShader = 0;
+	GLuint textShader = 0;
+
+	// Small and large faces; each queue holds glyph quads waiting for FlushText.
+	Font   fonts[2];
+	std::vector<TextVertex> textQueue[2];
+	GLuint vboText = 0;
+	GLint  textScreen = -1;
+	GLint  textAtlas = -1;
 
 	// Scene targets. sceneTex is the resolved HDR image; msFbo exists only when multisampling is available.
 	GLuint msFbo = 0;
