@@ -62,6 +62,7 @@ public:
 	void ClearLights();
 	void AddLight(const Vec3& pos, const Vec3& color, float radius);
 
+	// Models and blob shadows are queued and drawn one call per mesh when the pass ends.
 	void DrawModel(int id, const Mat4& model, const DrawParams& params);
 	void DrawModel(int id, const Vec3& pos, float yaw, const Vec3& scale, const DrawParams& params);
 	void DrawShadow(const Vec3& pos, float radius);
@@ -91,15 +92,20 @@ private:
 		int    count = 0;
 	};
 
+	// Per-instance attributes at locations 4-9 in Lit.vs.
+	struct Instance
+	{
+		float model[16];
+		float tint[3];
+		float emissive;
+		float phase;
+		float flash;
+	};
+
 	struct LitLocations
 	{
 		GLint viewProj = -1;
 		GLint model = -1;
-		GLint normalMat = -1;
-		GLint tint = -1;
-		GLint emissive = -1;
-		GLint phase = -1;
-		GLint flash = -1;
 		GLint mode = -1;
 		GLint timeOfDay = -1;
 		GLint sporeExposure = -1;
@@ -124,8 +130,6 @@ private:
 	{
 		GLint viewProj = -1;
 		GLint model = -1;
-		GLint normalMat = -1;
-		GLint phase = -1;
 		GLint time = -1;
 	};
 
@@ -202,8 +206,11 @@ private:
 	void LoadModels();
 	void GetGLPosition(float x, float y, float* newX, float* newY);
 
-	void BindLit(const Mat4& model, const DrawParams& params, int mode);
+	void BindLit(const Mat4& model, int mode);
+	void BindMesh(int id);
 	void DrawMesh(int id);
+	void FlushModels();
+	void DrawInstances(int mesh, int start, int count);
 	void DrawMotes(int style, int first, int count, const Vec3& center, const Vec3& field, const Vec3& color, float densityScale, float size);
 	void DrawPixelQuad(float x, float y, float w, float h, const OverlayParams& params);
 	void DrawOverlayQuad(float rx, float ry, float rw, float rh, const OverlayParams& params);
@@ -272,6 +279,12 @@ private:
 	ParticleLocations    particle;
 	PostLocations        post;
 	std::vector<GpuMesh> meshes;
+
+	// DrawModel and DrawShadow only queue; FlushModels draws each mesh once for all its instances.
+	std::vector<std::vector<Instance>> modelQueue;
+	std::vector<Instance> discQueue;
+	std::vector<Instance> instanceData;
+	GLuint vboInstances = 0;
 
 	Mat4  viewProj;
 	Vec3  camPos;

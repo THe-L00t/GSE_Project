@@ -9,10 +9,10 @@ in vec3  v_Normal;
 in vec3  v_Color;
 in vec3  v_Local;
 in float v_Glow;
+in vec3  v_Tint;
+in float v_Emissive;
+in float v_Flash;
 
-uniform vec3  u_Tint;
-uniform float u_Emissive;
-uniform float u_Flash;
 uniform int   u_Mode;
 uniform vec3  u_FogOrigin;      // camera target; fog thickens away from it
 uniform float u_Time;
@@ -156,8 +156,8 @@ void main()
 	}
 
 	vec3 n = normalize(v_Normal);
-	vec3 base = v_Color * u_Tint;
-	float emissive = u_Emissive + v_Glow;
+	vec3 base = v_Color * v_Tint;
+	float emissive = v_Emissive + v_Glow;
 	float gloss = 0.0;
 
 	if (u_Mode == 1)
@@ -253,7 +253,7 @@ void main()
 	}
 
 	color += base * emissive;
-	color = mix(color, vec3(1.0, 0.95, 0.85), clamp(u_Flash, 0.0, 1.0));
+	color = mix(color, vec3(1.0, 0.95, 0.85), clamp(v_Flash, 0.0, 1.0));
 
 	// Muted palette: only spores and light are allowed to be saturated.
 	float luma = dot(color, vec3(0.299, 0.587, 0.114));

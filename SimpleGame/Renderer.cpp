@@ -248,6 +248,7 @@ void Renderer::BeginShadowPass(const Vec3& focus)
 
 void Renderer::EndShadowPass()
 {
+	FlushModels();
 	if (!shadowPass) return;
 
 	shadowPass = false;
@@ -324,17 +325,13 @@ void Renderer::CreateVertexBufferObjects()
 	glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(spores.size() * sizeof(float)), &spores[0], GL_STATIC_DRAW);
 
 	glGenBuffers(1, &vboText);
+	glGenBuffers(1, &vboInstances);
 }
 
 void Renderer::CacheUniformLocations()
 {
 	lit.viewProj = glGetUniformLocation(litShader, "u_ViewProj");
 	lit.model = glGetUniformLocation(litShader, "u_Model");
-	lit.normalMat = glGetUniformLocation(litShader, "u_NormalMat");
-	lit.tint = glGetUniformLocation(litShader, "u_Tint");
-	lit.emissive = glGetUniformLocation(litShader, "u_Emissive");
-	lit.phase = glGetUniformLocation(litShader, "u_Phase");
-	lit.flash = glGetUniformLocation(litShader, "u_Flash");
 	lit.mode = glGetUniformLocation(litShader, "u_Mode");
 	lit.timeOfDay = glGetUniformLocation(litShader, "u_TimeOfDay");
 	lit.sporeExposure = glGetUniformLocation(litShader, "u_SporeExposure");
@@ -356,8 +353,6 @@ void Renderer::CacheUniformLocations()
 
 	shadow.viewProj = glGetUniformLocation(shadowShader, "u_ViewProj");
 	shadow.model = glGetUniformLocation(shadowShader, "u_Model");
-	shadow.normalMat = glGetUniformLocation(shadowShader, "u_NormalMat");
-	shadow.phase = glGetUniformLocation(shadowShader, "u_Phase");
 	shadow.time = glGetUniformLocation(shadowShader, "u_Time");
 
 	overlay.rect = glGetUniformLocation(overlayShader, "u_Rect");
@@ -407,6 +402,7 @@ void Renderer::LoadModels()
 	LoadModelMeshes(meshData, built);
 
 	meshes.resize(meshData.size());
+	modelQueue.resize(meshData.size());
 	for (size_t i = 0; i < meshData.size(); ++i)
 	{
 		const std::vector<MeshVertex>& vertices = meshData[i].vertices;
@@ -561,6 +557,7 @@ void Renderer::BeginFrame()
 
 void Renderer::EndScene()
 {
+	FlushModels();
 	if (!postReady) return;
 
 	if (samples > 1)
@@ -689,21 +686,12 @@ void Renderer::AddLight(const Vec3& pos, const Vec3& color, float radius)
 	lightsDirty = true;
 }
 
-void Renderer::BindLit(const Mat4& model, const DrawParams& params, int mode)
+void Renderer::BindLit(const Mat4& model, int mode)
 {
 	glUseProgram(litShader);
 
-	float normalMat[9];
-	MatNormal3x3(model, normalMat);
-
 	glUniformMatrix4fv(lit.viewProj, 1, GL_FALSE, viewProj.m);
 	glUniformMatrix4fv(lit.model, 1, GL_FALSE, model.m);
-	glUniformMatrix3fv(lit.normalMat, 1, GL_FALSE, normalMat);
-
-	glUniform3f(lit.tint, params.tint.x, params.tint.y, params.tint.z);
-	glUniform1f(lit.emissive, params.emissive);
-	glUniform1f(lit.phase, params.phase);
-	glUniform1f(lit.flash, params.flash);
 	glUniform1i(lit.mode, mode);
 
 	glUniform1f(lit.timeOfDay, timeOfDay);
@@ -722,12 +710,18 @@ void Renderer::BindLit(const Mat4& model, const DrawParams& params, int mode)
 		glUniform3fv(lit.lightColor, kMaxLights, lightColor);
 		lightsDirty = false;
 	}
+
+	// A single draw reads the instance attributes as constants: identity placement, no tint.
+	glVertexAttrib4f(4, 1.0f, 0.0f, 0.0f, 0.0f);
+	glVertexAttrib4f(5, 0.0f, 1.0f, 0.0f, 0.0f);
+	glVertexAttrib4f(6, 0.0f, 0.0f, 1.0f, 0.0f);
+	glVertexAttrib4f(7, 0.0f, 0.0f, 0.0f, 1.0f);
+	glVertexAttrib4f(8, 1.0f, 1.0f, 1.0f, 0.0f);
+	glVertexAttrib4f(9, 0.0f, 0.0f, 0.0f, 0.0f);
 }
 
-void Renderer::DrawMesh(int id)
+void Renderer::BindMesh(int id)
 {
-	if (id < 0 || id >= (int)meshes.size() || meshes[id].count == 0) return;
-
 	// Attribute locations are fixed by layout qualifiers in Lit.vs.
 	const GLsizei stride = (GLsizei)sizeof(MeshVertex);
 	glBindBuffer(GL_ARRAY_BUFFER, meshes[id].vbo);
@@ -739,7 +733,13 @@ void Renderer::DrawMesh(int id)
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(sizeof(float) * 3));
 	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, stride, (void*)(sizeof(float) * 6));
 	glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, stride, (void*)(sizeof(float) * 9));
+}
 
+void Renderer::DrawMesh(int id)
+{
+	if (id < 0 || id >= (int)meshes.size() || meshes[id].count == 0) return;
+
+	BindMesh(id);
 	glDrawArrays(GL_TRIANGLES, 0, meshes[id].count);
 	++drawCalls;
 
@@ -751,19 +751,17 @@ void Renderer::DrawMesh(int id)
 
 void Renderer::DrawModel(int id, const Mat4& model, const DrawParams& params)
 {
-	if (shadowPass)
-	{
-		float normalMat[9];
-		MatNormal3x3(model, normalMat);
-		glUniformMatrix4fv(shadow.model, 1, GL_FALSE, model.m);
-		glUniformMatrix3fv(shadow.normalMat, 1, GL_FALSE, normalMat);
-		glUniform1f(shadow.phase, params.phase);
-		DrawMesh(id);
-		return;
-	}
+	if (id < 0 || id >= (int)meshes.size() || meshes[id].count == 0) return;
 
-	BindLit(model, params, 0);
-	DrawMesh(id);
+	Instance instance;
+	for (int i = 0; i < 16; ++i) instance.model[i] = model.m[i];
+	instance.tint[0] = params.tint.x;
+	instance.tint[1] = params.tint.y;
+	instance.tint[2] = params.tint.z;
+	instance.emissive = params.emissive;
+	instance.phase = params.phase;
+	instance.flash = params.flash;
+	modelQueue[id].push_back(instance);
 }
 
 void Renderer::DrawModel(int id, const Vec3& pos, float yaw, const Vec3& scale, const DrawParams& params)
@@ -774,14 +772,93 @@ void Renderer::DrawModel(int id, const Vec3& pos, float yaw, const Vec3& scale, 
 
 void Renderer::DrawShadow(const Vec3& pos, float radius)
 {
-	if (shadowPass) return;
+	if (shadowPass || MODEL_SHADOW >= (int)meshes.size()) return;
 
 	Mat4 model = Mul(MatTranslate(Vec3(pos.x, 0.0f, pos.z)), MatScale(Vec3(radius * 2.0f, 1.0f, radius * 2.0f)));
 
-	glDepthMask(GL_FALSE);
-	BindLit(model, DrawParams(), 3);
-	DrawMesh(MODEL_SHADOW);
-	glDepthMask(GL_TRUE);
+	Instance instance = {};
+	for (int i = 0; i < 16; ++i) instance.model[i] = model.m[i];
+	instance.tint[0] = instance.tint[1] = instance.tint[2] = 1.0f;
+	discQueue.push_back(instance);
+}
+
+void Renderer::FlushModels()
+{
+	// Pack every queued instance into one buffer; each mesh then draws its run in one call.
+	instanceData.clear();
+	std::vector<int> first(meshes.size() + 1, 0);
+	for (size_t id = 0; id < meshes.size(); ++id)
+	{
+		first[id] = (int)instanceData.size();
+		instanceData.insert(instanceData.end(), modelQueue[id].begin(), modelQueue[id].end());
+		modelQueue[id].clear();
+	}
+	first[meshes.size()] = (int)instanceData.size();
+	int discFirst = (int)instanceData.size();
+	instanceData.insert(instanceData.end(), discQueue.begin(), discQueue.end());
+	discQueue.clear();
+
+	if (instanceData.empty()) return;
+
+	Mat4 identity;
+	if (shadowPass)
+	{
+		glUseProgram(shadowShader);
+		glUniformMatrix4fv(shadow.model, 1, GL_FALSE, identity.m);
+	}
+	else
+	{
+		BindLit(identity, 0);
+	}
+
+	glBindBuffer(GL_ARRAY_BUFFER, vboInstances);
+	glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(instanceData.size() * sizeof(Instance)), &instanceData[0], GL_STREAM_DRAW);
+
+	for (GLuint loc = 4; loc <= 9; ++loc)
+	{
+		glEnableVertexAttribArray(loc);
+		glVertexAttribDivisor(loc, 1);
+	}
+
+	for (size_t id = 0; id < meshes.size(); ++id)
+		DrawInstances((int)id, first[id], first[id + 1] - first[id]);
+
+	// Blob shadows go last: blended over the ground and the models, writing no depth.
+	if (discFirst < (int)instanceData.size())
+	{
+		glUniform1i(lit.mode, 3);
+		glDepthMask(GL_FALSE);
+		DrawInstances(MODEL_SHADOW, discFirst, (int)instanceData.size() - discFirst);
+		glDepthMask(GL_TRUE);
+	}
+
+	for (GLuint loc = 4; loc <= 9; ++loc)
+	{
+		glVertexAttribDivisor(loc, 0);
+		glDisableVertexAttribArray(loc);
+	}
+	glDisableVertexAttribArray(0);
+	glDisableVertexAttribArray(1);
+	glDisableVertexAttribArray(2);
+	glDisableVertexAttribArray(3);
+}
+
+void Renderer::DrawInstances(int mesh, int start, int count)
+{
+	if (count <= 0 || meshes[mesh].count == 0) return;
+
+	BindMesh(mesh);
+
+	const GLsizei stride = (GLsizei)sizeof(Instance);
+	const size_t base = (size_t)start * sizeof(Instance);
+	glBindBuffer(GL_ARRAY_BUFFER, vboInstances);
+	for (int c = 0; c < 4; ++c)
+		glVertexAttribPointer(4 + c, 4, GL_FLOAT, GL_FALSE, stride, (void*)(base + sizeof(float) * 4 * c));
+	glVertexAttribPointer(8, 4, GL_FLOAT, GL_FALSE, stride, (void*)(base + sizeof(float) * 16));
+	glVertexAttribPointer(9, 2, GL_FLOAT, GL_FALSE, stride, (void*)(base + sizeof(float) * 20));
+
+	glDrawArraysInstanced(GL_TRIANGLES, 0, meshes[mesh].count, count);
+	++drawCalls;
 }
 
 void Renderer::DrawGround(const Vec3& center, float extent, const GroundParams& params)
@@ -789,7 +866,7 @@ void Renderer::DrawGround(const Vec3& center, float extent, const GroundParams& 
 	if (shadowPass) return;
 
 	Mat4 model = Mul(MatTranslate(Vec3(center.x, 0.0f, center.z)), MatScale(Vec3(extent, 1.0f, extent)));
-	BindLit(model, DrawParams(), 1);
+	BindLit(model, 1);
 
 	glUniform1f(lit.stage, params.stage);
 	glUniform4f(lit.neighborStage, params.neighborStage[0], params.neighborStage[1], params.neighborStage[2], params.neighborStage[3]);
@@ -806,7 +883,7 @@ void Renderer::DrawWater(const Vec3& center, float sizeX, float sizeZ)
 	if (shadowPass) return;
 
 	Mat4 model = Mul(MatTranslate(center), MatScale(Vec3(sizeX, 1.0f, sizeZ)));
-	BindLit(model, DrawParams(), 2);
+	BindLit(model, 2);
 	DrawMesh(MODEL_GROUND);
 }
 
@@ -824,6 +901,8 @@ void Renderer::DrawAmbientMotes(const Vec3& center)
 
 void Renderer::DrawMotes(int style, int first, int count, const Vec3& center, const Vec3& field, const Vec3& color, float densityScale, float size)
 {
+	// Motes blend over the models and test against their depth.
+	FlushModels();
 	if (shadowPass || densityScale <= 0.001f) return;
 	if (first + count > sporeCount) count = sporeCount - first;
 	if (count <= 0) return;
