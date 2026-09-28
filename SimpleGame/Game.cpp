@@ -185,7 +185,7 @@ void Game::OnKeyDown(unsigned char key)
 	if (key == 't')
 	{
 		timeScale = (timeScale > 1.5f) ? 1.0f : 12.0f;
-		ShowMessage(timeScale > 1.5f ? "Time: fast" : "Time: normal", 2.0f);
+		ShowMessage(timeScale > 1.5f ? "시간: 빠르게" : "시간: 보통", 2.0f);
 		return;
 	}
 
@@ -327,7 +327,7 @@ void Game::DrawObjective(const char* text)
 {
 	float boxW = Maxf(430.0f, (float)renderer->TextWidth(text, false) + 40.0f);
 	renderer->DrawRectPx(18.0f, 18.0f, boxW, 62.0f, kHudPanel, 0.38f);
-	renderer->DrawTexts(32, 40, "OBJECTIVE", kHudDim, false);
+	renderer->DrawTexts(32, 40, "목표", kHudDim, false);
 	renderer->DrawTexts(32, 64, text, kHudInk, false);
 }
 
@@ -336,7 +336,7 @@ void Game::DrawCommonHud(const char* help)
 	const int w = renderer->GetWidth();
 	const int h = renderer->GetHeight();
 
-	renderer->DrawTexts(24, h - 62, "SPORE EXPOSURE", kHudDim, false);
+	renderer->DrawTexts(24, h - 62, "포자 노출", kHudDim, false);
 	renderer->DrawBarPx(24.0f, (float)h - 54.0f, 220.0f, 12.0f, sporeExposure,
 						Vec3(0.35f, 0.70f, 0.60f), Vec3(0.75f, 0.95f, 0.55f));
 

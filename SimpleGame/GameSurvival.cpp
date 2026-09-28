@@ -35,7 +35,7 @@ void Game::UpdateSurvival(float dt)
 		if (torchBattery <= 0.0f)
 		{
 			torchOn = false;
-			ShowMessage("The torch flickers out. The battery is spent.", 3.5f);
+			ShowMessage("손전등이 깜빡이다 꺼진다. 배터리가 다 됐다.", 3.5f);
 		}
 	}
 
@@ -49,17 +49,17 @@ void Game::UpdateSurvival(float dt)
 	waterMeter = Maxf(waterMeter - kWaterDrain * dt, 0.0f);
 	foodMeter = Maxf(foodMeter - kFoodDrain * dt, 0.0f);
 
-	if (Crossed(oldWater, waterMeter, kLowMark)) ShowMessage("Your mouth is dry. Drink (R), or find water.", 4.0f);
-	if (Crossed(oldWater, waterMeter, 0.01f)) ShowMessage("You are parched. The spores reach you faster.", 4.0f);
-	if (Crossed(oldFood, foodMeter, kLowMark)) ShowMessage("Your stomach growls. Eat something (F).", 4.0f);
-	if (Crossed(oldFood, foodMeter, 0.01f)) ShowMessage("Hunger slows your steps and your swings.", 4.0f);
+	if (Crossed(oldWater, waterMeter, kLowMark)) ShowMessage("입이 바짝 마른다. 물을 마시거나(R) 물을 찾아라.", 4.0f);
+	if (Crossed(oldWater, waterMeter, 0.01f)) ShowMessage("목이 타들어 간다. 포자가 더 빨리 스며든다.", 4.0f);
+	if (Crossed(oldFood, foodMeter, kLowMark)) ShowMessage("배가 꼬르륵거린다. 뭘 좀 먹어라(F).", 4.0f);
+	if (Crossed(oldFood, foodMeter, 0.01f)) ShowMessage("허기 때문에 걸음도 휘두르기도 느려진다.", 4.0f);
 
 	// Warmth only starts to matter once a whole day has passed out on the road.
 	if (!warmthActive && routeTime > dayLength)
 	{
 		warmthActive = true;
 		warmthMeter = 100.0f;
-		ShowMessage("The nights are getting colder. Stay near light after dark.", 6.0f);
+		ShowMessage("밤이 점점 추워진다. 어두워지면 불빛 가까이 있어라.", 6.0f);
 	}
 	if (!warmthActive) return;
 
@@ -72,12 +72,12 @@ void Game::UpdateSurvival(float dt)
 	else
 		warmthMeter = Minf(warmthMeter + kWarmRecover * dt, 100.0f);
 
-	if (Crossed(oldWarmth, warmthMeter, kLowMark)) ShowMessage("You are shivering. Find the lantern, or wait for the sun.", 4.0f);
+	if (Crossed(oldWarmth, warmthMeter, kLowMark)) ShowMessage("몸이 덜덜 떨린다. 석등을 찾거나 해가 뜨길 기다려라.", 4.0f);
 
 	if (warmthMeter <= 0.0f)
 	{
 		health -= dt;
-		if (health <= 0.0f) FallAsleep("The cold takes you. You sink into a long sleep...");
+		if (health <= 0.0f) FallAsleep("추위에 정신이 아득해진다. 긴 잠에 빠져든다...");
 	}
 }
 
@@ -93,12 +93,12 @@ void Game::EatFood()
 
 	if (pick < 0)
 	{
-		ShowMessage("You have nothing to eat.", 2.0f);
+		ShowMessage("먹을 것이 없다.", 2.0f);
 		return;
 	}
 	if (foodMeter >= 98.0f)
 	{
-		ShowMessage("You are not hungry.", 1.5f);
+		ShowMessage("배고프지 않다.", 1.5f);
 		return;
 	}
 
@@ -106,8 +106,8 @@ void Game::EatFood()
 	foodMeter = Minf(foodMeter + FoodValue(pick), 100.0f);
 	++mealsEaten;
 
-	char buf[96];
-	sprintf_s(buf, sizeof(buf), "You eat the %s.  Food +%d", GetItemInfo(pick).name, (int)FoodValue(pick));
+	char buf[256];
+	sprintf_s(buf, sizeof(buf), "%s을(를) 먹었다.  음식 +%d", GetItemInfo(pick).name, (int)FoodValue(pick));
 	ShowMessage(buf, 2.5f);
 }
 
@@ -117,14 +117,14 @@ void Game::DrinkWater()
 
 	if (inventory[ITEM_CLEAN_WATER] <= 0)
 	{
-		ShowMessage("No water flasks left.", 2.0f);
+		ShowMessage("남은 물병이 없다.", 2.0f);
 		return;
 	}
 
 	--inventory[ITEM_CLEAN_WATER];
 	waterMeter = Minf(waterMeter + kFlaskWater, 100.0f);
 	sporeExposure = Maxf(sporeExposure - kFlaskClear, 0.0f);
-	ShowMessage("You drink. The water rinses the spores out.", 2.5f);
+	ShowMessage("물을 마신다. 물이 포자를 씻어 낸다.", 2.5f);
 }
 
 void Game::ToggleTorch()
@@ -133,7 +133,7 @@ void Game::ToggleTorch()
 
 	if (torchBattery <= 0.0f)
 	{
-		ShowMessage("The torch is dead. The battery will not come back.", 2.5f);
+		ShowMessage("손전등이 죽었다. 배터리는 다시 채울 수 없다.", 2.5f);
 		return;
 	}
 
@@ -168,13 +168,13 @@ void Game::FindRelic(int id)
 	if (id >= 0 && !relicFound[id])
 	{
 		relicFound[id] = true;
-		char buf[128];
-		sprintf_s(buf, sizeof(buf), "New entry in your Relic Journal: %s.  (B to read)", RelicName(id));
+		char buf[256];
+		sprintf_s(buf, sizeof(buf), "유물 도감에 새 기록: %s  (B로 읽기)", RelicName(id));
 		ShowMessage(buf, 4.5f);
 	}
 	else
 	{
-		ShowMessage("Another old-world trinket. Nothing new to write down.", 3.0f);
+		ShowMessage("또 하나의 옛 세상 잡동사니. 새로 적을 것은 없다.", 3.0f);
 	}
 
 	if (level == LEVEL_ROUTE) GrantXp(12);
@@ -184,8 +184,8 @@ void Game::AddInsight(int amount, const char* text)
 {
 	natureInsight += amount;
 
-	char buf[160];
-	sprintf_s(buf, sizeof(buf), "%s  Nature Insight %d", text, natureInsight);
+	char buf[256];
+	sprintf_s(buf, sizeof(buf), "%s  자연 이해도 %d", text, natureInsight);
 	ShowMessage(buf, 5.0f);
 }
 
@@ -220,9 +220,9 @@ void Game::DrawSurvivalHud()
 
 	Row rows[3] =
 	{
-		{ "WATER", waterMeter, Vec3(0.55f, 0.35f, 0.25f), Vec3(0.40f, 0.70f, 0.85f) },
-		{ "FOOD", foodMeter, Vec3(0.55f, 0.35f, 0.25f), Vec3(0.85f, 0.75f, 0.40f) },
-		{ "WARMTH", warmthMeter, Vec3(0.35f, 0.45f, 0.75f), Vec3(0.95f, 0.65f, 0.40f) },
+		{ "물", waterMeter, Vec3(0.55f, 0.35f, 0.25f), Vec3(0.40f, 0.70f, 0.85f) },
+		{ "음식", foodMeter, Vec3(0.55f, 0.35f, 0.25f), Vec3(0.85f, 0.75f, 0.40f) },
+		{ "체온", warmthMeter, Vec3(0.35f, 0.45f, 0.75f), Vec3(0.95f, 0.65f, 0.40f) },
 	};
 	int rowCount = warmthActive ? 3 : 2;
 
@@ -254,38 +254,41 @@ void Game::DrawBagPanel()
 
 	int x = (int)px + 36;
 	int y = (int)py + 44;
-	char buf[128];
+	char buf[256];
 
-	sprintf_s(buf, sizeof(buf), "BAG   %d / %d", BagCount(), kBagCapacity);
+	sprintf_s(buf, sizeof(buf), "배낭   %d / %d", BagCount(), kBagCapacity);
 	renderer->DrawTexts(x, y, buf, kHudInk, true);
 	y += 38;
 
 	const int shown[] = { ITEM_CLEAN_WATER, ITEM_BERRIES, ITEM_VEGETABLE, ITEM_CANNED_FOOD, ITEM_HERB };
-	const char* keys[] = { "[R] drink", "[F] eat", "[F] eat", "[F] eat", "[Q] heal" };
+	const char* keys[] = { "[R] 마시기", "[F] 먹기", "[F] 먹기", "[F] 먹기", "[Q] 치료" };
 	for (int i = 0; i < 5; ++i)
 	{
 		int type = shown[i];
-		sprintf_s(buf, sizeof(buf), "%-16s x%d", GetItemInfo(type).name, inventory[type]);
-		renderer->DrawTexts(x, y, buf, inventory[type] > 0 ? kHudInk : kHudDim, false);
+		Vec3 color = inventory[type] > 0 ? kHudInk : kHudDim;
+		sprintf_s(buf, sizeof(buf), "x%d", inventory[type]);
+		renderer->DrawTexts(x, y, GetItemInfo(type).name, color, false);
+		renderer->DrawTexts(x + 150, y, buf, color, false);
 		renderer->DrawTexts(x + 260, y, keys[i], kHudDim, false);
 		y += 26;
 	}
 
 	if (torchOwned)
 	{
-		sprintf_s(buf, sizeof(buf), "Hand torch       battery %d%%", (int)(torchBattery + 0.5f));
-		renderer->DrawTexts(x, y, buf, kHudInk, false);
-		renderer->DrawTexts(x + 260, y, torchOn ? "[L] on" : "[L] off", kHudDim, false);
+		sprintf_s(buf, sizeof(buf), "배터리 %d%%", (int)(torchBattery + 0.5f));
+		renderer->DrawTexts(x, y, "손전등", kHudInk, false);
+		renderer->DrawTexts(x + 150, y, buf, kHudInk, false);
+		renderer->DrawTexts(x + 260, y, torchOn ? "[L] 켜짐" : "[L] 꺼짐", kHudDim, false);
 		y += 26;
 	}
 
 	y += 12;
 	int relics = 0;
 	for (int i = 0; i < kRelicCount; ++i) relics += relicFound[i] ? 1 : 0;
-	sprintf_s(buf, sizeof(buf), "Nature Insight %d     Relics %d / %d", natureInsight, relics, kRelicCount);
+	sprintf_s(buf, sizeof(buf), "자연 이해도 %d     유물 %d / %d", natureInsight, relics, kRelicCount);
 	renderer->DrawTexts(x, y, buf, kHudAccent, false);
 
-	renderer->DrawTexts(x, (int)(py + ph) - 22, "[I] close", kHudAccent, false);
+	renderer->DrawTexts(x, (int)(py + ph) - 22, "[I] 닫기", kHudAccent, false);
 }
 
 void Game::DrawJournalPanel()
@@ -305,8 +308,8 @@ void Game::DrawJournalPanel()
 
 	int x = (int)px + 36;
 	int y = (int)py + 44;
-	renderer->DrawTexts(x, y, "RELIC JOURNAL", kHudInk, true);
-	renderer->DrawTexts(x + 250, y, "things the old world left behind", kHudDim, false);
+	renderer->DrawTexts(x, y, "유물 도감", kHudInk, true);
+	renderer->DrawTexts(x + 250, y, "옛 세상이 남기고 간 것들", kHudDim, false);
 	y += 36;
 
 	for (int i = 0; i < kRelicCount; ++i)
@@ -323,5 +326,5 @@ void Game::DrawJournalPanel()
 		y += 44;
 	}
 
-	renderer->DrawTexts(x, (int)(py + ph) - 18, "[B] close", kHudAccent, false);
+	renderer->DrawTexts(x, (int)(py + ph) - 18, "[B] 닫기", kHudAccent, false);
 }

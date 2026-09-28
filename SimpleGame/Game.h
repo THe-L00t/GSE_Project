@@ -84,7 +84,7 @@ struct Popup
 	Vec3  pos;
 	Vec3  color;
 	float timer = 0.0f;
-	char  text[16] = "";
+	char  text[32] = "";
 };
 
 // What has happened to a generated chunk's creatures and finds since it was first visited.

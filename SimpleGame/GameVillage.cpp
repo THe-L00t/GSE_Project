@@ -23,59 +23,59 @@ namespace
 	// Grandmother talks in a country dialect, and always about whether you have eaten.
 	const char* kWakeLines[] =
 	{
-		"Up already, Yul? Did ye eat? ...Course ye didn't. Skin an' bones, this one.",
-		"Fetch us some water from the well first, there's a dear. Then we'll see about feedin' ye.",
+		"율아, 벌써 일어났냐? 밥은 먹었고? ...안 먹었지. 아이고, 뼈만 남았네.",
+		"우물에서 물 좀 떠 오너라, 우리 강아지. 그다음에 밥 먹이자.",
 	};
 	const char* kWellHintLines[] =
 	{
-		"Well's just there by the road, love. Mind ye don't lean in too far.",
+		"우물은 저기 길가에 있다. 너무 들여다보진 말고.",
 	};
 	const char* kWaterLines[] =
 	{
-		"Good child. Drink some yerself, go on. Ye look peaky.",
-		"Now then. Pull a few radishes from the patch, an' pick berries up the back hill.",
-		"Red'uns only, mind! Them pale ones'll twist yer belly.",
+		"아이고 착하다. 너도 좀 마셔라, 어서. 얼굴이 핼쑥하다.",
+		"자, 이제 텃밭에서 무 몇 개 뽑고, 뒷산에서 열매 좀 따 오너라.",
+		"빨간 것만이다! 허연 건 먹으면 배가 뒤틀린다.",
 	};
 	const char* kForageHintLines[] =
 	{
-		"Three radishes from the patch by the fence, an' red berries off the back hill, north past the trees.",
+		"울타리 옆 텃밭에서 무 세 개, 그리고 나무 너머 북쪽 뒷산에서 빨간 열매다.",
 	};
 	const char* kFoodLines[] =
 	{
-		"That's a good haul. Now eat a bit, I'm watchin' ye.",
+		"많이도 따 왔네. 이제 좀 먹어라, 할미가 보고 있다.",
 	};
 	const char* kEatHintLines[] =
 	{
-		"Go on, eat somethin'. I'll not have ye wastin' away.",
+		"어서 뭐라도 먹어라. 비쩍 마르는 꼴은 못 본다.",
 	};
 	const char* kAteLines[] =
 	{
-		"There. Colour's comin' back already.",
-		"One more thing, love. There's an old torch in the shed, from before the Bloom.",
-		"Fetch it, would ye? Nights are long now. Shed's out east, past the Kims' place.",
+		"봐라, 벌써 혈색이 돈다.",
+		"하나만 더. 헛간에 개화 전에 쓰던 손전등이 있다.",
+		"좀 가져오너라. 요즘 밤이 길다. 헛간은 동쪽, 김씨네 집 지나서다.",
 	};
 	const char* kTorchHintLines[] =
 	{
-		"The shed, love. East, past the Kims' place. Under the old tarp, I think.",
+		"헛간 말이다. 동쪽, 김씨네 지나서. 아마 헌 천막 밑에 있을 거다.",
 	};
 	const char* kTorchLines[] =
 	{
-		"Ah, that's the one. Yer grandad's. Mind the battery, there's no more where that came from.",
-		"Sun's goin' down already. Stay close to home tonight, an' come in 'fore it's dark.",
+		"그래, 그거다. 너희 할아버지 거다. 배터리 아껴 써라, 더는 없다.",
+		"벌써 해가 진다. 오늘 밤은 집 가까이 있다가 어두워지기 전에 들어와라.",
 	};
 	const char* kDuskHintLines[] =
 	{
-		"Stay close now, it's gettin' dark. Did ye eat enough today?",
+		"멀리 가지 마라, 어두워진다. 오늘 밥은 넉넉히 먹었냐?",
 	};
 	const char* kDeerLines[] =
 	{
-		"Hush... look there, by the water. A lantern deer.",
-		"Don't ye go followin' it tonight.",
+		"쉿... 저기 물가 봐라. 등불 사슴이다.",
+		"오늘 밤엔 따라가지 마라.",
 	};
 	const char* kBedLines[] =
 	{
-		"Did ye eat enough? ...Sleep, then.",
-		"Them lights'll be gone by mornin'.",
+		"배는 불렀냐? ...그럼 자거라.",
+		"저 불빛들, 아침이면 없어질 거다.",
 	};
 
 	const int kPackRows[] = { ITEM_CLEAN_WATER, ITEM_BERRIES, ITEM_VEGETABLE, ITEM_HERB };
@@ -325,7 +325,7 @@ void Game::UpdateVillageStory(float dt)
 		}
 		else if (messageTimer <= 0.0f)
 		{
-			ShowMessage("It is getting dark. Grandmother is calling you home.", 3.0f);
+			ShowMessage("어두워진다. 할머니가 집으로 부르신다.", 3.0f);
 		}
 	}
 
@@ -374,7 +374,7 @@ void Game::UpdateDeer(float dt)
 	deer = nullptr;
 	if (tutorial == TUT_WATCH_DEER)
 	{
-		if (!deerWatched) ShowMessage("The deer slips away into the reeds.", 3.0f);
+		if (!deerWatched) ShowMessage("사슴이 갈대숲으로 사라진다.", 3.0f);
 		SetTutorial(TUT_BEDTIME);
 	}
 }
@@ -403,29 +403,29 @@ void Game::SetTutorial(int next)
 	switch (next)
 	{
 	case TUT_FETCH_WATER:
-		ShowMessage("Walk to the well with WASD, then press E beside it.", 5.0f);
+		ShowMessage("WASD로 우물까지 걸어가서, 옆에서 E를 눌러라.", 5.0f);
 		break;
 
 	case TUT_FORAGE:
-		ShowMessage("The patch is inside the fence west of the house. The back hill is north.", 5.0f);
+		ShowMessage("텃밭은 집 서쪽 울타리 안에 있다. 뒷산은 북쪽이다.", 5.0f);
 		break;
 
 	case TUT_EAT:
 		mealsBaseline = mealsEaten;
-		ShowMessage("Press F to eat.", 4.0f);
+		ShowMessage("F를 눌러 먹어라.", 4.0f);
 		break;
 
 	case TUT_DUSK:
 		timeScale = 12.0f;
-		ShowMessage("The sun sinks fast. Head home before dark.", 4.0f);
+		ShowMessage("해가 빠르게 진다. 어두워지기 전에 집으로 가라.", 4.0f);
 		break;
 
 	case TUT_BEDTIME:
-		ShowMessage("Go to bed: press E at the door.", 4.0f);
+		ShowMessage("잠자리에 들어라: 문 앞에서 E.", 4.0f);
 		break;
 
 	case TUT_FIND_GRANDMOTHER:
-		ShowMessage("Grandmother has not come out this morning.", 4.5f);
+		ShowMessage("오늘 아침엔 할머니가 나오지 않으셨다.", 4.5f);
 		break;
 
 	case TUT_READ_LETTER:
@@ -434,11 +434,11 @@ void Game::SetTutorial(int next)
 
 	case TUT_PACK:
 		inventory[ITEM_HERB] += 2;
-		ShowMessage("On her shelf, two herbs wrapped in cloth. Pack your bag at the door.", 5.0f);
+		ShowMessage("할머니 선반에 천에 싼 약초 두 묶음이 있다. 문 앞에서 배낭을 꾸려라.", 5.0f);
 		break;
 
 	case TUT_LEAVE:
-		ShowMessage("Follow the road south, out of the village.", 5.0f);
+		ShowMessage("길을 따라 남쪽으로, 마을 밖으로 나가라.", 5.0f);
 		break;
 
 	default:
@@ -501,7 +501,7 @@ void Game::Pick(ForageActor& f)
 		f.Destroy();
 		++radishes;
 		++inventory[ITEM_VEGETABLE];
-		ShowMessage("You pull a radish and brush the soil off.  (I: bag)", 3.0f);
+		ShowMessage("무를 뽑아 흙을 턴다.  (I: 배낭)", 3.0f);
 		break;
 
 	case FORAGE_RED_BERRY:
@@ -510,20 +510,20 @@ void Game::Pick(ForageActor& f)
 		++redBerries;
 		++inventory[ITEM_BERRIES];
 		if (redBerries == 1)
-			AddInsight(1, "Red, not pale: you know which berries are safe now.");
+			AddInsight(1, "허연 것 말고 빨간 것: 이제 어떤 열매가 안전한지 안다.");
 		else
-			ShowMessage("You pick a handful of red berries.", 2.5f);
+			ShowMessage("빨간 열매를 한 줌 딴다.", 2.5f);
 		break;
 
 	default:
-		ShowMessage("Grandmother said the pale ones twist your belly. You leave them.", 3.5f);
+		ShowMessage("할머니가 허연 건 배가 뒤틀린다고 했다. 그냥 둔다.", 3.5f);
 		break;
 	}
 
 	if (tutorial == TUT_FORAGE && radishes >= kForageGoal && redBerries >= kForageGoal)
 	{
 		SetTutorial(TUT_BRING_FOOD);
-		ShowMessage("That's plenty. Take it back to Grandmother.", 4.0f);
+		ShowMessage("이만하면 충분하다. 할머니께 가져가자.", 4.0f);
 	}
 }
 
@@ -560,13 +560,13 @@ void Game::UpdateInteractionTarget()
 	if (DialogOpen())
 	{
 		targetSpot = SPOT_DIALOG;
-		prompt = "[E]  Continue";
+		prompt = "[E]  계속";
 		return;
 	}
 	if (letterOpen)
 	{
 		targetSpot = SPOT_LETTER_OPEN;
-		prompt = "[E]  Close";
+		prompt = "[E]  닫기";
 		return;
 	}
 
@@ -575,7 +575,7 @@ void Game::UpdateInteractionTarget()
 	if (day == 1 && DistXZ(pos, grandmaNpc->Position()) < kInteractRange)
 	{
 		targetSpot = SPOT_GRANDMA;
-		prompt = "[E]  Talk to Grandmother";
+		prompt = "[E]  할머니와 이야기하기";
 		return;
 	}
 
@@ -583,36 +583,36 @@ void Game::UpdateInteractionTarget()
 	if (tutorial == TUT_READ_LETTER && DistXZ(pos, letter->Position()) < kInteractRange)
 	{
 		targetSpot = SPOT_LETTER;
-		prompt = "[E]  Read the letter";
+		prompt = "[E]  편지 읽기";
 		return;
 	}
 
 	if (DistXZ(pos, homeDoor) < kDoorRange && (tutorial == TUT_BEDTIME || tutorial == TUT_PACK))
 	{
 		targetSpot = SPOT_DOOR;
-		if (tutorial == TUT_BEDTIME) prompt = "[E]  Go to bed";
-		else prompt = riceEaten ? "[E]  Pack your bag" : "[E]  Eat the rice Grandmother left";
+		if (tutorial == TUT_BEDTIME) prompt = "[E]  잠자리에 들기";
+		else prompt = riceEaten ? "[E]  배낭 꾸리기" : "[E]  할머니가 남긴 밥 먹기";
 		return;
 	}
 
 	if (tutorial >= TUT_FETCH_WATER && DistXZ(pos, wellPos) < 2.2f)
 	{
 		targetSpot = SPOT_WELL;
-		prompt = (tutorial == TUT_FETCH_WATER) ? "[E]  Draw water" : "[E]  Drink from the well";
+		prompt = (tutorial == TUT_FETCH_WATER) ? "[E]  물 긷기" : "[E]  우물물 마시기";
 		return;
 	}
 
 	if (tutorial == TUT_FETCH_TORCH && DistXZ(pos, shedDoor) < 2.2f)
 	{
 		targetSpot = SPOT_SHED;
-		prompt = "[E]  Search the shed";
+		prompt = "[E]  헛간 뒤지기";
 		return;
 	}
 
 	if (deer && tutorial == TUT_WATCH_DEER && !deerWatched && DistXZ(pos, deer->Position()) < kDeerWatchRange)
 	{
 		targetSpot = SPOT_DEER;
-		prompt = "[E]  Watch the lantern deer";
+		prompt = "[E]  등불 사슴 지켜보기";
 		return;
 	}
 
@@ -635,9 +635,9 @@ void Game::UpdateInteractionTarget()
 		if (targetForage)
 		{
 			targetSpot = SPOT_FORAGE;
-			if (targetForage->forage == FORAGE_RADISH) prompt = "[E]  Pull the radish";
-			else if (targetForage->forage == FORAGE_RED_BERRY) prompt = "[E]  Pick red berries";
-			else prompt = "[E]  Pick pale berries";
+			if (targetForage->forage == FORAGE_RADISH) prompt = "[E]  무 뽑기";
+			else if (targetForage->forage == FORAGE_RED_BERRY) prompt = "[E]  빨간 열매 따기";
+			else prompt = "[E]  허연 열매 따기";
 			return;
 		}
 	}
@@ -659,9 +659,9 @@ void Game::UpdateInteractionTarget()
 	if (targetSleeper)
 	{
 		if (targetSleeper->isGrandma)
-			prompt = (tutorial == TUT_FIND_GRANDMOTHER) ? "[E]  Look at Grandmother" : "[E]  Sit with her";
+			prompt = (tutorial == TUT_FIND_GRANDMOTHER) ? "[E]  할머니 살펴보기" : "[E]  곁에 앉기";
 		else if (!targetSleeper->visited)
-			prompt = "[E]  Rest beside them";
+			prompt = "[E]  곁에서 쉬기";
 
 		targetSpot = prompt.empty() ? SPOT_NONE : SPOT_SLEEPER;
 	}
@@ -702,7 +702,7 @@ void Game::TryInteract()
 		{
 			riceEaten = true;
 			foodMeter = 100.0f;
-			ShowMessage("The rice in the pot is still warm. You eat every grain.", 4.0f);
+			ShowMessage("솥의 밥이 아직 따뜻하다. 한 톨도 남김없이 먹는다.", 4.0f);
 		}
 		else
 		{
@@ -716,25 +716,25 @@ void Game::TryInteract()
 		{
 			inventory[ITEM_CLEAN_WATER] += 2;
 			survivalShown = true;
-			ShowMessage("You draw cold water, drink deep, and fill two flasks.  Water and food now show below.", 6.0f);
+			ShowMessage("찬물을 길어 실컷 마시고 물병 두 개를 채운다.  이제 아래에 물과 음식이 표시된다.", 6.0f);
 			SetTutorial(TUT_BRING_WATER);
 		}
 		else
 		{
-			ShowMessage("Cold, clean water.", 2.0f);
+			ShowMessage("차갑고 맑은 물.", 2.0f);
 		}
 		break;
 
 	case SPOT_SHED:
 		torchOwned = true;
 		FindRelic(RELIC_TORCH);
-		ShowMessage("Under a tarp: a hand torch from the old world. L switches it on.  B opens your Relic Journal.", 6.5f);
+		ShowMessage("천막 밑에서 옛 세상의 손전등을 찾았다. L로 켠다.  B로 유물 도감을 연다.", 6.5f);
 		SetTutorial(TUT_BRING_TORCH);
 		break;
 
 	case SPOT_DEER:
 		deerWatched = true;
-		AddInsight(1, "The lights on its antlers pulse like slow breathing.");
+		AddInsight(1, "뿔의 불빛이 느린 숨처럼 맥박친다.");
 		break;
 
 	case SPOT_FORAGE:
@@ -748,12 +748,12 @@ void Game::TryInteract()
 		{
 			if (tutorial == TUT_FIND_GRANDMOTHER)
 			{
-				ShowMessage("She is breathing. Moss has started at her fingertips. A letter and a map lie beside her.", 6.5f);
+				ShowMessage("숨은 쉬고 계신다. 손끝에 이끼가 돋기 시작했다. 곁에 편지와 지도가 놓여 있다.", 6.5f);
 				SetTutorial(TUT_READ_LETTER);
 			}
 			else
 			{
-				ShowMessage("She is breathing. She will not wake.", 3.5f);
+				ShowMessage("숨은 쉬고 계신다. 깨어나지 않으신다.", 3.5f);
 			}
 			break;
 		}
@@ -767,7 +767,7 @@ void Game::TryInteract()
 				s.mote = nullptr;
 			}
 			++fragments;
-			AddInsight(1, "A dream fragment: the first spring, seen from someone else's eyes.");
+			AddInsight(1, "꿈 조각: 다른 누군가의 눈으로 본 첫봄.");
 		}
 		break;
 	}
@@ -847,7 +847,7 @@ void Game::ConfirmPack()
 	}
 
 	packOpen = false;
-	ShowMessage("You shoulder the bag. What stays behind stays with her.", 4.0f);
+	ShowMessage("배낭을 멘다. 두고 가는 것은 할머니 곁에 남는다.", 4.0f);
 	SetTutorial(TUT_LEAVE);
 }
 
@@ -855,53 +855,53 @@ void Game::ObjectiveText(char* buf, size_t size) const
 {
 	switch (tutorial)
 	{
-	case TUT_WAKE:             sprintf_s(buf, size, "Talk to Grandmother."); break;
-	case TUT_FETCH_WATER:      sprintf_s(buf, size, "Fetch water from the well."); break;
-	case TUT_BRING_WATER:      sprintf_s(buf, size, "Bring the water to Grandmother."); break;
+	case TUT_WAKE:             sprintf_s(buf, size, "할머니와 이야기하라."); break;
+	case TUT_FETCH_WATER:      sprintf_s(buf, size, "우물에서 물을 길어라."); break;
+	case TUT_BRING_WATER:      sprintf_s(buf, size, "할머니께 물을 가져가라."); break;
 	case TUT_FORAGE:
-		sprintf_s(buf, size, "Pull radishes (%d/%d) and pick red berries (%d/%d).",
+		sprintf_s(buf, size, "무 뽑기 (%d/%d), 빨간 열매 따기 (%d/%d).",
 				  radishes < kForageGoal ? radishes : kForageGoal, kForageGoal,
 				  redBerries < kForageGoal ? redBerries : kForageGoal, kForageGoal);
 		break;
-	case TUT_BRING_FOOD:       sprintf_s(buf, size, "Take the food back to Grandmother."); break;
-	case TUT_EAT:              sprintf_s(buf, size, "Eat something while she watches. (F)"); break;
-	case TUT_FETCH_TORCH:      sprintf_s(buf, size, "Find the old torch in the shed, east of the village."); break;
-	case TUT_BRING_TORCH:      sprintf_s(buf, size, "Bring the torch to Grandmother. (L switches it on)"); break;
-	case TUT_DUSK:             sprintf_s(buf, size, "Evening is falling. Go home."); break;
-	case TUT_WATCH_DEER:       sprintf_s(buf, size, "Watch the lantern deer by the water."); break;
-	case TUT_BEDTIME:          sprintf_s(buf, size, "Go to bed. (E at the door)"); break;
-	case TUT_FIND_GRANDMOTHER: sprintf_s(buf, size, "Find Grandmother."); break;
-	case TUT_READ_LETTER:      sprintf_s(buf, size, "Read the letter beside her."); break;
-	case TUT_PACK:             sprintf_s(buf, size, "Pack your bag at the door."); break;
-	case TUT_LEAVE:            sprintf_s(buf, size, "Leave the village. Follow the road south."); break;
-	default:                   sprintf_s(buf, size, "You left Mulangae Village."); break;
+	case TUT_BRING_FOOD:       sprintf_s(buf, size, "할머니께 먹을 것을 가져가라."); break;
+	case TUT_EAT:              sprintf_s(buf, size, "할머니 앞에서 뭐라도 먹어라. (F)"); break;
+	case TUT_FETCH_TORCH:      sprintf_s(buf, size, "마을 동쪽 헛간에서 옛 손전등을 찾아라."); break;
+	case TUT_BRING_TORCH:      sprintf_s(buf, size, "할머니께 손전등을 가져가라. (L로 켠다)"); break;
+	case TUT_DUSK:             sprintf_s(buf, size, "저녁이 내린다. 집으로 가라."); break;
+	case TUT_WATCH_DEER:       sprintf_s(buf, size, "물가의 등불 사슴을 지켜보라."); break;
+	case TUT_BEDTIME:          sprintf_s(buf, size, "잠자리에 들어라. (문 앞에서 E)"); break;
+	case TUT_FIND_GRANDMOTHER: sprintf_s(buf, size, "할머니를 찾아라."); break;
+	case TUT_READ_LETTER:      sprintf_s(buf, size, "할머니 곁의 편지를 읽어라."); break;
+	case TUT_PACK:             sprintf_s(buf, size, "문 앞에서 배낭을 꾸려라."); break;
+	case TUT_LEAVE:            sprintf_s(buf, size, "마을을 떠나라. 길을 따라 남쪽으로."); break;
+	default:                   sprintf_s(buf, size, "물안개 마을을 떠났다."); break;
 	}
 }
 
 void Game::VillageHelp(char* buf, size_t size) const
 {
 	// Keys appear as the day teaches them.
-	sprintf_s(buf, size, "WASD move   SPACE roll   E interact%s%s   T time   F2 skip   ESC quit",
-			  tutorial >= TUT_FORAGE ? "   I bag   F eat" : "",
-			  torchOwned ? "   L torch   B journal" : "");
+	sprintf_s(buf, size, "WASD 이동   SPACE 구르기   E 상호작용%s%s   T 시간   F2 건너뛰기   ESC 종료",
+			  tutorial >= TUT_FORAGE ? "   I 배낭   F 먹기" : "",
+			  torchOwned ? "   L 손전등   B 도감" : "");
 }
 
 void Game::DrawVillageHud()
 {
 	const int w = renderer->GetWidth();
 
-	char buf[128];
+	char buf[256];
 	ObjectiveText(buf, sizeof(buf));
 	DrawObjective(buf);
 
-	sprintf_s(buf, sizeof(buf), "Dream fragments  %d / %d", fragments, fragmentGoal);
+	sprintf_s(buf, sizeof(buf), "꿈 조각  %d / %d", fragments, fragmentGoal);
 	int tw = renderer->TextWidth(buf, false);
 	renderer->DrawRectPx((float)(w - tw - 46), 18.0f, (float)(tw + 28), 38.0f, kHudPanel, 0.38f);
 	renderer->DrawTexts(w - tw - 32, 42, buf, fragments >= fragmentGoal ? kHudAccent : kHudInk, false);
 
 	DrawSurvivalHud();
 
-	char help[160];
+	char help[256];
 	VillageHelp(help, sizeof(help));
 	DrawCommonHud(help);
 
@@ -910,7 +910,7 @@ void Game::DrawVillageHud()
 	DrawPackPanel();
 	DrawBagPanel();
 	DrawJournalPanel();
-	if (day == 1) DrawTitleCard("MULANGAE VILLAGE", "the morning the spores arrived");
+	if (day == 1) DrawTitleCard("물안개 마을", "포자가 찾아온 아침");
 	DrawVillageFades();
 }
 
@@ -927,7 +927,7 @@ void Game::DrawDialog()
 	renderer->DrawRectPx(px, py, pw, ph, Vec3(0.08f, 0.09f, 0.08f), 0.88f);
 	renderer->DrawRectPx(px, py, 4.0f, ph, Vec3(0.85f, 0.70f, 0.45f), 0.9f);
 
-	renderer->DrawTexts((int)px + 24, (int)py + 28, "GRANDMOTHER", Vec3(0.92f, 0.80f, 0.58f), false);
+	renderer->DrawTexts((int)px + 24, (int)py + 28, "할머니", Vec3(0.92f, 0.80f, 0.58f), false);
 	renderer->DrawTexts((int)px + 24, (int)py + 58, dialogLines[dialogIndex].c_str(), kHudInk, false);
 
 	char buf[16];
@@ -952,14 +952,14 @@ void Game::DrawLetterPanel()
 
 	const char* lines[] =
 	{
-		"The spores have reached us, so the village will sleep soon.",
-		"I am not telling you to run.",
+		"포자가 여기까지 왔으니, 마을은 곧 잠들 거다.",
+		"도망치라는 말이 아니다.",
 		"",
-		"There is a tree at the heart of the city.",
-		"They say the people there do not fall asleep. They wake.",
+		"도시 한가운데에 나무가 하나 있단다.",
+		"거기 사람들은 잠들지 않는다더구나. 깨어난다고.",
 		"",
-		"Go and see it with your own eyes.",
-		"Then choose, for yourself, where you will live.",
+		"네 눈으로 직접 가서 보거라.",
+		"그리고 어디서 살지는, 네가 정하거라.",
 	};
 
 	int y = (int)py + 52;
@@ -968,9 +968,9 @@ void Game::DrawLetterPanel()
 		renderer->DrawTexts((int)px + 40, y, lines[i], Vec3(0.88f, 0.90f, 0.86f), false);
 		y += 26;
 	}
-	renderer->DrawTexts((int)(px + pw) - 130, y + 12, "- Sunim", Vec3(0.70f, 0.76f, 0.72f), false);
-	renderer->DrawTexts((int)px + 40, y + 40, "P.S. There's rice in the pot. Eat before ye go, mind.", Vec3(0.78f, 0.74f, 0.62f), false);
-	renderer->DrawTexts((int)px + 40, (int)(py + ph) - 18, "[E]  Close", kHudAccent, false);
+	renderer->DrawTexts((int)(px + pw) - 130, y + 12, "- 순임", Vec3(0.70f, 0.76f, 0.72f), false);
+	renderer->DrawTexts((int)px + 40, y + 40, "추신. 솥에 밥 있다. 꼭 먹고 가거라.", Vec3(0.78f, 0.74f, 0.62f), false);
+	renderer->DrawTexts((int)px + 40, (int)(py + ph) - 18, "[E]  닫기", kHudAccent, false);
 }
 
 void Game::DrawPackPanel()
@@ -995,8 +995,8 @@ void Game::DrawPackPanel()
 	int y = (int)py + 44;
 	char buf[128];
 
-	renderer->DrawTexts(x, y, "PACK YOUR BAG", kHudInk, true);
-	sprintf_s(buf, sizeof(buf), "%d / %d slots", used, kBagCapacity);
+	renderer->DrawTexts(x, y, "배낭 꾸리기", kHudInk, true);
+	sprintf_s(buf, sizeof(buf), "%d / %d칸", used, kBagCapacity);
 	renderer->DrawTexts(x + 380, y, buf, used >= kBagCapacity ? kHudAccent : kHudDim, false);
 	y += 42;
 
@@ -1007,21 +1007,27 @@ void Game::DrawPackPanel()
 		if (selected)
 			renderer->DrawRectPx((float)x - 14.0f, (float)y - 18.0f, pw - 44.0f, 26.0f, Vec3(0.25f, 0.40f, 0.34f), 0.45f);
 
+		const char* name = "손전등";
 		if (r < kPackItemRows)
 		{
 			int type = kPackRows[r];
-			sprintf_s(buf, sizeof(buf), "%s %-14s take %d of %d", selected ? ">" : " ", GetItemInfo(type).name, packTake[type], packHave[type]);
+			name = GetItemInfo(type).name;
+			sprintf_s(buf, sizeof(buf), "%d개 중 %d개 챙김", packHave[type], packTake[type]);
 		}
 		else
 		{
-			sprintf_s(buf, sizeof(buf), "%s %-14s %s", selected ? ">" : " ", "Hand torch", packTorch ? "take it" : "leave it");
+			sprintf_s(buf, sizeof(buf), "%s", packTorch ? "챙김" : "두고 감");
 		}
-		renderer->DrawTexts(x, y, buf, selected ? kHudInk : kHudDim, false);
+
+		Vec3 color = selected ? kHudInk : kHudDim;
+		if (selected) renderer->DrawTexts(x, y, ">", color, false);
+		renderer->DrawTexts(x + 16, y, name, color, false);
+		renderer->DrawTexts(x + 180, y, buf, color, false);
 		y += 30;
 	}
 
-	renderer->DrawTexts(x, (int)(py + ph) - 48, "What you leave stays in the house with her.", kHudDim, false);
-	renderer->DrawTexts(x, (int)(py + ph) - 22, "W/S select    D take    A leave    E done", kHudAccent, false);
+	renderer->DrawTexts(x, (int)(py + ph) - 48, "두고 가는 것은 할머니와 함께 집에 남는다.", kHudDim, false);
+	renderer->DrawTexts(x, (int)(py + ph) - 22, "W/S 선택    D 넣기    A 빼기    E 완료", kHudAccent, false);
 }
 
 void Game::DrawVillageFades()
@@ -1038,7 +1044,7 @@ void Game::DrawVillageFades()
 	if (dayCardTimer >= 0.0f)
 	{
 		float a = Saturatef(Minf(dayCardTimer - 1.0f, 6.0f - dayCardTimer));
-		const char* t1 = "THE NEXT MORNING";
+		const char* t1 = "다음 날 아침";
 		int w1 = renderer->TextWidth(t1, true);
 		renderer->DrawTexts(w / 2 - w1 / 2, h / 2 - 60, t1, Vec3(0.92f, 0.95f, 0.92f) * a, true);
 	}

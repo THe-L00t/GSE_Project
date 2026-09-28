@@ -152,7 +152,7 @@ void Game::UpdateRoute(float dt, const bool* keys)
 	if (sporeExposure >= 1.0f && deathTimer < 0.0f)
 	{
 		health -= kSporeDrain * dt;
-		if (health <= 0.0f) FallAsleep("The spores close over you. You sink into a long sleep...");
+		if (health <= 0.0f) FallAsleep("포자가 온몸을 덮는다. 긴 잠에 빠져든다...");
 	}
 }
 
@@ -163,7 +163,7 @@ void Game::SetGuide(int next)
 	switch (next)
 	{
 	case GUIDE_TAKE_PIPE:
-		ShowMessage("Something glints on the road ahead. Walk over it to pick it up.", 5.0f);
+		ShowMessage("길 앞에서 뭔가 반짝인다. 위로 걸어가면 줍는다.", 5.0f);
 		break;
 
 	case GUIDE_FIGHT_MITES:
@@ -171,12 +171,12 @@ void Game::SetGuide(int next)
 		SpawnEnemy(ENEMY_SPORE_MITE, 1, Vec3(-3.5f, 0.0f, 3.0f), 0, 0, -1);
 		SpawnEnemy(ENEMY_SPORE_MITE, 1, Vec3(3.5f, 0.0f, 4.5f), 0, 0, -1);
 		SpawnEnemy(ENEMY_SPORE_MITE, 1, Vec3(0.0f, 0.0f, 8.0f), 0, 0, -1);
-		ShowMessage("Spore mites are stirring. Attack with J or the left mouse button.", 5.0f);
+		ShowMessage("포자 진드기들이 꿈틀거린다. J 또는 마우스 왼쪽 버튼으로 공격하라.", 5.0f);
 		break;
 
 	case GUIDE_ASSIGN_STATS:
 		guideBaseline = statConfirmations;
-		ShowMessage("Level up: 3 stat points and full health. Press C to spend the points.", 6.0f);
+		ShowMessage("레벨 업: 능력치 3점과 체력 회복. C를 눌러 점수를 써라.", 6.0f);
 		break;
 
 	case GUIDE_FIGHT_BOAR:
@@ -184,28 +184,28 @@ void Game::SetGuide(int next)
 		SpawnEnemy(ENEMY_MOSS_BOAR, 1, Vec3(RoadCenter(22.0f), 0.0f, 22.0f), 0, 1, -1);
 		if (inventory[ITEM_HERB] == 0)
 			DropItem(ITEM_HERB, player->Position() + Vec3(1.5f, 0.0f, 1.0f), 0, 0, -1);
-		ShowMessage("A moss boar blocks the road south. When it glows red, roll through the charge.", 6.0f);
+		ShowMessage("이끼 멧돼지가 남쪽 길을 막고 있다. 붉게 빛나면 구르기로 돌진을 피하라.", 6.0f);
 		break;
 
 	case GUIDE_ASSIGN_AGAIN:
 		guideBaseline = statConfirmations;
-		ShowMessage("Level up again. Try putting these points somewhere new.", 5.0f);
+		ShowMessage("또 레벨 업. 이번 점수는 다른 곳에 넣어 보라.", 5.0f);
 		break;
 
 	case GUIDE_BUS_STOP:
-		ShowMessage("Something is sheltered at the bus stop down the road.", 5.0f);
+		ShowMessage("길 아래 버스 정류장 지붕 밑에 뭔가 있다.", 5.0f);
 		break;
 
 	case GUIDE_FIND_WATER:
-		ShowMessage("Your flasks will not last. Grandmother said the lantern deer know where water is.", 6.0f);
+		ShowMessage("물병이 오래가지 않는다. 할머니는 등불 사슴이 물 있는 곳을 안다고 했다.", 6.0f);
 		break;
 
 	case GUIDE_REACH_TOWN:
-		ShowMessage("Ginkgo Town lies further south. Follow what is left of the road.", 5.0f);
+		ShowMessage("은행나무 읍내는 더 남쪽에 있다. 남은 길을 따라가라.", 5.0f);
 		break;
 
 	case GUIDE_EXPLORE:
-		ShowMessage("The road goes on. The further you walk, the less of the old world is left.", 6.0f);
+		ShowMessage("길은 계속된다. 멀리 걸을수록 옛 세상은 덜 남아 있다.", 6.0f);
 		break;
 
 	default:
@@ -262,35 +262,35 @@ void Game::GuideText(char* buf, size_t size) const
 	switch (guide)
 	{
 	case GUIDE_TAKE_PIPE:
-		sprintf_s(buf, size, "Take the rusty pipe lying on the road.");
+		sprintf_s(buf, size, "길에 떨어진 녹슨 파이프를 주워라.");
 		break;
 	case GUIDE_FIGHT_MITES:
-		sprintf_s(buf, size, "Defeat the spore mites (%d/%d).  J or click to attack.",
+		sprintf_s(buf, size, "포자 진드기를 물리쳐라 (%d/%d).  J 또는 클릭으로 공격.",
 				  kills[ENEMY_SPORE_MITE] - guideBaseline, kGuideMites);
 		break;
 	case GUIDE_ASSIGN_STATS:
-		sprintf_s(buf, size, "You reached level %d. Press C and assign your stat points.", stats.level);
+		sprintf_s(buf, size, "레벨 %d에 올랐다. C를 눌러 능력치 점수를 분배하라.", stats.level);
 		break;
 	case GUIDE_FIGHT_BOAR:
-		sprintf_s(buf, size, "Defeat the moss boar to the south. SPACE rolls through its charge.");
+		sprintf_s(buf, size, "남쪽의 이끼 멧돼지를 물리쳐라. SPACE로 구르면 돌진을 피한다.");
 		break;
 	case GUIDE_ASSIGN_AGAIN:
-		sprintf_s(buf, size, "Level %d. Spend the new points - try a different stat.", stats.level);
+		sprintf_s(buf, size, "레벨 %d. 새 점수를 써라 - 다른 능력치도 올려 보라.", stats.level);
 		break;
 	case GUIDE_BUS_STOP:
-		sprintf_s(buf, size, "Look in the bus stop further down the road.");
+		sprintf_s(buf, size, "길 아래쪽 버스 정류장을 살펴라.");
 		break;
 	case GUIDE_FIND_WATER:
 		if (timeOfDay < 0.22f || timeOfDay > 0.78f)
-			sprintf_s(buf, size, "Find water. Follow the lantern deer if it appears.");
+			sprintf_s(buf, size, "물을 찾아라. 등불 사슴이 나타나면 따라가라.");
 		else
-			sprintf_s(buf, size, "Find water. The lantern deer come out after dark (T hurries time).");
+			sprintf_s(buf, size, "물을 찾아라. 등불 사슴은 어두워지면 나온다 (T로 시간 빠르게).");
 		break;
 	case GUIDE_REACH_TOWN:
-		sprintf_s(buf, size, "Reach Ginkgo Town, south along the road.");
+		sprintf_s(buf, size, "길을 따라 남쪽의 은행나무 읍내에 닿아라.");
 		break;
 	default:
-		sprintf_s(buf, size, "Walk on. The land grows in every direction, and forgets the old world.");
+		sprintf_s(buf, size, "계속 걸어라. 땅은 사방으로 자라며 옛 세상을 잊어 간다.");
 		break;
 	}
 }
@@ -453,14 +453,14 @@ void Game::UpdateLandmarks(float dt)
 	if (!reservoirFound && reservoir->ShoreDistance(pos) < 3.0f)
 	{
 		reservoirFound = true;
-		AddInsight(1, "Water, hidden where the land dips.");
+		AddInsight(1, "땅이 움푹 꺼진 곳에 물이 숨어 있었다.");
 	}
 
 	if (!townReached && pos.z > kTownGateZ && fabsf(pos.x - RoadCenter(pos.z)) < 16.0f)
 	{
 		townReached = true;
 		townCardTimer = 0.0f;
-		ShowMessage("You reached Ginkgo Town. The road goes on, if you want it to.", 6.0f);
+		ShowMessage("은행나무 읍내에 닿았다. 원한다면, 길은 계속된다.", 6.0f);
 	}
 
 	if (townCardTimer >= 0.0f)
@@ -470,7 +470,7 @@ void Game::UpdateLandmarks(float dt)
 	}
 
 	prompt.clear();
-	if (deathTimer < 0.0f && reservoir->ShoreDistance(pos) < 1.8f) prompt = "[E]  Drink and fill your flasks";
+	if (deathTimer < 0.0f && reservoir->ShoreDistance(pos) < 1.8f) prompt = "[E]  물 마시고 물병 채우기";
 }
 
 void Game::UpdateRouteDeer(float dt)
@@ -492,7 +492,7 @@ void Game::UpdateRouteDeer(float dt)
 		deer->goal = kReservoirCenter + Vec3(-kReservoirSizeX * 0.5f - 1.5f, 0.0f, 0.0f);
 		deer->speed = 2.4f;
 		deer->leading = true;
-		ShowMessage("A lantern deer steps out of the dark, and waits for you.", 5.0f);
+		ShowMessage("등불 사슴이 어둠 속에서 걸어 나와 너를 기다린다.", 5.0f);
 		return;
 	}
 
@@ -502,7 +502,7 @@ void Game::UpdateRouteDeer(float dt)
 	if (deerLeaveTimer < 0.0f && (reservoirFound || (!night && !deer->arrived)))
 	{
 		deerLeaveTimer = 0.0f;
-		if (!reservoirFound) ShowMessage("With the dawn, the deer is gone.", 3.0f);
+		if (!reservoirFound) ShowMessage("날이 밝자 사슴은 사라졌다.", 3.0f);
 	}
 	if (deerLeaveTimer >= 0.0f)
 	{
@@ -553,8 +553,8 @@ void Game::TryRouteInteract()
 	if (fill < 0) fill = 0;
 	inventory[ITEM_CLEAN_WATER] += fill;
 
-	char buf[96];
-	sprintf_s(buf, sizeof(buf), "You drink deep and fill %d flask%s.", fill, fill == 1 ? "" : "s");
+	char buf[256];
+	sprintf_s(buf, sizeof(buf), "물을 실컷 마시고 물병 %d개를 채웠다.", fill);
 	ShowMessage(buf, 3.0f);
 }
 
@@ -562,17 +562,17 @@ void Game::DrawRouteHud()
 {
 	const int w = renderer->GetWidth();
 
-	char objective[128];
+	char objective[256];
 	GuideText(objective, sizeof(objective));
 	DrawObjective(objective);
 
 	const ChunkActor* here = EnsureChunk(playerChunkX, playerChunkZ);
-	char lines[5][96];
-	sprintf_s(lines[0], sizeof(lines[0]), "Seed  %016llX", (unsigned long long)routeMap.WorldSeed());
-	sprintf_s(lines[1], sizeof(lines[1]), "Chunk (%d, %d)  stage %d", here->cx, here->cz, here->stage);
-	sprintf_s(lines[2], sizeof(lines[2]), "Chunk hash  %016llX", (unsigned long long)here->hash);
-	sprintf_s(lines[3], sizeof(lines[3]), "Chunks grown  %d", routeMap.GeneratedCount());
-	sprintf_s(lines[4], sizeof(lines[4]), "Old world left  %d%%", (int)(here->modernity * 100.0f + 0.5f));
+	char lines[5][128];
+	sprintf_s(lines[0], sizeof(lines[0]), "시드  %016llX", (unsigned long long)routeMap.WorldSeed());
+	sprintf_s(lines[1], sizeof(lines[1]), "청크 (%d, %d)  단계 %d", here->cx, here->cz, here->stage);
+	sprintf_s(lines[2], sizeof(lines[2]), "청크 해시  %016llX", (unsigned long long)here->hash);
+	sprintf_s(lines[3], sizeof(lines[3]), "생성된 청크  %d", routeMap.GeneratedCount());
+	sprintf_s(lines[4], sizeof(lines[4]), "남은 옛 세상  %d%%", (int)(here->modernity * 100.0f + 0.5f));
 
 	int boxW = 0;
 	for (int i = 0; i < 5; ++i)
@@ -589,9 +589,9 @@ void Game::DrawRouteHud()
 	DrawCombatHud();
 	DrawPopups();
 	DrawSurvivalHud();
-	DrawCommonHud("WASD move  SPACE roll  J attack  Q herb  R drink  F eat  L torch  I bag  B journal  C stats  E use");
-	DrawTitleCard("ROUTE 32", "the first outside");
-	DrawTitleCardAt("GINKGO TOWN", "the end of the first road", townCardTimer);
+	DrawCommonHud("WASD 이동  SPACE 구르기  J 공격  Q 약초  R 마시기  F 먹기  L 손전등  I 배낭  B 도감  C 능력치  E 사용");
+	DrawTitleCard("32번 국도", "처음 나선 바깥");
+	DrawTitleCardAt("은행나무 읍내", "첫 길의 끝", townCardTimer);
 	DrawStatPanel();
 	DrawBagPanel();
 	DrawJournalPanel();
@@ -605,12 +605,12 @@ void Game::DrawGuideCard()
 
 	const char* lines[] =
 	{
-		"HOW YOU GROW",
-		"Creatures and relics give XP.",
-		"A full XP bar raises your level:",
-		"  +3 stat points and full health.",
-		"Each level asks for more XP.",
-		"C opens stats; place points freely.",
+		"성장하는 법",
+		"짐승과 유물은 경험치를 준다.",
+		"경험치가 가득 차면 레벨이 오른다:",
+		"  능력치 +3점, 체력 완전 회복.",
+		"레벨마다 필요한 경험치가 늘어난다.",
+		"C로 능력치 창을 열고 자유롭게 분배하라.",
 	};
 	const int lineCount = (int)(sizeof(lines) / sizeof(lines[0]));
 

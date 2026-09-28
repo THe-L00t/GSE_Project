@@ -151,7 +151,7 @@ void Game::DamagePlayer(float amount, const Vec3& push)
 	sprintf_s(text, sizeof(text), "-%d", (int)(amount + 0.5f));
 	AddPopup(player->Position() + Vec3(0.0f, 2.0f, 0.0f), text, kHurtColor);
 
-	if (health <= 0.0f) FallAsleep("You sink into a long sleep...");
+	if (health <= 0.0f) FallAsleep("긴 잠에 빠져든다...");
 }
 
 void Game::FallAsleep(const char* reason)
@@ -181,7 +181,7 @@ void Game::WakeAtSafePoint()
 		enemies[i]->stateTimer = 0.0f;
 	}
 
-	ShowMessage("You wake beside the lantern. Nothing is lost but time.", 4.0f);
+	ShowMessage("석등 곁에서 눈을 뜬다. 잃은 것은 시간뿐이다.", 4.0f);
 }
 
 void Game::UpdateEnemies(float dt)
@@ -352,7 +352,7 @@ void Game::UpdateItems()
 			// A full bag leaves the find where it lies.
 			if (TakesBagSlot(item.type) && !BagHasRoom())
 			{
-				if (messageTimer <= 0.0f) ShowMessage("Your bag is full. Eat, drink or use something first.", 2.5f);
+				if (messageTimer <= 0.0f) ShowMessage("배낭이 가득 찼다. 먼저 먹거나 마시거나 써서 비워라.", 2.5f);
 				continue;
 			}
 
@@ -451,12 +451,12 @@ void Game::UseHerb()
 	float maxHealth = MaxHealth(stats);
 	if (inventory[ITEM_HERB] <= 0)
 	{
-		ShowMessage("No herbs. Creatures sometimes drop them.", 2.5f);
+		ShowMessage("약초가 없다. 짐승들이 가끔 떨어뜨린다.", 2.5f);
 		return;
 	}
 	if (health >= maxHealth)
 	{
-		ShowMessage("You are not hurt.", 1.5f);
+		ShowMessage("다친 데가 없다.", 1.5f);
 		return;
 	}
 
@@ -474,8 +474,8 @@ void Game::GrantXp(int amount)
 {
 	amount = (int)((float)amount * XpScale(stats) + 0.5f);
 
-	char text[16];
-	sprintf_s(text, sizeof(text), "+%d XP", amount);
+	char text[32];
+	sprintf_s(text, sizeof(text), "경험치 +%d", amount);
 	AddPopup(player->Position() + Vec3(0.0f, 2.4f, 0.0f), text, kXpColor);
 
 	int gained = GainXp(stats, amount);
@@ -484,8 +484,8 @@ void Game::GrantXp(int amount)
 	health = MaxHealth(stats);
 	levelUpTimer = 3.0f;
 
-	char buf[96];
-	sprintf_s(buf, sizeof(buf), "Level up! You are level %d. Press C to assign %d stat points.",
+	char buf[256];
+	sprintf_s(buf, sizeof(buf), "레벨 업! 레벨 %d이 되었다. C를 눌러 능력치 %d점을 분배하라.",
 			  stats.level, stats.unspentPoints);
 	ShowMessage(buf, 6.0f);
 }
@@ -568,8 +568,8 @@ void Game::ConfirmStats()
 	++statConfirmations;
 	statPanelOpen = false;
 
-	char buf[96];
-	sprintf_s(buf, sizeof(buf), "Stats assigned. %d point%s left.", stats.unspentPoints, stats.unspentPoints == 1 ? "" : "s");
+	char buf[256];
+	sprintf_s(buf, sizeof(buf), "능력치를 분배했다. 남은 점수 %d점.", stats.unspentPoints);
 	ShowMessage(buf, 3.0f);
 }
 
@@ -611,35 +611,35 @@ void Game::DrawCombatHud()
 
 	renderer->DrawRectPx(18.0f, 88.0f, 330.0f, 100.0f, kHudPanel, 0.38f);
 
-	sprintf_s(buf, sizeof(buf), "LV %d", stats.level);
+	sprintf_s(buf, sizeof(buf), "Lv %d", stats.level);
 	renderer->DrawTexts(32, 120, buf, kHudAccent, true);
 
-	sprintf_s(buf, sizeof(buf), "HP  %d / %d", (int)(health + 0.5f), (int)(maxHealth + 0.5f));
+	sprintf_s(buf, sizeof(buf), "체력  %d / %d", (int)(health + 0.5f), (int)(maxHealth + 0.5f));
 	renderer->DrawTexts(104, 108, buf, kHudInk, false);
 	renderer->DrawBarPx(104.0f, 114.0f, 228.0f, 10.0f, health / maxHealth,
 						Vec3(0.75f, 0.28f, 0.25f), Vec3(0.45f, 0.85f, 0.55f));
 
-	sprintf_s(buf, sizeof(buf), "XP  %d / %d", stats.xp, need);
+	sprintf_s(buf, sizeof(buf), "경험치  %d / %d", stats.xp, need);
 	renderer->DrawTexts(104, 142, buf, kHudDim, false);
 	renderer->DrawBarPx(104.0f, 148.0f, 228.0f, 8.0f, (float)stats.xp / (float)need,
 						Vec3(0.40f, 0.55f, 0.75f), Vec3(0.60f, 0.85f, 0.95f));
 
 	int meals = inventory[ITEM_BERRIES] + inventory[ITEM_VEGETABLE] + inventory[ITEM_CANNED_FOOD];
-	sprintf_s(buf, sizeof(buf), "%s   Herb %d [Q]  Water %d [R]  Food %d [F]",
-			  player->weapon ? "Pipe" : "Hands", inventory[ITEM_HERB], inventory[ITEM_CLEAN_WATER], meals);
+	sprintf_s(buf, sizeof(buf), "%s   약초 %d [Q]  물 %d [R]  음식 %d [F]",
+			  player->weapon ? "파이프" : "맨손", inventory[ITEM_HERB], inventory[ITEM_CLEAN_WATER], meals);
 	renderer->DrawTexts(32, 176, buf, kHudDim, false);
 
 	if (stats.unspentPoints > 0)
 	{
 		float pulse = 0.65f + 0.35f * sinf(time * 5.0f);
-		sprintf_s(buf, sizeof(buf), "%d stat point%s to assign  [C]", stats.unspentPoints, stats.unspentPoints == 1 ? "" : "s");
+		sprintf_s(buf, sizeof(buf), "분배할 능력치 %d점  [C]", stats.unspentPoints);
 		renderer->DrawRectPx(18.0f, 194.0f, 330.0f, 28.0f, kHudPanel, 0.38f);
 		renderer->DrawTexts(32, 213, buf, kHudAccent * pulse, false);
 	}
 
 	if (levelUpTimer > 0.0f)
 	{
-		const char* banner = "LEVEL UP";
+		const char* banner = "레벨 업";
 		float fade = Saturatef(levelUpTimer);
 		int tw = renderer->TextWidth(banner, true);
 		renderer->DrawTexts(w / 2 - tw / 2, h / 2 - 90, banner, Vec3(0.85f, 0.97f, 0.70f) * fade, true);
@@ -678,9 +678,9 @@ void Game::DrawStatPanel()
 	int y = (int)py + 44;
 	char buf[128];
 
-	sprintf_s(buf, sizeof(buf), "STATS  -  Level %d", stats.level);
+	sprintf_s(buf, sizeof(buf), "능력치  -  레벨 %d", stats.level);
 	renderer->DrawTexts(x, y, buf, kHudInk, true);
-	sprintf_s(buf, sizeof(buf), "Points to assign: %d", remaining);
+	sprintf_s(buf, sizeof(buf), "분배할 점수: %d", remaining);
 	renderer->DrawTexts(x + 360, y, buf, remaining > 0 ? kHudAccent : kHudDim, false);
 
 	y += 42;
@@ -690,33 +690,41 @@ void Game::DrawStatPanel()
 		if (selected)
 			renderer->DrawRectPx((float)x - 14.0f, (float)y - 18.0f, pw - 44.0f, 26.0f, Vec3(0.25f, 0.40f, 0.34f), 0.45f);
 
-		if (pendingPoints[i] > 0)
-			sprintf_s(buf, sizeof(buf), "%s %-9s %2d  (+%d)", selected ? ">" : " ", StatName(i), stats.stat[i], pendingPoints[i]);
-		else
-			sprintf_s(buf, sizeof(buf), "%s %-9s %2d", selected ? ">" : " ", StatName(i), stats.stat[i]);
+		// Columns sit at fixed offsets: the font is proportional, so padding with spaces would not line up.
+		Vec3 color = selected ? kHudInk : kHudDim;
+		if (selected) renderer->DrawTexts(x, y, ">", color, false);
+		renderer->DrawTexts(x + 16, y, StatName(i), color, false);
 
-		renderer->DrawTexts(x, y, buf, selected ? kHudInk : kHudDim, false);
-		renderer->DrawTexts(x + 280, y, StatHint(i), kHudDim, false);
+		if (pendingPoints[i] > 0)
+			sprintf_s(buf, sizeof(buf), "%d  (+%d)", stats.stat[i], pendingPoints[i]);
+		else
+			sprintf_s(buf, sizeof(buf), "%d", stats.stat[i]);
+		renderer->DrawTexts(x + 110, y, buf, color, false);
+		renderer->DrawTexts(x + 200, y, StatHint(i), kHudDim, false);
 		y += 30;
 	}
 
 	y += 16;
-	renderer->DrawTexts(x, y, "What changes", kHudDim, false);
+	renderer->DrawTexts(x, y, "달라지는 것", kHudDim, false);
 	y += 26;
 
-	sprintf_s(buf, sizeof(buf), "Max health     %3d  ->  %3d", (int)(MaxHealth(stats) + 0.5f), (int)(MaxHealth(preview) + 0.5f));
-	renderer->DrawTexts(x, y, buf, kHudInk, false);
-	sprintf_s(buf, sizeof(buf), "Attack     %5.1f  ->  %5.1f", AttackPower(stats, weapon), AttackPower(preview, weapon));
-	renderer->DrawTexts(x + 300, y, buf, kHudInk, false);
+	renderer->DrawTexts(x, y, "최대 체력", kHudInk, false);
+	sprintf_s(buf, sizeof(buf), "%d  ->  %d", (int)(MaxHealth(stats) + 0.5f), (int)(MaxHealth(preview) + 0.5f));
+	renderer->DrawTexts(x + 110, y, buf, kHudInk, false);
+	renderer->DrawTexts(x + 300, y, "공격력", kHudInk, false);
+	sprintf_s(buf, sizeof(buf), "%.1f  ->  %.1f", AttackPower(stats, weapon), AttackPower(preview, weapon));
+	renderer->DrawTexts(x + 410, y, buf, kHudInk, false);
 	y += 24;
 
-	sprintf_s(buf, sizeof(buf), "Move speed     %3d%% ->  %3d%%", (int)(MoveSpeedScale(stats) * 100.0f + 0.5f), (int)(MoveSpeedScale(preview) * 100.0f + 0.5f));
-	renderer->DrawTexts(x, y, buf, kHudInk, false);
-	sprintf_s(buf, sizeof(buf), "XP gain     %4d%% -> %4d%%", (int)(XpScale(stats) * 100.0f + 0.5f), (int)(XpScale(preview) * 100.0f + 0.5f));
-	renderer->DrawTexts(x + 300, y, buf, kHudInk, false);
+	renderer->DrawTexts(x, y, "이동 속도", kHudInk, false);
+	sprintf_s(buf, sizeof(buf), "%d%%  ->  %d%%", (int)(MoveSpeedScale(stats) * 100.0f + 0.5f), (int)(MoveSpeedScale(preview) * 100.0f + 0.5f));
+	renderer->DrawTexts(x + 110, y, buf, kHudInk, false);
+	renderer->DrawTexts(x + 300, y, "경험치 획득", kHudInk, false);
+	sprintf_s(buf, sizeof(buf), "%d%%  ->  %d%%", (int)(XpScale(stats) * 100.0f + 0.5f), (int)(XpScale(preview) * 100.0f + 0.5f));
+	renderer->DrawTexts(x + 410, y, buf, kHudInk, false);
 
 	if (level == LEVEL_ROUTE && (guide == GUIDE_ASSIGN_STATS || guide == GUIDE_ASSIGN_AGAIN))
-		renderer->DrawTexts(x, (int)(py + ph) - 48, "Tip: press D a few times and watch the right-hand numbers move.", kHudDim, false);
+		renderer->DrawTexts(x, (int)(py + ph) - 48, "팁: D를 몇 번 눌러 오른쪽 숫자가 어떻게 바뀌는지 보라.", kHudDim, false);
 
-	renderer->DrawTexts(x, (int)(py + ph) - 22, "W/S select    D add    A remove    E confirm    C close", kHudAccent, false);
+	renderer->DrawTexts(x, (int)(py + ph) - 22, "W/S 선택    D 올리기    A 내리기    E 확정    C 닫기", kHudAccent, false);
 }
