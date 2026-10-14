@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "Models.h"
+#include "Random.h"
 
 // ASCII only: the original template's CP949 comments turned into mojibake in UTF-8 tools.
 
@@ -43,6 +44,8 @@ void Renderer::Initialize(int sizeX, int sizeY)
 
 	CreateTargets(sizeX, sizeY);
 	CreateShadowMap();
+
+	CreateNoiseTexture();
 
 	if (GLEW_VERSION_3_3 || GLEW_ARB_timer_query) glGenQueries(kQueryFrames * MARK_COUNT, &timeQueries[0][0]);
 	std::cout << "GPU: " << (const char*)glGetString(GL_RENDERER) << "\n";
@@ -187,6 +190,33 @@ void Renderer::CreateShadowMap()
 	glUseProgram(0);
 
 	std::cout << "Shadows: " << (shadowReady ? "sun shadow map ready" : "unavailable") << "\n";
+}
+
+void Renderer::CreateNoiseTexture()
+{
+	const int size = 256;
+	std::vector<float> values(size * size);
+	for (int i = 0; i < size * size; ++i)
+	{
+		uint64_t h = MixSeed((uint64_t)i * 0x9E3779B97F4A7C15ULL + 0x51ED270BULL);
+		values[i] = (float)(h >> 40) / 16777216.0f;
+	}
+
+	glGenTextures(1, &noiseTex);
+	glActiveTexture(GL_TEXTURE4);
+	glBindTexture(GL_TEXTURE_2D, noiseTex);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, size, size, 0, GL_RED, GL_FLOAT, &values[0]);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+	// Unit 4 is left to the noise for the whole run; nothing else binds there.
+	glActiveTexture(GL_TEXTURE0);
+
+	glUseProgram(litShader);
+	glUniform1i(glGetUniformLocation(litShader, "u_Noise"), 4);
+	glUseProgram(0);
 }
 
 void Renderer::BindSceneTarget()

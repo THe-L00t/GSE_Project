@@ -258,6 +258,7 @@ private:
 	void DeleteTargets();
 	void BindSceneTarget();
 	void CreateShadowMap();
+	void CreateNoiseTexture();
 	void DrawPostPass(GLuint target, int width, int height, int mode, GLuint source, float sourceWidth, float sourceHeight);
 
 	bool initialized = false;
@@ -309,6 +310,7 @@ private:
 	bool   shadowReady = false;
 	bool   shadowPass = false;     // inside BeginShadowPass / EndShadowPass
 	bool   shadowActive = false;   // this frame's shadow map is valid
+	GLuint noiseTex = 0;
 	Mat4   lightViewProj;
 
 	LitLocations         lit;

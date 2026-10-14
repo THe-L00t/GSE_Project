@@ -43,16 +43,16 @@ float hash21(vec2 p)
 	return fract(p.x * p.y);
 }
 
+uniform sampler2D u_Noise;      // one random value per lattice cell, 256x256, repeating
+
+// One filtered fetch instead of four hashes: sampling between the two texel centres with a
+// smoothstepped offset gives the same smooth value noise, and the ground calls it ~30 times a pixel.
 float valueNoise(vec2 p)
 {
 	vec2 i = floor(p);
 	vec2 f = fract(p);
 	f = f * f * (3.0 - 2.0 * f);
-	float a = hash21(i);
-	float b = hash21(i + vec2(1.0, 0.0));
-	float c = hash21(i + vec2(0.0, 1.0));
-	float d = hash21(i + vec2(1.0, 1.0));
-	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+	return texture(u_Noise, (i + f + 0.5) / 256.0).r;
 }
 
 float fbm(vec2 p)
@@ -200,23 +200,33 @@ void main()
 		float field = 1.0 - road;
 		base = mix(base, base * vec3(0.92, 1.12, 0.90), u_Season.x * 0.5 * field);
 		base = mix(base, base * vec3(1.18, 0.96, 0.68), u_Season.y * 0.55 * field);
-		float litter = smoothstep(0.45, 0.70, fbm(p * 0.6 + 5.0)) * u_Season.y;
-		vec3 leafColor = mix(vec3(0.44, 0.22, 0.09), vec3(0.52, 0.40, 0.14), valueNoise(p * 3.1));
-		base = mix(base, leafColor * (0.8 + 0.4 * grain), litter * (0.65 - 0.35 * road));
+		// The season and weather terms are skipped outright while they are off: the branches are uniform.
+		if (u_Season.y > 0.005)
+		{
+			float litter = smoothstep(0.45, 0.70, fbm(p * 0.6 + 5.0)) * u_Season.y;
+			vec3 leafColor = mix(vec3(0.44, 0.22, 0.09), vec3(0.52, 0.40, 0.14), valueNoise(p * 3.1));
+			base = mix(base, leafColor * (0.8 + 0.4 * grain), litter * (0.65 - 0.35 * road));
+		}
 		float baseLuma = dot(base, vec3(0.299, 0.587, 0.114));
 		base = mix(base, vec3(baseLuma) * vec3(0.95, 0.97, 1.0), u_Season.z * 0.35);
 
 		// Rain soaks in: darker ground, and puddles that catch the light.
-		float puddle = smoothstep(0.62, 0.78, valueNoise(p * 0.45 + 3.0)) * u_Weather.w;
-		base *= 1.0 - 0.25 * u_Weather.w - 0.20 * puddle;
-		gloss = puddle * 0.8;
+		if (u_Weather.w > 0.005)
+		{
+			float puddle = smoothstep(0.62, 0.78, valueNoise(p * 0.45 + 3.0)) * u_Weather.w;
+			base *= 1.0 - 0.25 * u_Weather.w - 0.20 * puddle;
+			gloss = puddle * 0.8;
+		}
 
 		// Snow lies in drifts first, then covers everything; the road keeps its wheel ruts longest.
-		float drift = fbm(p * 0.22 + 41.0) * 0.6 + grain * 0.4;
-		float cover = u_Season.w * (1.0 - 0.25 * road);
-		float snow = smoothstep(1.0 - cover - 0.08, 1.0 - cover + 0.08, drift) * smoothstep(0.0, 0.05, cover);
-		base = mix(base, vec3(0.84, 0.88, 0.93) * (0.92 + 0.12 * grain), snow);
-		gloss *= 1.0 - snow;
+		if (u_Season.w > 0.001)
+		{
+			float drift = fbm(p * 0.22 + 41.0) * 0.6 + grain * 0.4;
+			float cover = u_Season.w * (1.0 - 0.25 * road);
+			float snow = smoothstep(1.0 - cover - 0.08, 1.0 - cover + 0.08, drift) * smoothstep(0.0, 0.05, cover);
+			base = mix(base, vec3(0.84, 0.88, 0.93) * (0.92 + 0.12 * grain), snow);
+			gloss *= 1.0 - snow;
+		}
 		emissive = 0.0;
 	}
 	else if (u_Mode == 2)
