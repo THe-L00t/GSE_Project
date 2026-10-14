@@ -983,6 +983,7 @@ void Renderer::DrawModel(int id, const Mat4& model, const DrawParams& params)
 	instance.emissive = params.emissive;
 	instance.phase = params.phase;
 	instance.flash = params.flash;
+	instance.dissolve = params.dissolve;
 	modelQueue[id].push_back(instance);
 }
 
@@ -1083,7 +1084,7 @@ void Renderer::DrawInstances(int mesh, int start, int count)
 	for (int c = 0; c < 4; ++c)
 		glVertexAttribPointer(4 + c, 4, GL_FLOAT, GL_FALSE, stride, (void*)(base + sizeof(float) * 4 * c));
 	glVertexAttribPointer(8, 4, GL_FLOAT, GL_FALSE, stride, (void*)(base + sizeof(float) * 16));
-	glVertexAttribPointer(9, 2, GL_FLOAT, GL_FALSE, stride, (void*)(base + sizeof(float) * 20));
+	glVertexAttribPointer(9, 3, GL_FLOAT, GL_FALSE, stride, (void*)(base + sizeof(float) * 20));
 
 	glDrawArraysInstanced(GL_TRIANGLES, 0, meshes[mesh].count, count);
 	++drawCalls;

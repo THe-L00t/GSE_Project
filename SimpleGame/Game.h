@@ -141,6 +141,15 @@ struct Popup
 	char  text[32] = "";
 };
 
+// A mote of light let go when a creature is released; it drifts up and shrinks away.
+struct Wisp
+{
+	Vec3  pos;
+	Vec3  vel;
+	float life = 0.0f;
+	float maxLife = 1.0f;
+};
+
 // What has happened to a generated chunk's creatures and finds since it was first visited.
 struct ChunkState
 {
@@ -268,6 +277,7 @@ private:
 	void ConfirmStats();
 	void DrawCombatHud();
 	void DrawPopups();
+	void DrawWisps();
 	void DrawStatPanel();
 
 	// GameSurvival.cpp: water, food, warmth, the bag, the relic journal and the torch
@@ -395,8 +405,10 @@ private:
 	float levelUpTimer = 0.0f;
 	float hitStop = 0.0f;         // > 0 while a landed blow freezes the world
 	Rng   combatRng{ 0x5EED5EEDULL };
+	Rng   fxRng{ 0xF0CA11ULL };      // looks only; never touches a gameplay roll
 
 	std::vector<Popup> popups;
+	std::vector<Wisp>  wisps;
 
 	bool  statPanelOpen = false;
 	int   statCursor = 0;

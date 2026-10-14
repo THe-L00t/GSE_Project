@@ -9,7 +9,7 @@
 
 const float kPlayerRadius = 0.38f;
 const float kSwingTime = 0.22f;
-const float kDyingTime = 0.6f;
+const float kDyingTime = 0.9f;
 const int   kChunkDrawRadius = 1;   // chunks drawn around the camera; covers the orthographic view
 
 enum EnemyState

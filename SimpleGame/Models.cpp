@@ -15,7 +15,7 @@ namespace
 		"herb", "water_flask", "relic",
 		"shadow", "ground",
 		"grandma", "shed", "garden_bed", "vegetable", "berry_red", "berry_pale", "deer",
-		"canned_food", "bus_stop", "ginkgo", "pole", "meat", "cooked_meat",
+		"canned_food", "bus_stop", "ginkgo", "pole", "meat", "cooked_meat", "wisp",
 	};
 
 	const Vec3 kMoss(0.24f, 0.38f, 0.24f);
@@ -677,6 +677,12 @@ ModelRecipe BuildRecipe(int id)
 		r.Add(SHAPE_ELLIPSOID, Vec3(-0.42f, 0.26f, 0.0f), Vec3(0.10f, 0.10f, 0.12f), Vec3(0.88f, 0.86f, 0.78f), pickup);
 		break;
 	}
+
+	case MODEL_WISP:
+		// A mote of what a creature was holding, set free; centred so it can be placed anywhere.
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 0.0f, 0.0f), Vec3(0.10f, 0.10f, 0.10f), Vec3(0.95f, 1.00f, 0.92f));
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 0.0f, 0.0f), Vec3(0.05f, 0.22f, 0.05f), Vec3(0.55f, 0.95f, 0.80f));
+		break;
 
 	default:
 		r.Add(SHAPE_BOX, Vec3(0.0f, 0.5f, 0.0f), Vec3(1.0f, 1.0f, 1.0f), Vec3(1.0f, 0.0f, 1.0f));

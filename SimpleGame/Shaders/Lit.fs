@@ -12,6 +12,7 @@ in float v_Glow;
 in vec3  v_Tint;
 in float v_Emissive;
 in float v_Flash;
+in float v_Dissolve;
 
 uniform int   u_Mode;
 uniform vec3  u_FogOrigin;      // camera target; fog thickens away from it
@@ -172,6 +173,17 @@ void main()
 		return;
 	}
 
+	// A released creature comes apart into spore light from the feet up; the edge of the cut glows.
+	float release = 0.0;
+	if (u_Mode == 0 && v_Dissolve > 0.0)
+	{
+		float cut = valueNoise(v_Local.xz * 6.0 + vec2(v_Local.y * 4.3, -v_Local.y * 3.1)) * 0.7
+				  + clamp(v_Local.y / 1.6, 0.0, 1.0) * 0.3;
+		float gone = v_Dissolve * 1.02;
+		if (cut < gone) discard;
+		release = 1.0 - smoothstep(0.0, 0.08, cut - gone);
+	}
+
 	vec3 n = normalize(v_Normal);
 	vec3 base = v_Color * v_Tint;
 	float emissive = v_Emissive + v_Glow;
@@ -324,6 +336,7 @@ void main()
 	// Muted palette: only spores and light are allowed to be saturated.
 	float luma = dot(color, vec3(0.299, 0.587, 0.114));
 	color = mix(vec3(luma), color, env.saturation);
+	color += vec3(0.55, 0.95, 0.80) * release * 2.2;
 
 	color = mix(color, env.fogColor, fog);
 

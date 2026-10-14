@@ -292,6 +292,7 @@ void Game::Render()
 	renderer->EndShadowPass();
 
 	scene.Draw(renderer, view);
+	DrawWisps();
 
 	// Spores last: additive, and they should sit over everything. Rain beats them down.
 	renderer->DrawSpores(Vec3(view.x, 0.0f, view.z), Vec3(70.0f, 16.0f, 70.0f),
@@ -375,6 +376,17 @@ void Game::GatherLights(const Vec3& view)
 	{
 		Vec3 pos = items[i]->WorldPosition() + Vec3(0.0f, 0.5f, 0.0f);
 		lights.push_back({ pos, Vec3(0.70f, 0.95f, 0.75f) * 0.6f, 2.5f, DistXZ(pos, view) });
+	}
+
+	// A creature coming apart lights the ground around it for a moment; it jumps the queue.
+	std::vector<EnemyActor*> enemies;
+	SceneGraph::Collect(scene.Root(), ACTOR_ENEMY, enemies);
+	for (size_t i = 0; i < enemies.size(); ++i)
+	{
+		if (enemies[i]->alive) continue;
+		float k = Saturatef(enemies[i]->stateTimer / kDyingTime);
+		Vec3 pos = enemies[i]->WorldPosition() + Vec3(0.0f, 0.8f, 0.0f);
+		lights.push_back({ pos, Vec3(0.55f, 0.95f, 0.80f) * (2.2f * k), 5.0f, DistXZ(pos, view) - 6.0f });
 	}
 
 	std::sort(lights.begin(), lights.end(), [](const Candidate& a, const Candidate& b) { return a.dist < b.dist; });

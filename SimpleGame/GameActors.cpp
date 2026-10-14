@@ -275,11 +275,12 @@ void EnemyActor::Draw(const DrawContext& dc) const
 	const EnemyInfo& info = GetEnemyInfo(type);
 
 	float size = 1.0f + 0.06f * (float)(level - 1);
-	float squash = alive ? 1.0f : 0.2f + 0.8f * Saturatef(stateTimer / kDyingTime);
 
+	// Released, not killed: the body comes apart into light instead of collapsing.
 	DrawParams params;
 	params.phase = (float)(spawnIndex + 1) * 1.7f + home.x;
 	params.flash = flash;
+	if (!alive) params.dissolve = 1.0f - Saturatef(stateTimer / kDyingTime);
 
 	// A reddening windup is the tell to roll.
 	if (state == ENEMY_WINDUP)
@@ -289,7 +290,7 @@ void EnemyActor::Draw(const DrawContext& dc) const
 		params.emissive = 0.25f * w;
 	}
 
-	Mat4 model = Mul(WorldMatrix(), MatScale(Vec3(size, size * squash, size)));
+	Mat4 model = Mul(WorldMatrix(), MatScale(Vec3(size, size, size)));
 	if (alive) dc.renderer->DrawShadow(WorldPosition(), info.radius * 1.1f * size);
 	dc.renderer->DrawModel(info.model, model, params);
 }

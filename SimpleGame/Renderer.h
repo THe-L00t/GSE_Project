@@ -16,6 +16,7 @@ struct DrawParams
 	float emissive = 0.0f;
 	float phase = 0.0f;       // offsets shader animation so neighbours do not move in lockstep
 	float flash = 0.0f;
+	float dissolve = 0.0f;    // [0,1] how much of the model has come apart into light
 };
 
 struct GroundParams
@@ -148,6 +149,7 @@ private:
 		float emissive;
 		float phase;
 		float flash;
+		float dissolve;
 	};
 
 	struct LitLocations

@@ -6,6 +6,7 @@
 #include <cstring>
 
 #include "Collision.h"
+#include "Models.h"
 
 namespace
 {
@@ -128,6 +129,20 @@ void Game::KillEnemy(EnemyActor& e)
 	e.stateTimer = kDyingTime;
 	++kills[e.type];
 	hitStop = Maxf(hitStop, kKillStop);
+
+	// What the creature was holding is let go as light. Its own generator keeps the drop rolls unchanged.
+	int motes = e.type == ENEMY_MOSS_BOAR ? 16 : 9;
+	for (int i = 0; i < motes; ++i)
+	{
+		float a = fxRng.Range(0.0f, 2.0f * kPi);
+		float r = fxRng.Range(0.0f, info.radius);
+		Wisp w;
+		w.pos = e.Position() + Vec3(cosf(a) * r, fxRng.Range(0.2f, 1.0f), sinf(a) * r);
+		w.vel = Vec3(cosf(a) * 0.4f, fxRng.Range(1.2f, 2.2f), sinf(a) * 0.4f);
+		w.maxLife = fxRng.Range(1.1f, 1.9f);
+		w.life = w.maxLife;
+		wisps.push_back(w);
+	}
 
 	if (e.spawnIndex >= 0)
 	{
@@ -434,6 +449,32 @@ void Game::UpdateCombatTimers(float dt)
 
 	popups.erase(std::remove_if(popups.begin(), popups.end(),
 		[](const Popup& p) { return p.timer <= 0.0f; }), popups.end());
+
+	for (size_t i = 0; i < wisps.size(); ++i)
+	{
+		Wisp& w = wisps[i];
+		w.life -= dt;
+		w.vel = w.vel * (1.0f - 0.9f * dt);
+		w.pos = w.pos + w.vel * dt;
+		w.pos.x += sinf(time * 2.3f + (float)i * 1.7f) * 0.35f * dt;
+	}
+
+	wisps.erase(std::remove_if(wisps.begin(), wisps.end(),
+		[](const Wisp& w) { return w.life <= 0.0f; }), wisps.end());
+}
+
+void Game::DrawWisps()
+{
+	for (size_t i = 0; i < wisps.size(); ++i)
+	{
+		const Wisp& w = wisps[i];
+		float k = Saturatef(w.life / w.maxLife);
+		float s = 1.3f * k;
+
+		DrawParams params;
+		params.emissive = 0.6f + 1.4f * k;
+		renderer->DrawModel(MODEL_WISP, w.pos, 0.0f, Vec3(s, s, s), params);
+	}
 }
 
 EnemyActor* Game::SpawnEnemy(int type, int enemyLevel, const Vec3& pos, int chunkX, int chunkZ, int spawnIndex)
