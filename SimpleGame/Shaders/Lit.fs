@@ -147,7 +147,7 @@ vec3 PointLights(vec3 pos, vec3 n)
 	return sum;
 }
 
-const float kCutRadius = 1.6;   // the player and a little of the ground around them
+const float kCutRadius = 1.1;   // the player and a little of the ground around them
 
 float CapsuleSdf(vec3 p, vec3 a, vec3 b, float radius)
 {
@@ -179,7 +179,7 @@ float CutawayMask(vec3 pos)
 		t += max(d * 0.8, 0.05);
 		if (t > 40.0) break;
 	}
-	return 1.0 - smoothstep(0.0, 0.45, closest);
+	return 1.0 - smoothstep(0.0, 0.35, closest);
 }
 
 // Each firefly leaves a small yellow-green pool of light on whatever is just below it.

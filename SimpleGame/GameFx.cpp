@@ -91,7 +91,7 @@ bool Game::PlayerHidden() const
 		Vec3 d = props[i]->WorldPosition() - pos;
 		float ahead = d.x * toEye.x + d.z * toEye.z;
 		float side = fabsf(d.x * toEye.z - d.z * toEye.x);
-		if (side > reach + 0.5f) continue;
+		if (side > reach + 0.35f) continue;
 		if (ahead < -reach * 0.5f || ahead > o.height * s.y / lift + reach) continue;
 		return true;
 	}
