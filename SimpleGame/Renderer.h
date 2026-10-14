@@ -28,6 +28,20 @@ struct GroundParams
 	float road = 1.0f;                                       // how much of the painted road survives
 };
 
+// Season weights and live weather, read by Env.glsl as u_Season and u_Weather.
+struct WeatherParams
+{
+	float summer = 0.0f;      // season weights; spring is what is left
+	float autumn = 0.0f;
+	float winter = 0.0f;
+	float snowCover = 0.0f;
+	float rain = 0.0f;
+	float snow = 0.0f;
+	float wind = 0.0f;
+	float wetness = 0.0f;
+	float windAngle = 0.0f;   // direction the wind blows toward
+};
+
 class Renderer
 {
 public:
@@ -57,6 +71,7 @@ public:
 	void EndShadowPass();
 	void SetCamera(const Mat4& view, const Mat4& proj, const Vec3& eye, float pxPerUnit);
 	void SetFrame(float dayTime, float exposure, const Vec3& fogCenter, float seconds);
+	void SetWeather(const WeatherParams& params) { weather = params; }
 
 	// Point lights for the lit shader; the first kMaxLights added each frame are kept.
 	void ClearLights();
@@ -124,6 +139,8 @@ private:
 		GLint shadowMap = -1;
 		GLint lightViewProj = -1;
 		GLint shadowOn = -1;
+		GLint season = -1;
+		GLint weather = -1;
 	};
 
 	struct ShadowLocations
@@ -146,6 +163,8 @@ private:
 		GLint time = -1;
 		GLint timeOfDay = -1;
 		GLint sporeExposure = -1;
+		GLint season = -1;
+		GLint weather = -1;
 		GLint positionAttrib = -1;
 	};
 
@@ -161,6 +180,9 @@ private:
 		GLint densityScale = -1;
 		GLint timeOfDay = -1;
 		GLint style = -1;
+		GLint season = -1;
+		GLint weather = -1;
+		GLint windDir = -1;
 		GLint seedAttrib = -1;
 		GLint randAttrib = -1;
 	};
@@ -212,6 +234,7 @@ private:
 	void FlushModels();
 	void DrawInstances(int mesh, int start, int count);
 	void DrawMotes(int style, int first, int count, const Vec3& center, const Vec3& field, const Vec3& color, float densityScale, float size);
+	void UploadWeather(GLint seasonLoc, GLint weatherLoc) const;
 	void DrawPixelQuad(float x, float y, float w, float h, const OverlayParams& params);
 	void DrawOverlayQuad(float rx, float ry, float rw, float rh, const OverlayParams& params);
 	void FlushText();
@@ -293,6 +316,7 @@ private:
 	float timeOfDay = 0.0f;
 	float sporeExposure = 0.0f;
 	float time = 0.0f;
+	WeatherParams weather;
 
 	static const int kMaxLights = 8;   // matches kMaxLights in Lit.fs
 	float lightPos[kMaxLights * 4] = {};

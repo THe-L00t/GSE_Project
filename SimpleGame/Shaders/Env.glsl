@@ -2,6 +2,8 @@
 
 uniform float u_TimeOfDay;      // [0,1), 0 is midnight
 uniform float u_SporeExposure;  // [0,1]
+uniform vec4  u_Season;         // summer, autumn, winter weights (spring is the rest), snow cover
+uniform vec4  u_Weather;        // rain, snowfall, wind, wetness
 
 struct Env
 {
@@ -36,6 +38,22 @@ Env EnvAt(float timeOfDay)
 	e.fogColor = mix(kFogColor[i], kFogColor[i + 1], f);
 	e.fogDensity = mix(kFogDensity[i], kFogDensity[i + 1], f) + u_SporeExposure * 0.010;
 	e.saturation = mix(kSaturation[i], kSaturation[i + 1], f);
+
+	// Seasons tint the light: a fuller summer, an amber autumn, a pale blue winter.
+	e.sunColor *= mix(vec3(1.0), vec3(1.06, 0.96, 0.84), u_Season.y) * mix(vec3(1.0), vec3(0.90, 0.97, 1.10), u_Season.z);
+	e.skyColor *= mix(vec3(1.0), vec3(0.92, 0.98, 1.10), u_Season.z);
+	e.saturation += 0.08 * u_Season.x + 0.04 * u_Season.y - 0.16 * u_Season.z;
+	e.groundColor += vec3(0.05, 0.06, 0.07) * u_Season.w;
+
+	// Overcast: rain and snow hide the sun, grey the sky and close the fog in.
+	float overcast = clamp(u_Weather.x + u_Weather.y * 0.8 + u_Weather.z * 0.25, 0.0, 1.0);
+	float skyLuma = dot(e.skyColor, vec3(0.299, 0.587, 0.114));
+	float fogLuma = dot(e.fogColor, vec3(0.299, 0.587, 0.114));
+	e.sunColor *= 1.0 - 0.55 * overcast;
+	e.skyColor = mix(e.skyColor, vec3(skyLuma) * vec3(0.95, 1.0, 1.06), overcast * 0.6);
+	e.fogColor = mix(e.fogColor, vec3(fogLuma) * mix(vec3(0.92, 0.98, 1.0), vec3(1.08), u_Weather.y), overcast * 0.6);
+	e.fogDensity += overcast * 0.010 + u_Weather.y * 0.010;
+	e.saturation *= 1.0 - 0.30 * overcast;
 
 	// The sun rises at 0.25 and sets at 0.75. A floor keeps night readable.
 	float ang = (timeOfDay - 0.25) * 6.2831853;

@@ -248,6 +248,18 @@ void Game::Render()
 
 	renderer->BeginFrame();
 	renderer->SetFrame(timeOfDay, sporeExposure, view, time);
+
+	WeatherParams wp;
+	wp.summer = seasonWeight[SEASON_SUMMER];
+	wp.autumn = seasonWeight[SEASON_AUTUMN];
+	wp.winter = seasonWeight[SEASON_WINTER];
+	wp.snowCover = snowCover;
+	wp.rain = rainLevel;
+	wp.snow = snowLevel;
+	wp.wind = windLevel;
+	wp.wetness = wetness;
+	wp.windAngle = windAngle;
+	renderer->SetWeather(wp);
 	camera->Apply(renderer);
 
 	if (level == LEVEL_ROUTE) PrepareChunkView();
@@ -262,9 +274,9 @@ void Game::Render()
 
 	scene.Draw(renderer, view);
 
-	// Spores last: additive, and they should sit over everything.
+	// Spores last: additive, and they should sit over everything. Rain beats them down.
 	renderer->DrawSpores(Vec3(view.x, 0.0f, view.z), Vec3(70.0f, 16.0f, 70.0f),
-						 Vec3(0.55f, 0.95f, 0.80f), sporeVisual, 0.13f);
+						 Vec3(0.55f, 0.95f, 0.80f), sporeVisual * (1.0f - 0.5f * rainLevel), 0.13f);
 	renderer->DrawAmbientMotes(Vec3(view.x, 0.0f, view.z));
 
 	renderer->EndScene();

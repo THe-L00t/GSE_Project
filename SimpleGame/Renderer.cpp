@@ -350,6 +350,8 @@ void Renderer::CacheUniformLocations()
 	lit.shadowMap = glGetUniformLocation(litShader, "u_ShadowMap");
 	lit.lightViewProj = glGetUniformLocation(litShader, "u_LightViewProj");
 	lit.shadowOn = glGetUniformLocation(litShader, "u_ShadowOn");
+	lit.season = glGetUniformLocation(litShader, "u_Season");
+	lit.weather = glGetUniformLocation(litShader, "u_Weather");
 
 	shadow.viewProj = glGetUniformLocation(shadowShader, "u_ViewProj");
 	shadow.model = glGetUniformLocation(shadowShader, "u_Model");
@@ -366,6 +368,8 @@ void Renderer::CacheUniformLocations()
 	overlay.time = glGetUniformLocation(overlayShader, "u_Time");
 	overlay.timeOfDay = glGetUniformLocation(overlayShader, "u_TimeOfDay");
 	overlay.sporeExposure = glGetUniformLocation(overlayShader, "u_SporeExposure");
+	overlay.season = glGetUniformLocation(overlayShader, "u_Season");
+	overlay.weather = glGetUniformLocation(overlayShader, "u_Weather");
 	overlay.positionAttrib = glGetAttribLocation(overlayShader, "a_Position");
 
 	particle.viewProj = glGetUniformLocation(particleShader, "u_ViewProj");
@@ -378,6 +382,9 @@ void Renderer::CacheUniformLocations()
 	particle.densityScale = glGetUniformLocation(particleShader, "u_DensityScale");
 	particle.timeOfDay = glGetUniformLocation(particleShader, "u_TimeOfDay");
 	particle.style = glGetUniformLocation(particleShader, "u_Style");
+	particle.season = glGetUniformLocation(particleShader, "u_Season");
+	particle.weather = glGetUniformLocation(particleShader, "u_Weather");
+	particle.windDir = glGetUniformLocation(particleShader, "u_WindDir");
 	particle.seedAttrib = glGetAttribLocation(particleShader, "a_Seed");
 	particle.randAttrib = glGetAttribLocation(particleShader, "a_Rand");
 
@@ -661,6 +668,12 @@ void Renderer::SetFrame(float dayTime, float exposure, const Vec3& fogCenter, fl
 	time = seconds;
 }
 
+void Renderer::UploadWeather(GLint seasonLoc, GLint weatherLoc) const
+{
+	glUniform4f(seasonLoc, weather.summer, weather.autumn, weather.winter, weather.snowCover);
+	glUniform4f(weatherLoc, weather.rain, weather.snow, weather.wind, weather.wetness);
+}
+
 void Renderer::ClearLights()
 {
 	lightCount = 0;
@@ -701,6 +714,7 @@ void Renderer::BindLit(const Mat4& model, int mode)
 	glUniform3f(lit.camPos, camPos.x, camPos.y, camPos.z);
 	glUniformMatrix4fv(lit.lightViewProj, 1, GL_FALSE, lightViewProj.m);
 	glUniform1f(lit.shadowOn, shadowActive ? 1.0f : 0.0f);
+	UploadWeather(lit.season, lit.weather);
 
 	// Uniforms stay with the program, so the light list goes up once per change.
 	if (lightsDirty)
@@ -919,6 +933,8 @@ void Renderer::DrawMotes(int style, int first, int count, const Vec3& center, co
 	glUniform3f(particle.color, color.x, color.y, color.z);
 	glUniform1f(particle.densityScale, densityScale);
 	glUniform1f(particle.timeOfDay, timeOfDay);
+	UploadWeather(particle.season, particle.weather);
+	glUniform2f(particle.windDir, sinf(weather.windAngle), cosf(weather.windAngle));
 
 	glBindBuffer(GL_ARRAY_BUFFER, vboSpores);
 	glEnableVertexAttribArray(particle.seedAttrib);
@@ -975,6 +991,7 @@ void Renderer::DrawOverlayQuad(float rx, float ry, float rw, float rh, const Ove
 	glUniform1f(overlay.time, time);
 	glUniform1f(overlay.timeOfDay, timeOfDay);
 	glUniform1f(overlay.sporeExposure, sporeExposure);
+	UploadWeather(overlay.season, overlay.weather);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vboScreen);
 	glEnableVertexAttribArray(overlay.positionAttrib);
