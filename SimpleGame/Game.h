@@ -323,6 +323,7 @@ private:
 
 	// GameFx.cpp: screen moods that follow the story and the body, and the marks left on the ground
 	void UpdateScreenFx(float dt);
+	Vec3 ShakeOffset() const;
 	void UpdateFootprints();
 	void DrawFootprints();
 
@@ -457,6 +458,8 @@ private:
 	float seasonWeight[SEASON_COUNT] = { 1.0f, 0.0f, 0.0f, 0.0f };   // eases between seasons
 
 	ScreenFx screenFx;
+	float hurtFlash = 0.0f;       // [0,1] the red at the edges from the last blow, fading
+	float shake = 0.0f;           // [0,1] camera shake from the last blow
 	std::vector<Footprint> footprints;
 	Vec3  lastPrintPos;
 	bool  printLeft = false;

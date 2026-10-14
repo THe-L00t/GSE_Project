@@ -279,7 +279,11 @@ void Game::Render()
 	wp.driftZ = windDriftZ;
 	renderer->SetWeather(wp);
 	renderer->SetScreenFx(screenFx);
+
+	// Only the view shakes; the fog and the light gathering keep the steady position.
+	camera->SetPosition(view + ShakeOffset());
 	camera->Apply(renderer);
+	camera->SetPosition(view);
 
 	if (level == LEVEL_ROUTE) PrepareChunkView();
 	GatherLights(view);

@@ -51,6 +51,7 @@ struct ScreenFx
 	float frost = 0.0f;       // [0,1] cold: a blue cast, frost creeping in from the edges
 	float hunger = 0.0f;      // [0,1] hunger or thirst: colour drains, sight narrows
 	Vec3  grade{ 1.0f, 1.0f, 1.0f };   // the region's colour cast
+	float hurt = 0.0f;        // [0,1] red at the edges after a blow
 };
 
 // Graphics options; ApplySettings rebuilds only what a change touches.
@@ -257,6 +258,7 @@ private:
 		GLint frost = -1;
 		GLint hunger = -1;
 		GLint grade = -1;
+		GLint hurt = -1;
 		GLint positionAttrib = -1;
 	};
 

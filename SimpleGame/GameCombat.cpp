@@ -207,6 +207,8 @@ void Game::DamagePlayer(float amount, const Vec3& push)
 	player->hurtTimer = kHurtTime;
 	player->flash = 1.0f;
 	player->SetPosition(player->Position() + FlatDirection(push) * 0.6f);
+	shake = 1.0f;
+	hurtFlash = 1.0f;
 
 	char text[16];
 	sprintf_s(text, sizeof(text), "-%d", (int)(amount + 0.5f));

@@ -504,6 +504,7 @@ void Renderer::CacheUniformLocations()
 	post.frost = glGetUniformLocation(postShader, "u_Frost");
 	post.hunger = glGetUniformLocation(postShader, "u_Hunger");
 	post.grade = glGetUniformLocation(postShader, "u_Grade");
+	post.hurt = glGetUniformLocation(postShader, "u_Hurt");
 
 	volume.invViewProj = glGetUniformLocation(volumeShader, "u_InvViewProj");
 	volume.lightViewProj = glGetUniformLocation(volumeShader, "u_LightViewProj");
@@ -751,6 +752,7 @@ void Renderer::EndScene()
 	glUniform1f(post.frost, screenFx.frost);
 	glUniform1f(post.hunger, screenFx.hunger);
 	glUniform3f(post.grade, screenFx.grade.x, screenFx.grade.y, screenFx.grade.z);
+	glUniform1f(post.hurt, screenFx.hurt);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vboScreen);
 	glEnableVertexAttribArray(post.positionAttrib);

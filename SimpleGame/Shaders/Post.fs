@@ -20,6 +20,7 @@ uniform float     u_Dream;          // a dream fragment playing
 uniform float     u_Frost;          // cold
 uniform float     u_Hunger;         // hunger or thirst, whichever is worse
 uniform vec3      u_Grade;          // the region's colour cast
+uniform float     u_Hurt;           // a fresh blow, or health running low
 
 layout(location = 0) out vec4 FragColor;
 
@@ -146,6 +147,10 @@ vec3 Composite(vec2 uv)
 		vec3 ice = vec3(0.78, 0.87, 0.95) * (0.75 + 0.35 * crystals);
 		c = mix(c, ice, rime * (0.35 + 0.4 * u_Frost));
 	}
+
+	// A blow leaves a dark red at the edges of sight.
+	if (u_Hurt > 0.002)
+		c = mix(c, vec3(0.50, 0.04, 0.03), smoothstep(0.35, 0.80, radial) * u_Hurt * 0.7);
 
 	c += texture(u_Bloom, uv).rgb * u_BloomStrength;
 	c += texture(u_Volume, uv).rgb * u_VolumeOn;

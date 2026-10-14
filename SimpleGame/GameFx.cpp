@@ -9,6 +9,9 @@ namespace
 	// hunger and thirst at the same low mark the HUD warns at.
 	const float kFrostFrom = 45.0f;
 	const float kHungerFrom = 25.0f;
+	const float kLowHealth = 0.33f;       // share of health below which the edges stay red
+
+	const float kShakeSize = 0.22f;       // world units at the moment of the blow
 
 	// Region colour casts: home is neutral, the open road a touch cool, the ginkgo town warm and gold.
 	const Vec3 kVillageGrade(1.00f, 1.00f, 1.00f);
@@ -41,6 +44,13 @@ void Game::UpdateScreenFx(float dt)
 	screenFx.frost = Approach(screenFx.frost, frost, 1.5f, dt);
 	screenFx.hunger = Approach(screenFx.hunger, hunger, 1.5f, dt);
 
+	// A blow reddens the edges and shakes the view; below a third of health the red stays, beating faintly.
+	hurtFlash = Maxf(hurtFlash - dt * 1.6f, 0.0f);
+	shake = Maxf(shake - dt * 3.5f, 0.0f);
+	float low = 0.0f;
+	if (level == LEVEL_ROUTE && deathTimer < 0.0f) low = Saturatef((kLowHealth - health / MaxHealth(stats)) / kLowHealth);
+	screenFx.hurt = Maxf(hurtFlash, low * (0.25f + 0.12f * sinf(time * 4.0f)));
+
 	// The cast eases over a few seconds, so stepping onto the road or into town reads as a change of light.
 	Vec3 grade = kVillageGrade;
 	if (level == LEVEL_ROUTE)
@@ -51,6 +61,13 @@ void Game::UpdateScreenFx(float dt)
 	screenFx.grade.x = Approach(screenFx.grade.x, grade.x, 0.8f, dt);
 	screenFx.grade.y = Approach(screenFx.grade.y, grade.y, 0.8f, dt);
 	screenFx.grade.z = Approach(screenFx.grade.z, grade.z, 0.8f, dt);
+}
+
+Vec3 Game::ShakeOffset() const
+{
+	// Falls off with the square, so the jolt is sharp and the settling quick.
+	float size = kShakeSize * shake * shake;
+	return Vec3(sinf(time * 53.0f) * size, 0.0f, sinf(time * 41.0f + 1.3f) * size);
 }
 
 void Game::UpdateFootprints()
