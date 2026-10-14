@@ -268,14 +268,14 @@ void Game::GuideText(char* buf, size_t size) const
 		sprintf_s(buf, size, "길에 떨어진 녹슨 파이프를 주워라.");
 		break;
 	case GUIDE_FIGHT_MITES:
-		sprintf_s(buf, size, "포자 진드기를 물리쳐라 (%d/%d).  J 또는 클릭으로 공격.",
+		sprintf_s(buf, size, "포자 진드기를 쳐서 풀어 주어라 (%d/%d).  J 또는 클릭으로 공격.",
 				  kills[ENEMY_SPORE_MITE] - guideBaseline, kGuideMites);
 		break;
 	case GUIDE_ASSIGN_STATS:
 		sprintf_s(buf, size, "레벨 %d에 올랐다. C를 눌러 능력치 점수를 분배하라.", stats.level);
 		break;
 	case GUIDE_FIGHT_BOAR:
-		sprintf_s(buf, size, "남쪽의 이끼 멧돼지를 물리쳐라. SPACE로 구르면 돌진을 피한다.");
+		sprintf_s(buf, size, "남쪽 길을 막은 이끼 멧돼지를 풀어 주어라. SPACE로 구르면 돌진을 피한다.");
 		break;
 	case GUIDE_ASSIGN_AGAIN:
 		sprintf_s(buf, size, "레벨 %d. 새 점수를 써라 - 다른 능력치도 올려 보라.", stats.level);

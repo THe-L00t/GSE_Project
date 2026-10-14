@@ -132,7 +132,21 @@ void Game::KillEnemy(EnemyActor& e)
 	float find = FindScale(stats);
 	if (combatRng.Chance(info.herbChance * find)) DropItem(ITEM_HERB, e.Position() + Vec3(0.4f, 0.0f, 0.2f), 0, 0, -1);
 	if (combatRng.Chance(info.waterChance * find)) DropItem(ITEM_CLEAN_WATER, e.Position() + Vec3(-0.4f, 0.0f, 0.1f), 0, 0, -1);
-	if (combatRng.Chance(info.relicChance * find)) DropItem(ITEM_RELIC, e.Position() + Vec3(0.0f, 0.0f, -0.4f), 0, 0, -1);
+	bool relic = combatRng.Chance(info.relicChance * find);
+	if (relic) DropItem(ITEM_RELIC, e.Position() + Vec3(0.0f, 0.0f, -0.4f), 0, 0, -1);
+
+	// Striking one down does not kill anything: it lets go of what the spores were holding.
+	AddPopup(e.Position() + Vec3(0.0f, 1.6f + info.radius, 0.0f), "풀려났다", kXpColor);
+	if (messageTimer <= 0.5f)
+	{
+		if (e.type == ENEMY_HUSK)
+			ShowMessage(relic ? "허물이 주저앉는다. 안주머니에서 누군가의 물건이 떨어진다."
+							  : "허물이 주저앉는다. 빈 옷만 남는다.", 3.0f);
+		else if (e.type == ENEMY_MOSS_BOAR)
+			ShowMessage("멧돼지가 이끼 속으로 무너진다. 지키던 잠이 풀린다.", 3.0f);
+		else if (relic)
+			ShowMessage("진드기가 터지며 붙잡혀 있던 것이 풀려난다.", 3.0f);
+	}
 
 	GrantXp(EnemyXpAt(info, e.level));
 }
