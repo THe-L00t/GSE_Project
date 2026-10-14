@@ -63,6 +63,11 @@ std::string Game::MonitorJson() const
 		   kSeasonIds[season], seasonDay + 1, kWeatherIds[weather], weatherTimer,
 		   rainLevel, snowLevel, windLevel, snowCover, wetness);
 
+	Append(out, "\"perf\":{\"fps\":%.1f,\"lowFps\":%.1f,\"worstMs\":%.1f,\"updateMs\":%.2f,\"renderMs\":%.2f,"
+				"\"gpuShadow\":%.2f,\"gpuScene\":%.2f,\"gpuPost\":%.2f,\"gpuUi\":%.2f,\"drawCalls\":%d,\"spikes\":%d},",
+		   perf.fps, perf.lowFps, perf.worstMs, perf.updateMs, perf.renderMs,
+		   perf.gpu.shadow, perf.gpu.scene, perf.gpu.post, perf.gpu.ui, perf.drawCalls, perf.spikes);
+
 	const Vec3 playerPos = player->Position();
 	out += "\"player\":{";
 	AppendVec(out, "pos", playerPos);

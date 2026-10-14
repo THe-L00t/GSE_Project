@@ -43,6 +43,15 @@ struct WeatherParams
 	float driftZ = 0.0f;
 };
 
+// GPU milliseconds per stage, read back a couple of frames late so the queries never stall.
+struct GpuTimes
+{
+	float shadow = 0.0f;
+	float scene = 0.0f;
+	float post = 0.0f;
+	float ui = 0.0f;
+};
+
 class Renderer
 {
 public:
@@ -50,6 +59,10 @@ public:
 	~Renderer();
 
 	bool IsInitialized();
+
+	// Call once per frame, before swapping buffers.
+	void EndFrame();
+	const GpuTimes& LastGpuTimes() const { return gpuTimes; }
 	void Resize(int sizeX, int sizeY);
 	int  GetWidth() const { return (int)windowSizeX; }
 	int  GetHeight() const { return (int)windowSizeY; }
@@ -327,4 +340,13 @@ private:
 	bool  lightsDirty = true;
 
 	int drawCalls = 0;
+
+	// Timestamps at frame start, after shadows, after the scene, after post and after the UI.
+	enum GpuMark { MARK_BEGIN, MARK_SHADOW, MARK_SCENE, MARK_POST, MARK_UI, MARK_COUNT };
+	static const int kQueryFrames = 3;
+	void MarkGpu(int mark);
+	GLuint   timeQueries[kQueryFrames][MARK_COUNT] = {};
+	bool     queryPending[kQueryFrames] = {};
+	int      queryFrame = 0;
+	GpuTimes gpuTimes;
 };

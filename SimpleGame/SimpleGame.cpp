@@ -9,7 +9,11 @@ but WITHOUT ANY WARRANTY.
 */
 
 #include "stdafx.h"
+#include <algorithm>
+#include <chrono>
+#include <cstdio>
 #include <iostream>
+#include <vector>
 #include "Dependencies\glew.h"
 #include "Dependencies\freeglut.h"
 
@@ -17,18 +21,36 @@ but WITHOUT ANY WARRANTY.
 #include "Game.h"
 #include "DebugMonitor.h"
 
+// Laptops with two GPUs otherwise hand an OpenGL program to the integrated one.
+extern "C"
+{
+	__declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
+	__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+
 Renderer* g_Renderer = NULL;
 Game*     g_Game = NULL;
 DebugMonitor g_Monitor;
 
-const int kMonitorPort = 8080;
+const int    kMonitorPort = 8080;
+const double kSpikeMs = 33.4;
 
-bool g_Keys[256] = { false };
-int  g_PrevTime = 0;
+bool   g_Keys[256] = { false };
+double g_PrevTime = 0.0;
 
-int g_StatsStart = 0;
-int g_StatsFrames = 0;
-int g_StatsDrawCalls = 0;
+double g_StatsStart = 0.0;
+double g_PrevFrame = 0.0;
+double g_UpdateMs = 0.0;      // the last update, so a spike can say which half was slow
+double g_UpdateSum = 0.0;
+double g_RenderSum = 0.0;
+int    g_StatsDrawCalls = 0;
+int    g_Spikes = 0;
+std::vector<float> g_FrameMs;
+
+static double NowMs()
+{
+	return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
 
 static unsigned char NormalizeKey(unsigned char key)
 {
@@ -38,33 +60,66 @@ static unsigned char NormalizeKey(unsigned char key)
 
 void RenderScene(void)
 {
+	double start = NowMs();
 	if (g_Game) g_Game->Render();
+	if (g_Renderer) g_Renderer->EndFrame();
+	double renderMs = NowMs() - start;
 	glutSwapBuffers();
 
 	if (g_Renderer == NULL) return;
 
-	++g_StatsFrames;
+	double now = NowMs();
+	double frameMs = now - g_PrevFrame;
+	g_PrevFrame = now;
+	g_FrameMs.push_back((float)frameMs);
+	g_RenderSum += renderMs;
 	g_StatsDrawCalls += g_Renderer->TakeDrawCalls();
 
-	// One line per second; drawing to the console every frame would cost frames itself.
-	int now = glutGet(GLUT_ELAPSED_TIME);
-	int elapsed = now - g_StatsStart;
-	if (elapsed >= 1000)
+	if (frameMs > kSpikeMs && g_FrameMs.size() > 1)
 	{
-		int fps = (int)(g_StatsFrames * 1000.0f / (float)elapsed + 0.5f);
-		int drawCalls = (g_StatsDrawCalls + g_StatsFrames / 2) / g_StatsFrames;
-		std::cout << "FPS " << fps << " | Draw calls " << drawCalls << "\n";
+		// Only the first few each second, so a bad patch does not flood the console.
+		if (++g_Spikes <= 3)
+			printf("Spike %.1f ms (update %.1f, draw %.1f)\n", frameMs, g_UpdateMs, renderMs);
+	}
+
+	// One line per second; drawing to the console every frame would cost frames itself.
+	double elapsed = now - g_StatsStart;
+	if (elapsed >= 1000.0)
+	{
+		int frames = (int)g_FrameMs.size();
+		std::vector<float> sorted = g_FrameMs;
+		std::sort(sorted.begin(), sorted.end());
+		float worst = sorted.back();
+		float p99 = sorted[(size_t)((float)(frames - 1) * 0.99f)];
+
+		PerfStats stats;
+		stats.fps = (float)(frames * 1000.0 / elapsed);
+		stats.lowFps = p99 > 0.0f ? 1000.0f / p99 : 0.0f;
+		stats.worstMs = worst;
+		stats.updateMs = (float)(g_UpdateSum / frames);
+		stats.renderMs = (float)(g_RenderSum / frames);
+		stats.gpu = g_Renderer->LastGpuTimes();
+		stats.drawCalls = (g_StatsDrawCalls + frames / 2) / frames;
+		stats.spikes = g_Spikes;
+		if (g_Game) g_Game->SetPerf(stats);
+
+		printf("FPS %.0f | 1%% low %.0f | worst %.1f ms | CPU update %.2f draw %.2f | GPU shadow %.2f scene %.2f post %.2f ui %.2f | calls %d | spikes %d\n",
+			   stats.fps, stats.lowFps, stats.worstMs, stats.updateMs, stats.renderMs,
+			   stats.gpu.shadow, stats.gpu.scene, stats.gpu.post, stats.gpu.ui, stats.drawCalls, stats.spikes);
 
 		g_StatsStart = now;
-		g_StatsFrames = 0;
+		g_FrameMs.clear();
+		g_UpdateSum = 0.0;
+		g_RenderSum = 0.0;
 		g_StatsDrawCalls = 0;
+		g_Spikes = 0;
 	}
 }
 
 void Idle(void)
 {
-	int now = glutGet(GLUT_ELAPSED_TIME);
-	float dt = (float)(now - g_PrevTime) / 1000.0f;
+	double now = NowMs();
+	float dt = (float)((now - g_PrevTime) / 1000.0);
 	g_PrevTime = now;
 
 	// A long stall (window drag, breakpoint) must not teleport the player.
@@ -74,6 +129,8 @@ void Idle(void)
 	if (g_Game)
 	{
 		g_Game->Update(dt, g_Keys);
+		g_UpdateMs = NowMs() - now;
+		g_UpdateSum += g_UpdateMs;
 		if (g_Game->WantsQuit())
 		{
 			glutLeaveMainLoop();
@@ -213,8 +270,9 @@ int main(int argc, char **argv)
 	glutSpecialUpFunc(SpecialKeyUpInput);
 	glutMouseFunc(MouseInput);
 
-	g_PrevTime = glutGet(GLUT_ELAPSED_TIME);
+	g_PrevTime = NowMs();
 	g_StatsStart = g_PrevTime;
+	g_PrevFrame = g_PrevTime;
 
 	glutMainLoop();
 

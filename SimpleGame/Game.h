@@ -97,6 +97,19 @@ enum Weather
 	WEATHER_COUNT
 };
 
+// Frame timing gathered by the main loop, once a second.
+struct PerfStats
+{
+	float    fps = 0.0f;
+	float    lowFps = 0.0f;      // 1% low: the frame rate of the slowest frames
+	float    worstMs = 0.0f;
+	float    updateMs = 0.0f;    // CPU, averaged
+	float    renderMs = 0.0f;
+	GpuTimes gpu;
+	int      drawCalls = 0;
+	int      spikes = 0;         // frames over 33 ms
+};
+
 struct Popup
 {
 	Vec3  pos;
@@ -135,6 +148,7 @@ public:
 
 	// GameMonitor.cpp: a read-only snapshot for the browser monitor
 	std::string MonitorJson() const;
+	void SetPerf(const PerfStats& stats) { perf = stats; }
 
 private:
 	// Game.cpp: shared by every level
@@ -374,6 +388,8 @@ private:
 	float snowCover = 0.0f;       // [0,1] snow lying on the ground
 	float wetness = 0.0f;         // [0,1] rain soaked into the ground
 	float seasonWeight[SEASON_COUNT] = { 1.0f, 0.0f, 0.0f, 0.0f };   // eases between seasons
+
+	PerfStats perf;
 
 	std::string message;
 	float messageTimer = 0.0f;

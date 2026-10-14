@@ -44,6 +44,9 @@ void Renderer::Initialize(int sizeX, int sizeY)
 	CreateTargets(sizeX, sizeY);
 	CreateShadowMap();
 
+	if (GLEW_VERSION_3_3 || GLEW_ARB_timer_query) glGenQueries(kQueryFrames * MARK_COUNT, &timeQueries[0][0]);
+	std::cout << "GPU: " << (const char*)glGetString(GL_RENDERER) << "\n";
+
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LEQUAL);
 	glEnable(GL_BLEND);
@@ -249,6 +252,7 @@ void Renderer::BeginShadowPass(const Vec3& focus)
 void Renderer::EndShadowPass()
 {
 	FlushModels();
+	MarkGpu(MARK_SHADOW);
 	if (!shadowPass) return;
 
 	shadowPass = false;
@@ -547,8 +551,38 @@ GLuint Renderer::CompileShaders(const char* filenameVS, const char* filenameFS)
 	return program;
 }
 
+void Renderer::MarkGpu(int mark)
+{
+	if (timeQueries[queryFrame][mark] != 0) glQueryCounter(timeQueries[queryFrame][mark], GL_TIMESTAMP);
+}
+
+void Renderer::EndFrame()
+{
+	if (timeQueries[0][0] == 0) return;
+	MarkGpu(MARK_UI);
+	queryPending[queryFrame] = true;
+	queryFrame = (queryFrame + 1) % kQueryFrames;
+
+	// The slot about to be reused was written kQueryFrames - 1 frames ago; read it only once it is ready.
+	if (!queryPending[queryFrame]) return;
+	GLint ready = 0;
+	glGetQueryObjectiv(timeQueries[queryFrame][MARK_UI], GL_QUERY_RESULT_AVAILABLE, &ready);
+	if (!ready) return;
+
+	GLuint64 stamp[MARK_COUNT];
+	for (int i = 0; i < MARK_COUNT; ++i)
+		glGetQueryObjectui64v(timeQueries[queryFrame][i], GL_QUERY_RESULT, &stamp[i]);
+	queryPending[queryFrame] = false;
+
+	gpuTimes.shadow = (float)(stamp[MARK_SHADOW] - stamp[MARK_BEGIN]) * 1e-6f;
+	gpuTimes.scene = (float)(stamp[MARK_SCENE] - stamp[MARK_SHADOW]) * 1e-6f;
+	gpuTimes.post = (float)(stamp[MARK_POST] - stamp[MARK_SCENE]) * 1e-6f;
+	gpuTimes.ui = (float)(stamp[MARK_UI] - stamp[MARK_POST]) * 1e-6f;
+}
+
 void Renderer::BeginFrame()
 {
+	MarkGpu(MARK_BEGIN);
 	BindSceneTarget();
 	shadowActive = false;
 
@@ -565,7 +599,12 @@ void Renderer::BeginFrame()
 void Renderer::EndScene()
 {
 	FlushModels();
-	if (!postReady) return;
+	MarkGpu(MARK_SCENE);
+	if (!postReady)
+	{
+		MarkGpu(MARK_POST);
+		return;
+	}
 
 	if (samples > 1)
 	{
@@ -617,6 +656,7 @@ void Renderer::EndScene()
 	glEnable(GL_BLEND);
 	glDepthMask(GL_TRUE);
 	glEnable(GL_DEPTH_TEST);
+	MarkGpu(MARK_POST);
 }
 
 void Renderer::DrawPostPass(GLuint target, int width, int height, int mode, GLuint source, float sourceWidth, float sourceHeight)
