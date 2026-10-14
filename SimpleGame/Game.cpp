@@ -321,12 +321,18 @@ void Game::GatherLights(const Vec3& view)
 	};
 	std::vector<Candidate> lights;
 
-	// The torch always makes the cut: it is the light you are holding.
+	// The torch is a cone aimed a few steps ahead. Where it lands, the ground throws a soft light back
+	// up: a point light tinted by the ground, so walls and faces nearby pick up the spill.
+	Vec3 facing(sinf(player->Yaw()), 0.0f, cosf(player->Yaw()));
+	Vec3 torchFrom = player->Position() + facing * 0.45f + Vec3(0.0f, 1.15f, 0.0f);
+	Vec3 torchDir = Normalize(facing + Vec3(0.0f, -0.38f, 0.0f));
+	renderer->SetTorch(torchOn, torchFrom, torchDir);
 	if (torchOn)
 	{
-		Vec3 facing(sinf(player->Yaw()), 0.0f, cosf(player->Yaw()));
-		Vec3 pos = player->Position() + facing * 1.6f + Vec3(0.0f, 1.3f, 0.0f);
-		lights.push_back({ pos, Vec3(1.00f, 0.92f, 0.75f) * 2.0f, 8.0f, -1.0f });
+		Vec3 hit = torchFrom + torchDir * (torchFrom.y / -torchDir.y);
+		Vec3 ground = LerpV(Vec3(0.42f, 0.48f, 0.36f), Vec3(0.90f, 0.92f, 0.95f), snowCover);
+		Vec3 bounce(1.00f * ground.x, 0.88f * ground.y, 0.68f * ground.z);
+		lights.push_back({ hit + Vec3(0.0f, 0.5f, 0.0f), bounce * 1.1f, 7.0f, -1.0f });
 	}
 
 	std::vector<LanternActor*> lanterns;

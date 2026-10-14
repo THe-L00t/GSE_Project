@@ -30,6 +30,9 @@ uniform int   u_LightCount;
 uniform vec4  u_LightPos[kMaxLights];     // xyz position, w radius
 uniform vec3  u_LightColor[kMaxLights];
 
+uniform vec4  u_TorchPos;       // xyz, w = 1 while the torch is lit
+uniform vec3  u_TorchDir;
+
 uniform sampler2DShadow u_ShadowMap;
 uniform mat4  u_LightViewProj;
 uniform float u_ShadowOn;
@@ -133,6 +136,20 @@ vec3 PointLights(vec3 pos, vec3 n)
 		sum += u_LightColor[i] * falloff * ndl;
 	}
 	return sum;
+}
+
+// A warm cone from the hand torch, soft at its rim. The light it throws back off the ground is a
+// separate point light added by the game.
+vec3 TorchLight(vec3 pos, vec3 n)
+{
+	if (u_TorchPos.w < 0.5) return vec3(0.0);
+	vec3 toLight = u_TorchPos.xyz - pos;
+	float d = length(toLight);
+	vec3 l = toLight / max(d, 0.001);
+	float cone = smoothstep(0.84, 0.95, dot(-l, u_TorchDir));
+	float falloff = clamp(1.0 - d / 14.0, 0.0, 1.0);
+	float ndl = clamp(dot(n, l) * 0.7 + 0.3, 0.0, 1.0);
+	return vec3(1.00, 0.88, 0.68) * 2.6 * cone * falloff * falloff * ndl;
 }
 
 void main()
@@ -281,7 +298,7 @@ void main()
 
 	// Lanterns and spore lights matter more once the sun is down.
 	float night = 1.0 - smoothstep(0.10, 0.60, env.sunDir.y);
-	vec3 lamp = PointLights(v_WorldPos, n) * (0.45 + 0.55 * night);
+	vec3 lamp = (PointLights(v_WorldPos, n) + TorchLight(v_WorldPos, n)) * (0.45 + 0.55 * night);
 
 	vec3 viewDir = normalize(u_CamPos - v_WorldPos);
 	vec3 ambient = mix(env.groundColor, env.skyColor, n.y * 0.5 + 0.5);

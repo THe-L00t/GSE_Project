@@ -33,6 +33,7 @@ void Renderer::Initialize(int sizeX, int sizeY)
 	particleShader  = CompileShaders("Shaders/Particle.vs",  "Shaders/Particle.fs");
 	overlayShader   = CompileShaders("Shaders/Overlay.vs",   "Shaders/Overlay.fs");
 	postShader      = CompileShaders("Shaders/Post.vs",      "Shaders/Post.fs");
+	volumeShader    = CompileShaders("Shaders/Post.vs",      "Shaders/Volume.fs");
 	shadowShader    = CompileShaders("Shaders/Lit.vs",       "Shaders/Shadow.fs");
 	textShader      = CompileShaders("Shaders/Text.vs",      "Shaders/Text.fs");
 
@@ -115,14 +116,19 @@ void Renderer::CreateTargets(int windowX, int windowY)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-	glGenRenderbuffers(1, &sceneDepth);
-	glBindRenderbuffer(GL_RENDERBUFFER, sceneDepth);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, sizeX, sizeY);
+	// Depth as a texture, so the light-shaft pass can find where each view ray ends.
+	glGenTextures(1, &sceneDepth);
+	glBindTexture(GL_TEXTURE_2D, sceneDepth);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, sizeX, sizeY, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 	glGenFramebuffers(1, &sceneFbo);
 	glBindFramebuffer(GL_FRAMEBUFFER, sceneFbo);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sceneTex, 0);
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, sceneDepth);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, sceneDepth, 0);
 	bool ok = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
 
 	// MSAA smooths the long diagonal edges the quarter view is full of.
@@ -170,6 +176,19 @@ void Renderer::CreateTargets(int windowX, int windowY)
 		glBindFramebuffer(GL_FRAMEBUFFER, bloomFbo[i]);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bloomTex[i], 0);
 		ok = ok && glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+
+		glGenTextures(1, &volumeTex[i]);
+		glBindTexture(GL_TEXTURE_2D, volumeTex[i]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, bloomWidth, bloomHeight, 0, GL_RGBA, GL_FLOAT, NULL);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+		glGenFramebuffers(1, &volumeFbo[i]);
+		glBindFramebuffer(GL_FRAMEBUFFER, volumeFbo[i]);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, volumeTex[i], 0);
+		volumeReady = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE && (i == 0 || volumeReady);
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -333,7 +352,13 @@ void Renderer::DeleteTargets()
 	if (msDepth) glDeleteRenderbuffers(1, &msDepth);
 	if (sceneFbo) glDeleteFramebuffers(1, &sceneFbo);
 	if (sceneTex) glDeleteTextures(1, &sceneTex);
-	if (sceneDepth) glDeleteRenderbuffers(1, &sceneDepth);
+	if (sceneDepth) glDeleteTextures(1, &sceneDepth);
+	for (int i = 0; i < 2; ++i)
+	{
+		if (volumeFbo[i]) glDeleteFramebuffers(1, &volumeFbo[i]);
+		if (volumeTex[i]) glDeleteTextures(1, &volumeTex[i]);
+		volumeFbo[i] = volumeTex[i] = 0;
+	}
 	for (int i = 0; i < 2; ++i)
 	{
 		if (bloomFbo[i]) glDeleteFramebuffers(1, &bloomFbo[i]);
@@ -416,6 +441,8 @@ void Renderer::CacheUniformLocations()
 	lit.shadowOn = glGetUniformLocation(litShader, "u_ShadowOn");
 	lit.season = glGetUniformLocation(litShader, "u_Season");
 	lit.weather = glGetUniformLocation(litShader, "u_Weather");
+	lit.torchPos = glGetUniformLocation(litShader, "u_TorchPos");
+	lit.torchDir = glGetUniformLocation(litShader, "u_TorchDir");
 
 	shadow.viewProj = glGetUniformLocation(shadowShader, "u_ViewProj");
 	shadow.model = glGetUniformLocation(shadowShader, "u_Model");
@@ -461,6 +488,25 @@ void Renderer::CacheUniformLocations()
 	post.sporeExposure = glGetUniformLocation(postShader, "u_SporeExposure");
 	post.time = glGetUniformLocation(postShader, "u_Time");
 	post.positionAttrib = glGetAttribLocation(postShader, "a_Position");
+	post.volume = glGetUniformLocation(postShader, "u_Volume");
+	post.volumeOn = glGetUniformLocation(postShader, "u_VolumeOn");
+
+	volume.invViewProj = glGetUniformLocation(volumeShader, "u_InvViewProj");
+	volume.lightViewProj = glGetUniformLocation(volumeShader, "u_LightViewProj");
+	volume.shadowOn = glGetUniformLocation(volumeShader, "u_ShadowOn");
+	volume.steps = glGetUniformLocation(volumeShader, "u_Steps");
+	volume.time = glGetUniformLocation(volumeShader, "u_Time");
+	volume.timeOfDay = glGetUniformLocation(volumeShader, "u_TimeOfDay");
+	volume.sporeExposure = glGetUniformLocation(volumeShader, "u_SporeExposure");
+	volume.season = glGetUniformLocation(volumeShader, "u_Season");
+	volume.weather = glGetUniformLocation(volumeShader, "u_Weather");
+	volume.torchPos = glGetUniformLocation(volumeShader, "u_TorchPos");
+	volume.torchDir = glGetUniformLocation(volumeShader, "u_TorchDir");
+	volume.positionAttrib = glGetAttribLocation(volumeShader, "a_Position");
+	glUseProgram(volumeShader);
+	glUniform1i(glGetUniformLocation(volumeShader, "u_Depth"), 0);
+	glUniform1i(glGetUniformLocation(volumeShader, "u_ShadowMap"), 2);
+	glUseProgram(0);
 
 	textScreen = glGetUniformLocation(textShader, "u_Screen");
 	textAtlas = glGetUniformLocation(textShader, "u_Atlas");
@@ -671,11 +717,15 @@ void Renderer::EndScene()
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, msFbo);
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, sceneFbo);
 		glBlitFramebuffer(0, 0, targetWidth, targetHeight, 0, 0, targetWidth, targetHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+		if (VolumeOn())
+			glBlitFramebuffer(0, 0, targetWidth, targetHeight, 0, 0, targetWidth, targetHeight, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 	}
 
 	glDisable(GL_DEPTH_TEST);
 	glDepthMask(GL_FALSE);
 	glDisable(GL_BLEND);
+
+	if (VolumeOn()) DrawVolumePass();
 
 	glUseProgram(postShader);
 	glUniform1i(post.source, 0);
@@ -702,11 +752,26 @@ void Renderer::EndScene()
 		DrawPostPass(bloomFbo[0], bloomWidth, bloomHeight, 1, bloomTex[1], bw, bh);
 	}
 
+	// One narrow blur takes the per-pixel jitter out of the shafts.
+	if (VolumeOn())
+	{
+		glUniform2f(post.direction, 1.0f / bw, 0.0f);
+		DrawPostPass(volumeFbo[1], bloomWidth, bloomHeight, 1, volumeTex[0], bw, bh);
+		glUniform2f(post.direction, 0.0f, 1.0f / bh);
+		DrawPostPass(volumeFbo[0], bloomWidth, bloomHeight, 1, volumeTex[1], bw, bh);
+	}
+
+	glActiveTexture(GL_TEXTURE3);
+	glBindTexture(GL_TEXTURE_2D, VolumeOn() ? volumeTex[0] : 0);
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, bloomTex[0]);
 	glActiveTexture(GL_TEXTURE0);
+	glUniform1i(post.volume, 3);
+	glUniform1f(post.volumeOn, VolumeOn() ? 1.0f : 0.0f);
 	DrawPostPass(0, (int)windowSizeX, (int)windowSizeY, 2, sceneTex, (float)targetWidth, (float)targetHeight);
 
+	glActiveTexture(GL_TEXTURE3);
+	glBindTexture(GL_TEXTURE_2D, 0);
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glActiveTexture(GL_TEXTURE0);
@@ -731,6 +796,46 @@ void Renderer::DrawPostPass(GLuint target, int width, int height, int mode, GLui
 
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 	++drawCalls;
+}
+
+bool Renderer::VolumeOn() const
+{
+	return settings.volumetric > 0 && volumeShader != 0 && volumeReady && postReady;
+}
+
+void Renderer::DrawVolumePass()
+{
+	glUseProgram(volumeShader);
+	Mat4 invViewProj = Inverse(viewProj);
+	glUniformMatrix4fv(volume.invViewProj, 1, GL_FALSE, invViewProj.m);
+	glUniformMatrix4fv(volume.lightViewProj, 1, GL_FALSE, lightViewProj.m);
+	glUniform1f(volume.shadowOn, shadowActive ? 1.0f : 0.0f);
+	glUniform1i(volume.steps, settings.volumetric >= 2 ? 24 : 12);
+	glUniform1f(volume.time, time);
+	glUniform1f(volume.timeOfDay, timeOfDay);
+	glUniform1f(volume.sporeExposure, sporeExposure);
+	UploadWeather(volume.season, volume.weather);
+	glUniform4f(volume.torchPos, torchPos.x, torchPos.y, torchPos.z, torchOn ? 1.0f : 0.0f);
+	glUniform3f(volume.torchDir, torchDir.x, torchDir.y, torchDir.z);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, volumeFbo[0]);
+	glViewport(0, 0, bloomWidth, bloomHeight);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, sceneDepth);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vboScreen);
+	glEnableVertexAttribArray(volume.positionAttrib);
+	glVertexAttribPointer(volume.positionAttrib, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, 0);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+	glDisableVertexAttribArray(volume.positionAttrib);
+	++drawCalls;
+}
+
+void Renderer::SetTorch(bool on, const Vec3& pos, const Vec3& dir)
+{
+	torchOn = on;
+	torchPos = pos;
+	torchDir = dir;
 }
 
 int Renderer::TakeDrawCalls()
@@ -816,6 +921,8 @@ void Renderer::BindLit(const Mat4& model, int mode)
 	glUniformMatrix4fv(lit.lightViewProj, 1, GL_FALSE, lightViewProj.m);
 	glUniform1f(lit.shadowOn, shadowActive ? 1.0f : 0.0f);
 	UploadWeather(lit.season, lit.weather);
+	glUniform4f(lit.torchPos, torchPos.x, torchPos.y, torchPos.z, torchOn ? 1.0f : 0.0f);
+	glUniform3f(lit.torchDir, torchDir.x, torchDir.y, torchDir.z);
 
 	// Uniforms stay with the program, so the light list goes up once per change.
 	if (lightsDirty)

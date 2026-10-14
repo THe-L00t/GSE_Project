@@ -106,6 +106,9 @@ public:
 	void ClearLights();
 	void AddLight(const Vec3& pos, const Vec3& color, float radius);
 
+	// The hand torch is a spotlight of its own, lit in Lit.fs and scattered in the light-shaft pass.
+	void SetTorch(bool on, const Vec3& pos, const Vec3& dir);
+
 	// Models and blob shadows are queued and drawn one call per mesh when the pass ends.
 	void DrawModel(int id, const Mat4& model, const DrawParams& params);
 	void DrawModel(int id, const Vec3& pos, float yaw, const Vec3& scale, const DrawParams& params);
@@ -171,6 +174,8 @@ private:
 		GLint shadowOn = -1;
 		GLint season = -1;
 		GLint weather = -1;
+		GLint torchPos = -1;
+		GLint torchDir = -1;
 	};
 
 	struct ShadowLocations
@@ -227,6 +232,24 @@ private:
 		GLint bloomStrength = -1;
 		GLint sporeExposure = -1;
 		GLint time = -1;
+		GLint volume = -1;
+		GLint volumeOn = -1;
+		GLint positionAttrib = -1;
+	};
+
+	struct VolumeLocations
+	{
+		GLint invViewProj = -1;
+		GLint lightViewProj = -1;
+		GLint shadowOn = -1;
+		GLint steps = -1;
+		GLint time = -1;
+		GLint timeOfDay = -1;
+		GLint sporeExposure = -1;
+		GLint season = -1;
+		GLint weather = -1;
+		GLint torchPos = -1;
+		GLint torchDir = -1;
 		GLint positionAttrib = -1;
 	};
 
@@ -276,6 +299,8 @@ private:
 	void DeleteShadowMap();
 	void CreateNoiseTexture();
 	void DrawPostPass(GLuint target, int width, int height, int mode, GLuint source, float sourceWidth, float sourceHeight);
+	bool VolumeOn() const;
+	void DrawVolumePass();
 
 	bool initialized = false;
 
@@ -294,6 +319,7 @@ private:
 	GLuint particleShader = 0;
 	GLuint overlayShader = 0;
 	GLuint postShader = 0;
+	GLuint volumeShader = 0;
 	GLuint textShader = 0;
 
 	// Small and large faces; each queue holds glyph quads waiting for FlushText.
@@ -310,7 +336,7 @@ private:
 	int    samples = 0;
 	GLuint sceneFbo = 0;
 	GLuint sceneTex = 0;
-	GLuint sceneDepth = 0;
+	GLuint sceneDepth = 0;      // a depth texture, read by the light-shaft pass
 	GLuint bloomFbo[2] = { 0, 0 };
 	GLuint bloomTex[2] = { 0, 0 };
 	int    bloomWidth = 0;
@@ -335,6 +361,7 @@ private:
 	OverlayLocations     overlay;
 	ParticleLocations    particle;
 	PostLocations        post;
+	VolumeLocations      volume;
 	std::vector<GpuMesh> meshes;
 
 	// DrawModel and DrawShadow only queue; FlushModels draws each mesh once for all its instances.
@@ -351,6 +378,14 @@ private:
 	float sporeExposure = 0.0f;
 	float time = 0.0f;
 	WeatherParams weather;
+	bool  torchOn = false;
+	Vec3  torchPos;
+	Vec3  torchDir{ 0.0f, 0.0f, 1.0f };
+
+	// Quarter-resolution light shafts, beside the bloom buffers; [1] is the blur scratch.
+	GLuint volumeFbo[2] = { 0, 0 };
+	GLuint volumeTex[2] = { 0, 0 };
+	bool   volumeReady = false;
 
 	static const int kMaxLights = 8;   // matches kMaxLights in Lit.fs
 	float lightPos[kMaxLights * 4] = {};

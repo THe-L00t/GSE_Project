@@ -9,6 +9,8 @@ in vec2 v_UV;
 uniform int       u_Mode;
 uniform sampler2D u_Source;
 uniform sampler2D u_Bloom;
+uniform sampler2D u_Volume;         // light scattered by the fog, quarter resolution
+uniform float     u_VolumeOn;
 uniform vec2      u_Texel;          // one texel of u_Source
 uniform vec2      u_Direction;      // blur step in UV
 uniform float     u_BloomStrength;
@@ -92,6 +94,7 @@ vec3 Composite(vec2 uv)
 	}
 
 	c += texture(u_Bloom, uv).rgb * u_BloomStrength;
+	c += texture(u_Volume, uv).rgb * u_VolumeOn;
 	c = ToneMap(c);
 
 	// A trace of grain breaks up banding in the fog gradients.
