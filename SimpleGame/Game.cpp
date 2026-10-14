@@ -14,6 +14,8 @@ namespace
 	const float kRollTime = 0.28f;
 	const float kRollCooldown = 0.70f;
 	const float kTitleDuration = 8.0f;
+	const float kFarView = 20.0f;      // the usual quarter view, and the furthest out
+	const float kNearView = 8.0f;
 }
 
 Game::Game(Renderer* r)
@@ -138,6 +140,7 @@ void Game::UpdatePlayer(float dt, const bool* keys)
 void Game::UpdateCamera(float dt)
 {
 	camera->SetPosition(LerpV(camera->Position(), player->Position(), 1.0f - expf(-6.0f * dt)));
+	camera->orthoHeight += (viewHeight - camera->orthoHeight) * (1.0f - expf(-10.0f * dt));
 }
 
 void Game::OnKeyDown(unsigned char key)
@@ -235,6 +238,12 @@ void Game::OnKeyDown(unsigned char key)
 void Game::OnMouseDown()
 {
 	if (!statPanelOpen && level == LEVEL_ROUTE) Attack();
+}
+
+void Game::ZoomBy(float steps)
+{
+	// Scaled rather than stepped, so each notch feels the same near and far.
+	viewHeight = Clampf(viewHeight * expf(-steps), kNearView, kFarView);
 }
 
 void Game::SkipToRoute()

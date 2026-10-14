@@ -148,10 +148,31 @@ void Reshape(int w, int h)
 	if (g_Renderer) g_Renderer->Resize(w, h);
 }
 
+bool g_WheelDrag = false;
+int  g_DragY = 0;
+
 void MouseInput(int button, int state, int x, int y)
 {
 	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN && g_Game)
 		g_Game->OnMouseDown();
+	if (button == GLUT_MIDDLE_BUTTON)
+	{
+		g_WheelDrag = state == GLUT_DOWN;
+		g_DragY = y;
+	}
+}
+
+// Holding the wheel down and dragging up brings the view in close; dragging down sends it back out.
+void MotionInput(int x, int y)
+{
+	if (!g_WheelDrag || !g_Game) return;
+	g_Game->ZoomBy((float)(g_DragY - y) * 0.005f);
+	g_DragY = y;
+}
+
+void WheelInput(int wheel, int direction, int x, int y)
+{
+	if (g_Game) g_Game->ZoomBy((float)direction * 0.12f);
 }
 
 void KeyInput(unsigned char key, int x, int y)
@@ -262,6 +283,7 @@ int main(int argc, char **argv)
 	std::cout << " F2            : skip to Route 32\n";
 	std::cout << " F3            : toggle state monitor (browser)\n";
 	std::cout << " F4            : graphics options\n";
+	std::cout << " wheel drag    : zoom toward the player\n";
 	std::cout << " ESC           : quit\n\n";
 
 	// One key press per physical press, so SPACE cannot auto-repeat into a chain of rolls.
@@ -275,6 +297,8 @@ int main(int argc, char **argv)
 	glutSpecialFunc(SpecialKeyInput);
 	glutSpecialUpFunc(SpecialKeyUpInput);
 	glutMouseFunc(MouseInput);
+	glutMotionFunc(MotionInput);
+	glutMouseWheelFunc(WheelInput);
 
 	g_PrevTime = NowMs();
 	g_StatsStart = g_PrevTime;

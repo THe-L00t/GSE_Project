@@ -184,6 +184,9 @@ public:
 	void OnKeyDown(unsigned char key);
 	void OnMouseDown();
 
+	// Positive steps pull the view in toward the player, negative ones back out.
+	void ZoomBy(float steps);
+
 	// Demo aid: jump straight to the level after the tutorial.
 	void SkipToRoute();
 
@@ -462,6 +465,7 @@ private:
 	float hurtFlash = 0.0f;       // [0,1] the red at the edges from the last blow, fading
 	float shake = 0.0f;           // [0,1] camera shake from the last blow
 	float cutaway = 0.0f;         // [0,1] how open the view through occluders is
+	float viewHeight = 20.0f;     // world height of the screen the camera eases toward
 	std::vector<Footprint> footprints;
 	Vec3  lastPrintPos;
 	bool  printLeft = false;
