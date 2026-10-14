@@ -207,6 +207,7 @@ void main()
 	vec3 base = v_Color * v_Tint;
 	float emissive = v_Emissive + v_Glow;
 	float gloss = 0.0;
+	vec3 reflected = vec3(0.0);     // what still water mirrors, added after the lighting
 
 	if (u_Mode == 1)
 	{
@@ -279,23 +280,42 @@ void main()
 	}
 	else if (u_Mode == 2)
 	{
-		// Reservoir. Ripple normals only, no reflection pass.
+		// Reservoir. Ripple normals, and a reflection of the sky, the sun and the lamps without a second pass.
 		vec2 p = v_WorldPos.xz;
 		float w1 = sin(p.x * 1.30 + u_Time * 0.75);
 		float w2 = sin(p.y * 1.70 - u_Time * 0.55);
 		float w3 = sin((p.x + p.y) * 0.65 + u_Time * 0.35);
 		n = normalize(vec3(w1 * 0.05 + w3 * 0.03, 1.0, w2 * 0.05 + w3 * 0.03));
 
-		float fres = pow(1.0 - clamp(dot(n, normalize(u_CamPos - v_WorldPos)), 0.0, 1.0), 3.0);
+		vec3 eye = normalize(u_CamPos - v_WorldPos);
+		float fres = pow(1.0 - clamp(dot(n, eye), 0.0, 1.0), 3.0);
 
 		// Deeper toward the middle, with a pale lapping band along the shore.
 		float edge = max(abs(v_Local.x), abs(v_Local.z)) * 2.0;
 		vec3 deep = mix(vec3(0.05, 0.11, 0.13), vec3(0.10, 0.18, 0.18), smoothstep(0.4, 1.0, edge));
-		base = mix(deep, env.skyColor * 0.9, 0.35 + fres * 0.55);
+		base = mix(deep, env.skyColor * 0.9, 0.20 + fres * 0.30);
+
+		// The sky seen in the water: hazy at the horizon, clearer overhead, stronger at a grazing angle.
+		vec3 r = reflect(-eye, n);
+		vec3 sky = mix(env.fogColor, env.skyColor * 1.5, smoothstep(0.0, 0.7, r.y));
+		reflected = sky * (0.25 + 0.55 * fres);
+		reflected += env.sunColor * (pow(max(dot(r, env.sunDir), 0.0), 220.0) * 2.5 + pow(max(dot(r, env.sunDir), 0.0), 12.0) * 0.15);
+
+		// Lanterns and the deer's light stretch into broken streaks across the ripples.
+		for (int i = 0; i < kMaxLights; ++i)
+		{
+			if (i >= u_LightCount) break;
+			vec3 toLight = u_LightPos[i].xyz - v_WorldPos;
+			float d = length(toLight);
+			float reach = clamp(1.0 - d / (u_LightPos[i].w * 2.5), 0.0, 1.0);
+			reflected += u_LightColor[i] * pow(max(dot(r, toLight / max(d, 0.001)), 0.0), 40.0) * reach * 0.8;
+		}
+
 		float lap = 0.5 + 0.5 * sin(edge * 60.0 - u_Time * 1.6);
 		float foam = smoothstep(0.90, 1.0, edge) * (0.55 + 0.45 * lap);
 		base = mix(base, vec3(0.55, 0.62, 0.60), foam * 0.45);
-		gloss = 1.0;
+		reflected *= 1.0 - foam * 0.6;
+		gloss = 0.4;   // the mirrored sun above carries most of the highlight now
 		emissive = 0.0;
 	}
 
@@ -349,7 +369,7 @@ void main()
 		color += env.sunColor * spec * 0.9 * sunVis;
 	}
 
-	color += base * emissive;
+	color += base * emissive + reflected;
 	color = mix(color, vec3(1.0, 0.95, 0.85), clamp(v_Flash, 0.0, 1.0));
 
 	// Muted palette: only spores and light are allowed to be saturated.
