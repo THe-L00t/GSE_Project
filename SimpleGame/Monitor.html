@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>물안개 마을 - 상태 모니터</title>
+<style>
+	body { margin: 0; padding: 16px; background: #0d1413; color: #e4ece6; font: 14px/1.5 "Malgun Gothic", sans-serif; }
+	h1 { margin: 0 0 4px; font-size: 18px; color: #99ebcc; }
+	#status { margin-bottom: 14px; color: #9eada6; font-size: 12px; }
+	#status.off { color: #ff8a7a; }
+	.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+	section { background: #15201e; border: 1px solid #24332f; border-radius: 6px; padding: 10px 12px; }
+	h2 { margin: 0 0 8px; font-size: 14px; color: #99ebcc; }
+	table { width: 100%; border-collapse: collapse; }
+	td, th { padding: 2px 6px; text-align: left; font-variant-numeric: tabular-nums; }
+	th { color: #9eada6; font-weight: normal; border-bottom: 1px solid #24332f; }
+	td.k { color: #9eada6; width: 40%; }
+	.bar { display: inline-block; width: 120px; height: 8px; background: #24332f; border-radius: 4px; vertical-align: middle; margin-right: 6px; }
+	.bar i { display: block; height: 100%; background: #6fd1a8; border-radius: 4px; }
+	.wide { grid-column: 1 / -1; }
+	.none { color: #6b7a74; }
+</style>
+</head>
+<body>
+<h1>물안개 마을 - 상태 모니터</h1>
+<div id="status">연결 중...</div>
+<div class="grid">
+	<section><h2>월드</h2><table id="world"></table></section>
+	<section><h2>플레이어</h2><table id="player"></table></section>
+	<section><h2>NPC</h2><table id="npc"></table></section>
+	<section class="wide"><h2>적 (<span id="enemyCount">0</span>)</h2><table id="enemies"></table></section>
+</div>
+<script>
+const kInterval = 250;
+
+const levelNames = { VILLAGE: "물안개 마을", ROUTE: "32번 국도" };
+const enemyStateNames = { IDLE: "대기", CHASE: "추격", WINDUP: "준비", STRIKE: "공격", RECOVER: "회복", DYING: "쓰러짐" };
+
+function esc(v)
+{
+	return String(v).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+function vec(v) { return v.map(n => n.toFixed(1)).join(", "); }
+
+function bar(value, max)
+{
+	const pct = Math.max(0, Math.min(1, value / max)) * 100;
+	return `<span class="bar"><i style="width:${pct}%"></i></span>${value.toFixed(1)} / ${max.toFixed(0)}`;
+}
+
+function rows(pairs)
+{
+	return pairs.map(([k, v]) => `<tr><td class="k">${esc(k)}</td><td>${v}</td></tr>`).join("");
+}
+
+function yesNo(b) { return b ? "예" : "아니오"; }
+
+function render(s)
+{
+	const w = s.world;
+	document.getElementById("world").innerHTML = rows([
+		["레벨", esc(levelNames[w.level] || w.level)],
+		["날짜", `${w.day}일째`],
+		["시각", `${w.clock} (${w.timeOfDay.toFixed(3)})`],
+		["시간 배속", `x${w.timeScale}`],
+		["포자 노출", bar(w.sporeExposure * 100, 100)],
+		["튜토리얼", esc(w.tutorial)],
+		["가이드", esc(w.guide)],
+		["플레이어 청크", `(${w.chunk[0]}, ${w.chunk[1]})`],
+		["진행 시간 / 틱", `${w.time.toFixed(1)}초 / ${w.tick}`],
+		["일시정지(메뉴)", yesNo(w.paused)]
+	]);
+
+	const p = s.player;
+	document.getElementById("player").innerHTML = rows([
+		["위치", vec(p.pos)],
+		["체력", bar(p.health, p.maxHealth)],
+		["레벨", `${p.level} (경험치 ${p.xp} / ${p.xpNext})`],
+		["물", bar(p.water, 100)],
+		["음식", bar(p.food, 100)],
+		["체온", p.warmthActive ? bar(p.warmth, 100) : '<span class="none">비활성</span>']
+	]);
+
+	const npc = [];
+	if (s.grandma)
+	{
+		const state = s.grandma.state === "AWAKE" ? "깨어 있음" : "잠듦" + (s.grandma.visited ? " (찾아감)" : "");
+		npc.push(["할머니", `${state} · ${vec(s.grandma.pos)}`]);
+	}
+	else
+	{
+		npc.push(["할머니", '<span class="none">없음</span>']);
+	}
+	if (s.deer)
+	{
+		const d = s.deer;
+		npc.push(["사슴 위치", `${vec(d.pos)} (거리 ${d.distance.toFixed(1)})`]);
+		npc.push(["사슴 목표", vec(d.goal)]);
+		npc.push(["사슴 상태", `안내 ${yesNo(d.leading)} · 도착 ${yesNo(d.arrived)}`]);
+	}
+	else
+	{
+		npc.push(["사슴", '<span class="none">없음</span>']);
+	}
+	document.getElementById("npc").innerHTML = rows(npc);
+
+	const enemies = s.enemies.slice().sort((a, b) => a.distance - b.distance);
+	document.getElementById("enemyCount").textContent = enemies.length;
+	document.getElementById("enemies").innerHTML = enemies.length === 0
+		? '<tr><td class="none">없음</td></tr>'
+		: "<tr><th>종류</th><th>레벨</th><th>상태</th><th>체력</th><th>도발</th><th>거리</th><th>위치</th></tr>" +
+		  enemies.map(e => `<tr><td>${esc(e.type)}</td><td>${e.level}</td><td>${esc(enemyStateNames[e.state] || e.state)}</td>` +
+			  `<td>${bar(e.health, e.maxHealth)}</td><td>${yesNo(e.provoked)}</td><td>${e.distance.toFixed(1)}</td><td>${vec(e.pos)}</td></tr>`).join("");
+}
+
+async function tick()
+{
+	const status = document.getElementById("status");
+	try
+	{
+		const res = await fetch("/state", { cache: "no-store" });
+		render(await res.json());
+		status.className = "";
+		status.textContent = `연결됨 · ${new Date().toLocaleTimeString()} 갱신`;
+	}
+	catch (err)
+	{
+		status.className = "off";
+		status.textContent = "연결 끊김 — 게임에서 F3로 모니터를 켜세요";
+	}
+	setTimeout(tick, kInterval);
+}
+
+tick();
+</script>
+</body>
+</html>

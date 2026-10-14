@@ -15,9 +15,13 @@ but WITHOUT ANY WARRANTY.
 
 #include "Renderer.h"
 #include "Game.h"
+#include "DebugMonitor.h"
 
 Renderer* g_Renderer = NULL;
 Game*     g_Game = NULL;
+DebugMonitor g_Monitor;
+
+const int kMonitorPort = 8080;
 
 bool g_Keys[256] = { false };
 int  g_PrevTime = 0;
@@ -75,6 +79,7 @@ void Idle(void)
 			glutLeaveMainLoop();
 			return;
 		}
+		g_Monitor.Poll([]() { return g_Game->MonitorJson(); });
 	}
 
 	glutPostRedisplay();
@@ -118,11 +123,33 @@ static unsigned char SpecialToKey(int key)
 	}
 }
 
+static void ToggleMonitor()
+{
+	if (g_Monitor.IsRunning())
+	{
+		g_Monitor.Stop();
+		std::cout << "Monitor off\n";
+	}
+	else if (g_Monitor.Start(kMonitorPort))
+	{
+		std::cout << "Monitor on: http://localhost:" << kMonitorPort << "\n";
+	}
+	else
+	{
+		std::cout << "Monitor could not listen on port " << kMonitorPort << "\n";
+	}
+}
+
 void SpecialKeyInput(int key, int x, int y)
 {
 	if (key == GLUT_KEY_F2)
 	{
 		if (g_Game) g_Game->SkipToRoute();
+		return;
+	}
+	if (key == GLUT_KEY_F3)
+	{
+		ToggleMonitor();
 		return;
 	}
 
@@ -171,6 +198,7 @@ int main(int argc, char **argv)
 	std::cout << " E             : interact\n";
 	std::cout << " T             : toggle fast time of day\n";
 	std::cout << " F2            : skip to Route 32\n";
+	std::cout << " F3            : toggle state monitor (browser)\n";
 	std::cout << " ESC           : quit\n\n";
 
 	// One key press per physical press, so SPACE cannot auto-repeat into a chain of rolls.
@@ -190,6 +218,7 @@ int main(int argc, char **argv)
 
 	glutMainLoop();
 
+	g_Monitor.Stop();
 	delete g_Game;
 	delete g_Renderer;
 

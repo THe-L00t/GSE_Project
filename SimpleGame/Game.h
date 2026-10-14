@@ -114,6 +114,9 @@ public:
 
 	bool WantsQuit() const { return quit; }
 
+	// GameMonitor.cpp: a read-only snapshot for the browser monitor
+	std::string MonitorJson() const;
+
 private:
 	// Game.cpp: shared by every level
 	void UpdatePlayer(float dt, const bool* keys);
