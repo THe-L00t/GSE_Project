@@ -531,6 +531,7 @@ void Game::WakeNextMorning()
 {
 	day = 2;
 	timeOfDay = 0.27f;
+	AdvanceDay();
 	timeScale = 1.0f;
 	torchOn = false;
 

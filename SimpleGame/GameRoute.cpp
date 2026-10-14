@@ -137,6 +137,9 @@ void Game::UpdateRoute(float dt, const bool* keys)
 	float rate = 0.012f * (float)here->stage * NatureGuard(natureInsight) * (waterMeter <= 0.0f ? 1.6f : 1.0f);
 	if (player->rollTimer > 0.0f) rate = 0.0f;
 
+	// Rain washes the spores out of the air, and a gale scatters them.
+	rate *= (1.0f - 0.7f * rainLevel) * (1.0f - 0.3f * windLevel);
+
 	// Open water clears the air, as the reservoir did at home.
 	if (reservoir->ShoreDistance(player->Position()) < reservoir->clearRange) rate = -0.075f;
 

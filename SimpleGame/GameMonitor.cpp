@@ -56,6 +56,13 @@ std::string Game::MonitorJson() const
 		   time, tick, sporeExposure, NameAt(kTutorialNames, tutorial), NameAt(kGuideNames, guide),
 		   playerChunkX, playerChunkZ, MenuOpen() ? "true" : "false");
 
+	static const char* kSeasonIds[SEASON_COUNT] = { "SPRING", "SUMMER", "AUTUMN", "WINTER" };
+	static const char* kWeatherIds[WEATHER_COUNT] = { "CLEAR", "RAIN", "SNOW", "WIND" };
+	Append(out, "\"weather\":{\"season\":\"%s\",\"seasonDay\":%d,\"weather\":\"%s\",\"next\":%.0f,"
+				"\"rain\":%.2f,\"snow\":%.2f,\"wind\":%.2f,\"snowCover\":%.2f,\"wetness\":%.2f},",
+		   kSeasonIds[season], seasonDay + 1, kWeatherIds[weather], weatherTimer,
+		   rainLevel, snowLevel, windLevel, snowCover, wetness);
+
 	const Vec3 playerPos = player->Position();
 	out += "\"player\":{";
 	AppendVec(out, "pos", playerPos);

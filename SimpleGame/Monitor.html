@@ -26,6 +26,7 @@
 <div id="status">연결 중...</div>
 <div class="grid">
 	<section><h2>월드</h2><table id="world"></table></section>
+	<section><h2>계절 · 날씨</h2><table id="weather"></table></section>
 	<section><h2>플레이어</h2><table id="player"></table></section>
 	<section><h2>NPC</h2><table id="npc"></table></section>
 	<section class="wide"><h2>적 (<span id="enemyCount">0</span>)</h2><table id="enemies"></table></section>
@@ -34,6 +35,8 @@
 const kInterval = 250;
 
 const levelNames = { VILLAGE: "물안개 마을", ROUTE: "32번 국도" };
+const seasonNames = { SPRING: "봄", SUMMER: "여름", AUTUMN: "가을", WINTER: "겨울" };
+const weatherNames = { CLEAR: "맑음", RAIN: "비", SNOW: "눈", WIND: "강풍" };
 const enemyStateNames = { IDLE: "대기", CHASE: "추격", WINDUP: "준비", STRIKE: "공격", RECOVER: "회복", DYING: "쓰러짐" };
 
 function esc(v)
@@ -70,6 +73,17 @@ function render(s)
 		["플레이어 청크", `(${w.chunk[0]}, ${w.chunk[1]})`],
 		["진행 시간 / 틱", `${w.time.toFixed(1)}초 / ${w.tick}`],
 		["일시정지(메뉴)", yesNo(w.paused)]
+	]);
+
+	const wx = s.weather;
+	document.getElementById("weather").innerHTML = rows([
+		["계절", `${esc(seasonNames[wx.season] || wx.season)} ${wx.seasonDay}일째`],
+		["날씨", `${esc(weatherNames[wx.weather] || wx.weather)} (다음 변화까지 ${wx.next}초)`],
+		["비", bar(wx.rain * 100, 100)],
+		["눈", bar(wx.snow * 100, 100)],
+		["바람", bar(wx.wind * 100, 100)],
+		["쌓인 눈", bar(wx.snowCover * 100, 100)],
+		["젖은 땅", bar(wx.wetness * 100, 100)]
 	]);
 
 	const p = s.player;

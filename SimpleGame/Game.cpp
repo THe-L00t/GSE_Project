@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <ctime>
 
 // On-screen text stays ASCII: the bitmap fonts freeglut ships cannot draw Hangul.
 
@@ -18,6 +19,11 @@ namespace
 Game::Game(Renderer* r)
 	: renderer(r)
 {
+	weatherRng = Rng(MixSeed((uint64_t)std::time(nullptr) ^ 0x5EA5011ULL));
+	season = weatherRng.RangeInt(0, SEASON_COUNT - 1);
+	for (int i = 0; i < SEASON_COUNT; ++i) seasonWeight[i] = i == season ? 1.0f : 0.0f;
+	if (season == SEASON_WINTER) snowCover = 0.2f;
+
 	worldNode = scene.Root()->AddChild(new Actor(ACTOR_NODE));
 
 	player = scene.Root()->AddChild(new PlayerActor());
@@ -42,7 +48,12 @@ void Game::Update(float dt, const bool* keys)
 	++tick;
 
 	timeOfDay += (dt * timeScale) / dayLength;
-	while (timeOfDay >= 1.0f) timeOfDay -= 1.0f;
+	while (timeOfDay >= 1.0f)
+	{
+		timeOfDay -= 1.0f;
+		AdvanceDay();
+	}
+	UpdateWeather(dt);
 
 	if (level == LEVEL_VILLAGE)
 		UpdateVillage(dt, keys);
@@ -92,6 +103,14 @@ void Game::UpdatePlayer(float dt, const bool* keys)
 	else if (wishLen > 0.001f)
 	{
 		float speed = kWalkSpeed * MoveSpeedScale(stats) * (p.swingTimer > 0.0f ? 0.7f : 1.0f) * (foodMeter <= 0.0f ? 0.85f : 1.0f);
+
+		// Out on the road the weather pushes back: deep snow drags, a headwind holds you, a tailwind helps a little.
+		if (level == LEVEL_ROUTE)
+		{
+			float against = WindAgainst(wish);
+			if (against < 0.0f) against *= 0.5f;
+			speed *= (1.0f - 0.2f * snowCover) * (1.0f - 0.3f * windLevel * against);
+		}
 		pos = pos + wish * (speed * dt);
 		p.SetYaw(atan2f(wish.x, wish.z));
 		p.walkPhase += dt * 9.0f;
@@ -342,6 +361,8 @@ void Game::DrawCommonHud(const char* help)
 
 	int helpWidth = renderer->TextWidth(help, false);
 	renderer->DrawTexts(w - helpWidth - 24, h - 24, help, kHudDim, false);
+
+	DrawWeatherHud();
 
 	if (!prompt.empty())
 	{

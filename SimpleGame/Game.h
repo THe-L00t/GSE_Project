@@ -79,6 +79,24 @@ enum RouteGuide
 	GUIDE_EXPLORE
 };
 
+enum Season
+{
+	SEASON_SPRING,
+	SEASON_SUMMER,
+	SEASON_AUTUMN,
+	SEASON_WINTER,
+	SEASON_COUNT
+};
+
+enum Weather
+{
+	WEATHER_CLEAR,
+	WEATHER_RAIN,
+	WEATHER_SNOW,
+	WEATHER_WIND,     // a gale; in autumn it carries the leaves
+	WEATHER_COUNT
+};
+
 struct Popup
 {
 	Vec3  pos;
@@ -223,6 +241,13 @@ private:
 	void DrawBagPanel();
 	void DrawJournalPanel();
 
+	// GameWeather.cpp: seasons turn with the days, and each season rolls its own weather
+	void UpdateWeather(float dt);
+	void AdvanceDay();
+	void RollWeather();
+	float WindAgainst(const Vec3& moveDir) const;   // [-1,1], positive when walking into the wind
+	void DrawWeatherHud();
+
 	Renderer* renderer = nullptr;
 	int   level = LEVEL_VILLAGE;
 	float levelTimer = 0.0f;      // seconds since the current level began
@@ -331,6 +356,19 @@ private:
 	float dayLength = 240.0f;     // real seconds per in-game day
 	float timeScale = 1.0f;
 	float sporeExposure = 0.15f;  // [0,1]
+
+	Rng   weatherRng{ 0 };        // reseeded from the clock, so every run starts in its own season
+	int   season = SEASON_SPRING;
+	int   seasonDay = 0;          // whole days spent in the current season
+	int   weather = WEATHER_CLEAR;
+	float weatherTimer = 60.0f;   // game seconds until the next roll
+	float rainLevel = 0.0f;       // [0,1], each eases toward the current weather
+	float snowLevel = 0.0f;
+	float windLevel = 0.0f;
+	float windAngle = 0.0f;       // direction the wind blows toward, on the XZ plane
+	float snowCover = 0.0f;       // [0,1] snow lying on the ground
+	float wetness = 0.0f;         // [0,1] rain soaked into the ground
+	float seasonWeight[SEASON_COUNT] = { 1.0f, 0.0f, 0.0f, 0.0f };   // eases between seasons
 
 	std::string message;
 	float messageTimer = 0.0f;

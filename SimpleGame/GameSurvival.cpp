@@ -46,7 +46,8 @@ void Game::UpdateSurvival(float dt)
 
 	float oldWater = waterMeter;
 	float oldFood = foodMeter;
-	waterMeter = Maxf(waterMeter - kWaterDrain * dt, 0.0f);
+	// Rain on the face: thirst comes slower while it falls.
+	waterMeter = Maxf(waterMeter - kWaterDrain * (1.0f - 0.5f * rainLevel) * dt, 0.0f);
 	foodMeter = Maxf(foodMeter - kFoodDrain * dt, 0.0f);
 
 	if (Crossed(oldWater, waterMeter, kLowMark)) ShowMessage("입이 바짝 마른다. 물을 마시거나(R) 물을 찾아라.", 4.0f);
@@ -54,21 +55,26 @@ void Game::UpdateSurvival(float dt)
 	if (Crossed(oldFood, foodMeter, kLowMark)) ShowMessage("배가 꼬르륵거린다. 뭘 좀 먹어라(F).", 4.0f);
 	if (Crossed(oldFood, foodMeter, 0.01f)) ShowMessage("허기 때문에 걸음도 휘두르기도 느려진다.", 4.0f);
 
-	// Warmth only starts to matter once a whole day has passed out on the road.
-	if (!warmthActive && routeTime > dayLength)
+	// Warmth only starts to matter once a whole day has passed out on the road, or at once in winter.
+	if (!warmthActive && (routeTime > dayLength || season == SEASON_WINTER))
 	{
 		warmthActive = true;
 		warmthMeter = 100.0f;
-		ShowMessage("밤이 점점 추워진다. 어두워지면 불빛 가까이 있어라.", 6.0f);
+		ShowMessage(season == SEASON_WINTER ? "겨울 길은 춥다. 눈과 밤을 조심하고 불빛 가까이 있어라."
+											: "밤이 점점 추워진다. 어두워지면 불빛 가까이 있어라.", 6.0f);
 	}
 	if (!warmthActive) return;
 
 	bool night = timeOfDay < 0.22f || timeOfDay > 0.78f;
 	bool nearLantern = lantern && DistXZ(player->Position(), lantern->WorldPosition()) < lantern->zoneRadius;
 
+	// Rain and snow chill you even by day; wind makes any cold bite harder.
+	float chill = (night ? 1.0f + 0.5f * snowLevel : 0.5f * rainLevel + 0.8f * snowLevel) * (1.0f + 0.5f * windLevel);
+	if (!night && chill < 0.05f) chill = 0.0f;
+
 	float oldWarmth = warmthMeter;
-	if (night && !nearLantern)
-		warmthMeter = Maxf(warmthMeter - kColdDrain * dt, 0.0f);
+	if (chill > 0.0f && !nearLantern)
+		warmthMeter = Maxf(warmthMeter - kColdDrain * chill * dt, 0.0f);
 	else
 		warmthMeter = Minf(warmthMeter + kWarmRecover * dt, 100.0f);
 
