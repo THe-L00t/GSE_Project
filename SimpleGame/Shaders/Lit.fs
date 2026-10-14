@@ -195,6 +195,28 @@ void main()
 		// Damp low ground near water reads darker.
 		float damp = (1.0 - smoothstep(6.0, 26.0, length(p - u_Damp.xy))) * u_Damp.z;
 		base = mix(base, base * vec3(0.78, 0.86, 0.92), damp * 0.5);
+
+		// Seasons: lush summer grass, autumn yellowing under drifts of fallen leaves, a dull winter.
+		float field = 1.0 - road;
+		base = mix(base, base * vec3(0.92, 1.12, 0.90), u_Season.x * 0.5 * field);
+		base = mix(base, base * vec3(1.18, 0.96, 0.68), u_Season.y * 0.55 * field);
+		float litter = smoothstep(0.45, 0.70, fbm(p * 0.6 + 5.0)) * u_Season.y;
+		vec3 leafColor = mix(vec3(0.44, 0.22, 0.09), vec3(0.52, 0.40, 0.14), valueNoise(p * 3.1));
+		base = mix(base, leafColor * (0.8 + 0.4 * grain), litter * (0.65 - 0.35 * road));
+		float baseLuma = dot(base, vec3(0.299, 0.587, 0.114));
+		base = mix(base, vec3(baseLuma) * vec3(0.95, 0.97, 1.0), u_Season.z * 0.35);
+
+		// Rain soaks in: darker ground, and puddles that catch the light.
+		float puddle = smoothstep(0.62, 0.78, valueNoise(p * 0.45 + 3.0)) * u_Weather.w;
+		base *= 1.0 - 0.25 * u_Weather.w - 0.20 * puddle;
+		gloss = puddle * 0.8;
+
+		// Snow lies in drifts first, then covers everything; the road keeps its wheel ruts longest.
+		float drift = fbm(p * 0.22 + 41.0) * 0.6 + grain * 0.4;
+		float cover = u_Season.w * (1.0 - 0.25 * road);
+		float snow = smoothstep(1.0 - cover - 0.08, 1.0 - cover + 0.08, drift) * smoothstep(0.0, 0.05, cover);
+		base = mix(base, vec3(0.84, 0.88, 0.93) * (0.92 + 0.12 * grain), snow);
+		gloss *= 1.0 - snow;
 		emissive = 0.0;
 	}
 	else if (u_Mode == 2)
@@ -217,6 +239,23 @@ void main()
 		base = mix(base, vec3(0.55, 0.62, 0.60), foam * 0.45);
 		gloss = 1.0;
 		emissive = 0.0;
+	}
+
+	if (u_Mode == 0 && emissive < 0.3)
+	{
+		// Leaves turn in autumn and dull in winter; anything glowing keeps its colour.
+		float greenness = base.g - max(base.r, base.b);
+		float foliage = smoothstep(0.015, 0.07, greenness);
+		float luma = dot(base, vec3(0.299, 0.587, 0.114));
+		float tone = hash21(floor(v_WorldPos.xz * 0.35));
+		vec3 autumnLeaf = mix(vec3(0.66, 0.26, 0.09), vec3(0.74, 0.56, 0.14), tone) * luma * 2.3;
+		base = mix(base, autumnLeaf, foliage * u_Season.y * 0.85);
+		base = mix(base, vec3(luma) * vec3(0.90, 0.96, 0.92), foliage * u_Season.z * 0.45);
+
+		// Rain darkens, and snow settles on whatever faces the sky.
+		base *= 1.0 - 0.15 * u_Weather.w;
+		float settle = smoothstep(0.55, 0.85, n.y) * u_Season.w;
+		base = mix(base, vec3(0.86, 0.89, 0.94), settle * 0.9);
 	}
 
 	// Wrapped diffuse keeps the shadow side readable and soft.
