@@ -13,6 +13,11 @@ inline float Maxf(float a, float b) { return a > b ? a : b; }
 inline float Clampf(float v, float a, float b) { return v < a ? a : (v > b ? b : v); }
 inline float Saturatef(float v) { return Clampf(v, 0.0f, 1.0f); }
 inline float Lerpf(float a, float b, float t) { return a + (b - a) * t; }
+inline float SmoothStep(float a, float b, float x)
+{
+	float t = Saturatef((x - a) / (b - a));
+	return t * t * (3.0f - 2.0f * t);
+}
 inline float DegToRad(float d) { return d * kPi / 180.0f; }
 inline float RandUnit() { return (float)rand() / (float)RAND_MAX; }
 

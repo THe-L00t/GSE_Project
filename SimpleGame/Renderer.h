@@ -127,6 +127,10 @@ public:
 	void DrawWater(const Vec3& center, float sizeX, float sizeZ);
 	void DrawSpores(const Vec3& center, const Vec3& field, const Vec3& color, float densityScale, float size);
 	void DrawAmbientMotes(const Vec3& center);   // fireflies by night, pollen by day
+
+	// Lights the ground under the fireflies DrawAmbientMotes will draw around the same centre.
+	// Call before the scene, after SetFrame and SetCamera.
+	void PlaceFireflyLights(const Vec3& center);
 	void DrawWeather(const Vec3& center);        // rain, snow and leaves from the SetWeather values
 
 	void BeginUI();
@@ -187,6 +191,8 @@ private:
 		GLint weather = -1;
 		GLint torchPos = -1;
 		GLint torchDir = -1;
+		GLint glowCount = -1;
+		GLint glowPos = -1;
 	};
 
 	struct ShadowLocations
@@ -409,6 +415,14 @@ private:
 	float lightColor[kMaxLights * 3] = {};
 	int   lightCount = 0;
 	bool  lightsDirty = true;
+
+	// Fireflies: the first kFireflyCount seeds of the spore buffer, and the few lighting the ground this frame.
+	static const int kFireflyCount = 260;
+	static const int kMaxGlows = 12;   // matches kMaxGlows in Lit.fs
+	std::vector<float> fireflySeeds;
+	float glowPos[kMaxGlows * 4] = {};
+	int   glowCount = 0;
+	bool  glowsDirty = true;
 
 	int drawCalls = 0;
 

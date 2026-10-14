@@ -10,6 +10,11 @@
 
 // ASCII only: the original template's CP949 comments turned into mojibake in UTF-8 tools.
 
+namespace
+{
+	const Vec3 kFireflyField(56.0f, 3.2f, 56.0f);   // the box the fireflies wander in, around the camera
+}
+
 Renderer::Renderer(int sizeX, int sizeY)
 {
 	Initialize(sizeX, sizeY);
@@ -413,6 +418,9 @@ void Renderer::CreateVertexBufferObjects()
 	glBindBuffer(GL_ARRAY_BUFFER, vboSpores);
 	glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(spores.size() * sizeof(float)), &spores[0], GL_STATIC_DRAW);
 
+	// The fireflies' seeds stay on the CPU too, so their light on the ground can follow them.
+	fireflySeeds.assign(spores.begin(), spores.begin() + kFireflyCount * 6);
+
 	glGenBuffers(1, &vboText);
 	glGenBuffers(1, &vboInstances);
 }
@@ -443,6 +451,8 @@ void Renderer::CacheUniformLocations()
 	lit.weather = glGetUniformLocation(litShader, "u_Weather");
 	lit.torchPos = glGetUniformLocation(litShader, "u_TorchPos");
 	lit.torchDir = glGetUniformLocation(litShader, "u_TorchDir");
+	lit.glowCount = glGetUniformLocation(litShader, "u_GlowCount");
+	lit.glowPos = glGetUniformLocation(litShader, "u_GlowPos");
 
 	shadow.viewProj = glGetUniformLocation(shadowShader, "u_ViewProj");
 	shadow.model = glGetUniformLocation(shadowShader, "u_Model");
@@ -938,6 +948,12 @@ void Renderer::BindLit(const Mat4& model, int mode)
 		glUniform3fv(lit.lightColor, kMaxLights, lightColor);
 		lightsDirty = false;
 	}
+	if (glowsDirty)
+	{
+		glUniform1i(lit.glowCount, glowCount);
+		glUniform4fv(lit.glowPos, kMaxGlows, glowPos);
+		glowsDirty = false;
+	}
 
 	// A single draw reads the instance attributes as constants: identity placement, no tint.
 	glVertexAttrib4f(4, 1.0f, 0.0f, 0.0f, 0.0f);
@@ -1130,8 +1146,73 @@ void Renderer::DrawSpores(const Vec3& center, const Vec3& field, const Vec3& col
 void Renderer::DrawAmbientMotes(const Vec3& center)
 {
 	// Slices of the spore seed buffer; each style animates its own way in Particle.vs.
-	DrawMotes(1, 0, 260, center, Vec3(56.0f, 3.2f, 56.0f), Vec3(0.85f, 1.00f, 0.45f), 1.0f, 0.09f);
+	DrawMotes(1, 0, kFireflyCount, center, kFireflyField, Vec3(0.85f, 1.00f, 0.45f), 1.0f, 0.09f);
 	DrawMotes(2, 1000, 1400, center, Vec3(60.0f, 9.0f, 60.0f), Vec3(0.95f, 0.92f, 0.78f), 0.35f, 0.05f);
+}
+
+void Renderer::PlaceFireflyLights(const Vec3& center)
+{
+	glowCount = 0;
+	glowsDirty = true;
+
+	// Fireflies only come out after dusk, as in Particle.fs.
+	float day = Saturatef(sinf((timeOfDay - 0.25f) * 2.0f * kPi));
+	float night = 1.0f - SmoothStep(0.0f, 0.35f, day);
+	if (night <= 0.01f) return;
+
+	// The same motion and blink as style 1 in Particle.vs and Particle.fs, for the ones near the middle of the view.
+	struct Glow
+	{
+		Vec3  pos;
+		float strength;
+		float score;
+	};
+	Glow best[kMaxGlows];
+	int found = 0;
+	for (int i = 0; i < kFireflyCount; ++i)
+	{
+		const float* s = &fireflySeeds[i * 6];
+		const float* r = s + 3;
+
+		float t = time * (0.25f + r[0] * 0.2f);
+		float sx = s[0] + sinf(t + r[1] * 6.283f) * 0.012f + cosf(t * 0.7f + r[2] * 6.283f) * 0.008f;
+		float sz = s[2] + cosf(t * 0.9f + r[1] * 6.283f) * 0.012f;
+		sx -= floorf(sx);
+		sz -= floorf(sz);
+		float sy = 0.15f + 0.7f * s[1] + sinf(time * 0.8f + r[2] * 6.283f) * 0.08f;
+
+		Vec3 pos(center.x + (sx - 0.5f) * kFireflyField.x, sy * kFireflyField.y, center.z + (sz - 0.5f) * kFireflyField.z);
+		float dist = DistXZ(pos, fogOrigin);
+		if (dist > 16.0f) continue;
+
+		float blink = powf(Maxf(sinf(time * (0.9f + r[0] * 0.8f) + r[0] * 40.0f), 0.0f), 4.0f);
+		float strength = blink * night;
+		if (strength < 0.15f) continue;
+
+		// Keep the brightest near ones; a short list, so a plain replace-the-weakest is enough.
+		Glow g = { pos, strength, strength / (1.0f + dist * 0.15f) };
+		if (found < kMaxGlows)
+		{
+			best[found++] = g;
+			continue;
+		}
+		int weakest = 0;
+		for (int k = 1; k < kMaxGlows; ++k)
+		{
+			if (best[k].score < best[weakest].score) weakest = k;
+		}
+		if (g.score > best[weakest].score) best[weakest] = g;
+	}
+
+	for (int i = 0; i < found; ++i)
+	{
+		float* p = &glowPos[i * 4];
+		p[0] = best[i].pos.x;
+		p[1] = best[i].pos.y;
+		p[2] = best[i].pos.z;
+		p[3] = best[i].strength;
+	}
+	glowCount = found;
 }
 
 void Renderer::DrawWeather(const Vec3& center)

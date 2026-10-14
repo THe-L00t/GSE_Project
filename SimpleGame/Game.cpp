@@ -282,6 +282,7 @@ void Game::Render()
 
 	if (level == LEVEL_ROUTE) PrepareChunkView();
 	GatherLights(view);
+	renderer->PlaceFireflyLights(Vec3(view.x, 0.0f, view.z));
 
 	player->UpdatePose(deathTimer);
 

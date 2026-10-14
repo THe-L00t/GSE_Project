@@ -31,6 +31,11 @@ uniform int   u_LightCount;
 uniform vec4  u_LightPos[kMaxLights];     // xyz position, w radius
 uniform vec3  u_LightColor[kMaxLights];
 
+// Fireflies near the middle of the view, followed on the CPU: xyz position, w brightness.
+const int kMaxGlows = 12;
+uniform int   u_GlowCount;
+uniform vec4  u_GlowPos[kMaxGlows];
+
 uniform vec4  u_TorchPos;       // xyz, w = 1 while the torch is lit
 uniform vec3  u_TorchDir;
 
@@ -137,6 +142,20 @@ vec3 PointLights(vec3 pos, vec3 n)
 		sum += u_LightColor[i] * falloff * ndl;
 	}
 	return sum;
+}
+
+// Each firefly leaves a small yellow-green pool of light on whatever is just below it.
+vec3 FireflyGlow(vec3 pos)
+{
+	float sum = 0.0;
+	for (int i = 0; i < kMaxGlows; ++i)
+	{
+		if (i >= u_GlowCount) break;
+		float d = length(u_GlowPos[i].xyz - pos);
+		float falloff = clamp(1.0 - d / 2.4, 0.0, 1.0);
+		sum += falloff * falloff * u_GlowPos[i].w;
+	}
+	return vec3(0.85, 1.00, 0.45) * sum * 0.8;
 }
 
 // A warm cone from the hand torch, soft at its rim. The light it throws back off the ground is a
@@ -310,7 +329,7 @@ void main()
 
 	// Lanterns and spore lights matter more once the sun is down.
 	float night = 1.0 - smoothstep(0.10, 0.60, env.sunDir.y);
-	vec3 lamp = (PointLights(v_WorldPos, n) + TorchLight(v_WorldPos, n)) * (0.45 + 0.55 * night);
+	vec3 lamp = (PointLights(v_WorldPos, n) + TorchLight(v_WorldPos, n)) * (0.45 + 0.55 * night) + FireflyGlow(v_WorldPos);
 
 	vec3 viewDir = normalize(u_CamPos - v_WorldPos);
 	vec3 ambient = mix(env.groundColor, env.skyColor, n.y * 0.5 + 0.5);
