@@ -150,6 +150,7 @@ struct ChunkState
 	std::vector<float> respawnAt;   // game time when each spawn may appear again
 	std::vector<bool>  itemTaken;
 	std::vector<bool>  swarmCleared;   // a car's mites driven off once leaves its find behind for good
+	std::vector<float> bushRegrowAt;   // game time when each picked bush fruits again
 };
 
 class Game
@@ -236,6 +237,8 @@ private:
 	void UpdateRouteDeer(float dt);
 	void TryRouteInteract();
 	bool NearLanternFire() const;   // close enough to roast, with raw meat in the bag
+	void UpdateRouteForage();
+	void PickRouteBush(ForageActor& bush);
 	void DrawRouteHud();
 	void DrawGuideCard();
 
@@ -353,6 +356,7 @@ private:
 	Actor*        chunkGroup = nullptr;
 	Actor*        itemGroup = nullptr;
 	Actor*        enemyGroup = nullptr;
+	Actor*        forageGroup = nullptr;
 	LanternActor* lantern = nullptr;
 	Actor*        safePoint = nullptr;   // where the long sleep ends
 	WaterActor*   reservoir = nullptr;   // hidden east of the road; the lantern deer knows the way

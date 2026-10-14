@@ -6,6 +6,7 @@
 #include <ctime>
 
 #include "Collision.h"
+#include "Models.h"
 #include "Random.h"
 
 namespace
@@ -20,6 +21,11 @@ namespace
 	const float kSporeDrain = 4.0f;  // health per second once exposure is full
 
 	const int kGuideMites = 3;
+
+	const float kBushRegrow = 180.0f;   // seconds until a picked bush fruits again
+
+	// Share of the bushes that fruit in each season; under the snow only a few hold on.
+	const float kBushShare[SEASON_COUNT] = { 0.6f, 1.0f, 0.9f, 0.15f };
 }
 
 void Game::StartRoute()
@@ -61,6 +67,7 @@ void Game::StartRoute()
 	safePoint->SetPosition(Vec3(0.0f, 0.0f, -7.0f));
 	itemGroup = levelNode->AddChild(new Actor(ACTOR_NODE));
 	enemyGroup = levelNode->AddChild(new Actor(ACTOR_NODE));
+	forageGroup = levelNode->AddChild(new Actor(ACTOR_NODE));
 
 	reservoir = levelNode->AddChild(new WaterActor(kReservoirSizeX, kReservoirSizeZ));
 	reservoir->SetPosition(Vec3(kReservoirCenter.x, 0.03f, kReservoirCenter.z));
@@ -140,6 +147,7 @@ void Game::UpdateRoute(float dt, const bool* keys)
 	UpdateItems();
 	UpdateCombatTimers(dt);
 	UpdateLandmarks(dt);
+	UpdateRouteForage();
 	UpdateRouteDeer(dt);
 	UpdateGuide();
 
@@ -367,6 +375,21 @@ void Game::ActivateChunk(int cx, int cz)
 	if (state.respawnAt.size() != chunk.spawns.size()) state.respawnAt.assign(chunk.spawns.size(), 0.0f);
 	if (state.itemTaken.size() != chunk.items.size()) state.itemTaken.assign(chunk.items.size(), false);
 	if (state.swarmCleared.size() != chunk.swarms.size()) state.swarmCleared.assign(chunk.swarms.size(), false);
+	if (state.bushRegrowAt.size() != chunk.bushes.size()) state.bushRegrowAt.assign(chunk.bushes.size(), 0.0f);
+
+	for (size_t i = 0; i < chunk.bushes.size(); ++i)
+	{
+		const ChunkBush& b = chunk.bushes[i];
+		ForageActor* f = forageGroup->AddChild(new ForageActor(b.pale ? FORAGE_PALE_BERRY : FORAGE_RED_BERRY));
+		f->SetPosition(b.pos);
+		f->SetYaw(b.yaw);
+		f->SetScale(Vec3(1.1f, 1.1f, 1.1f));
+		f->phase = b.pos.x * 0.37f + b.pos.z * 0.21f;
+		f->chunkX = cx;
+		f->chunkZ = cz;
+		f->spawnIndex = (int)i;
+		f->bearing = b.bearing;
+	}
 
 	for (size_t i = 0; i < chunk.spawns.size(); ++i)
 	{
@@ -409,6 +432,13 @@ void Game::DeactivateChunk(ChunkState& state)
 	{
 		ItemActor* item = items[i];
 		if (item->spawnIndex >= 0 && item->chunkX == state.cx && item->chunkZ == state.cz) item->Destroy();
+	}
+
+	std::vector<ForageActor*> bushes;
+	SceneGraph::Collect(forageGroup, ACTOR_FORAGE, bushes);
+	for (size_t i = 0; i < bushes.size(); ++i)
+	{
+		if (bushes[i]->chunkX == state.cx && bushes[i]->chunkZ == state.cz) bushes[i]->Destroy();
 	}
 }
 
@@ -516,6 +546,64 @@ void Game::UpdateLandmarks(float dt)
 	}
 }
 
+void Game::UpdateRouteForage()
+{
+	targetForage = nullptr;
+
+	std::vector<ForageActor*> bushes;
+	SceneGraph::Collect(forageGroup, ACTOR_FORAGE, bushes);
+
+	float best = kInteractRange;
+	for (size_t i = 0; i < bushes.size(); ++i)
+	{
+		ForageActor& f = *bushes[i];
+		const ChunkState& state = chunkStates[ChunkMap::Key(f.chunkX, f.chunkZ)];
+		bool regrown = f.spawnIndex < (int)state.bushRegrowAt.size() && state.bushRegrowAt[f.spawnIndex] <= time;
+		bool fruiting = regrown && f.bearing < kBushShare[season];
+
+		f.picked = !fruiting;
+		f.model = !fruiting ? MODEL_BUSH : (f.forage == FORAGE_PALE_BERRY ? MODEL_BERRY_PALE : MODEL_BERRY_RED);
+
+		float d = DistXZ(player->Position(), f.Position());
+		if (fruiting && d < best)
+		{
+			best = d;
+			targetForage = &f;
+		}
+	}
+
+	// The lantern and the water speak first; a bush only offers itself when nothing else does.
+	if (targetForage && deathTimer < 0.0f && prompt.empty())
+		prompt = targetForage->forage == FORAGE_PALE_BERRY ? "[E]  허연 열매 살펴보기" : "[E]  빨간 열매 따기";
+	else
+		targetForage = nullptr;
+}
+
+void Game::PickRouteBush(ForageActor& bush)
+{
+	if (bush.forage == FORAGE_PALE_BERRY)
+	{
+		ShowMessage("허연 열매다. 할머니 말대로 배가 뒤틀릴 테니 그냥 둔다.", 3.0f);
+		return;
+	}
+
+	int room = kBagCapacity - BagCount();
+	if (room <= 0)
+	{
+		ShowMessage("배낭이 가득 찼다. 먼저 먹거나 마시거나 써서 비워라.", 2.5f);
+		return;
+	}
+
+	int take = room < 2 ? room : 2;
+	inventory[ITEM_BERRIES] += take;
+	ChunkState& state = chunkStates[ChunkMap::Key(bush.chunkX, bush.chunkZ)];
+	if (bush.spawnIndex < (int)state.bushRegrowAt.size()) state.bushRegrowAt[bush.spawnIndex] = time + kBushRegrow;
+
+	char buf[256];
+	sprintf_s(buf, sizeof(buf), "빨간 열매를 %d줌 땄다. 덤불은 몇 분 지나면 다시 열린다.", take);
+	ShowMessage(buf, 3.0f);
+}
+
 bool Game::NearLanternFire() const
 {
 	return inventory[ITEM_MEAT] > 0 && DistXZ(player->Position(), lantern->WorldPosition()) < 2.4f;
@@ -595,6 +683,12 @@ void Game::UpdateRouteDeer(float dt)
 void Game::TryRouteInteract()
 {
 	if (deathTimer >= 0.0f) return;
+
+	if (targetForage)
+	{
+		PickRouteBush(*targetForage);
+		return;
+	}
 
 	// The lantern's flame roasts whatever raw meat is in the bag, all at once.
 	if (NearLanternFire())

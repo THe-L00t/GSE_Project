@@ -149,6 +149,12 @@ public:
 
 	int  forage = FORAGE_RADISH;
 	bool picked = false;
+
+	// Route 32 bushes only: which chunk bush this is, and its share of the season.
+	int   chunkX = 0;
+	int   chunkZ = 0;
+	int   spawnIndex = -1;
+	float bearing = 0.0f;
 };
 
 // Its antlers glow; it walks toward a goal and, when leading, waits for the player.

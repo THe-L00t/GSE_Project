@@ -40,6 +40,16 @@ struct ChunkSpawn
 	int  guardOf = -1;    // a boar asleep beside a sleeper: index into Chunk::sleepers
 };
 
+// A berry bush that can be picked and grows its fruit back. Whether it fruits in a season is
+// decided at play time from `bearing`, so the seed keeps the same bushes all year.
+struct ChunkBush
+{
+	Vec3  pos;
+	float yaw = 0.0f;
+	bool  pale = false;     // the berries that twist your belly
+	float bearing = 0.0f;   // [0,1); fruits while below the season's share
+};
+
 // Someone who lay down by the road and did not wake. Drawn as one of the chunk's props.
 struct ChunkSleeper
 {
@@ -67,6 +77,7 @@ struct Chunk
 	std::vector<ChunkItem>  items;
 	std::vector<Vec3>       swarms;    // the cars the mites gather on
 	std::vector<ChunkSleeper> sleepers;
+	std::vector<ChunkBush>  bushes;
 };
 
 class ChunkMap

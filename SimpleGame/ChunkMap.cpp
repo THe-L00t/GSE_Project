@@ -218,6 +218,13 @@ namespace
 			h = HashInt(h, Quantise(item.pos.x));
 			h = HashInt(h, Quantise(item.pos.z));
 		}
+		for (size_t i = 0; i < c.bushes.size(); ++i)
+		{
+			const ChunkBush& b = c.bushes[i];
+			h = HashInt(h, b.pale ? 1 : 0);
+			h = HashInt(h, Quantise(b.pos.x));
+			h = HashInt(h, Quantise(b.pos.z));
+		}
 		return h;
 	}
 }
@@ -426,6 +433,19 @@ Chunk ChunkMap::Generate(int cx, int cz, uint64_t seed, int parentDir) const
 			if (FindOpenSpot(rng, c, footprints, 0.6f, false, false, item.pos))
 				c.items.push_back(item);
 		}
+	}
+
+	// Berry bushes last, so they never push the rest of the layout around. Every chunk has some:
+	// the road must be able to feed whoever walks it.
+	int bushCount = rng.RangeInt(1, 3);
+	for (int i = 0; i < bushCount; ++i)
+	{
+		ChunkBush bush;
+		if (!FindOpenSpot(rng, c, footprints, 0.9f, true, origin, bush.pos)) continue;
+		bush.yaw = rng.Range(0.0f, 2.0f * kPi);
+		bush.pale = rng.Chance(0.25f);
+		bush.bearing = rng.Unit();
+		c.bushes.push_back(bush);
 	}
 
 	c.hash = HashChunk(c);
