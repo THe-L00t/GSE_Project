@@ -16,6 +16,7 @@ uniform vec2      u_Direction;      // blur step in UV
 uniform float     u_BloomStrength;
 uniform float     u_SporeExposure;
 uniform float     u_Time;
+uniform float     u_Dream;          // a dream fragment playing
 
 layout(location = 0) out vec4 FragColor;
 
@@ -66,12 +67,16 @@ vec3 ToneMap(vec3 c)
 
 vec3 Composite(vec2 uv)
 {
+	// In a dream the picture wavers, like air over a summer road.
+	if (u_Dream > 0.002)
+		uv += vec2(sin(uv.y * 22.0 + u_Time * 1.7), cos(uv.x * 18.0 + u_Time * 1.3)) * 0.0025 * u_Dream;
+
 	vec3 c = texture(u_Source, uv).rgb;
 
-	// Heavy spore exposure blurs the edges of sight and lets the colours slip apart.
+	// Heavy spore exposure blurs the edges of sight and lets the colours slip apart; a dream melts them the same way.
 	vec2 fromCenter = uv - vec2(0.5);
 	float edge = smoothstep(0.18, 0.72, length(fromCenter * vec2(1.15, 1.0)));
-	float amount = edge * smoothstep(0.10, 0.90, u_SporeExposure);
+	float amount = edge * max(smoothstep(0.10, 0.90, u_SporeExposure), u_Dream * 0.9);
 	if (amount > 0.002)
 	{
 		float radius = amount * 7.0;
@@ -91,6 +96,14 @@ vec3 Composite(vec2 uv)
 		c = mix(c, acc, amount);
 		c.r = mix(c.r, red, amount * 0.7);
 		c.b = mix(c.b, blue, amount * 0.7);
+	}
+
+	// Remembered colour: faded toward a warm sepia and lifted, an old photograph left in the sun.
+	if (u_Dream > 0.002)
+	{
+		float luma = dot(c, vec3(0.299, 0.587, 0.114));
+		vec3 warm = luma * vec3(1.15, 0.98, 0.78) + vec3(0.05, 0.035, 0.01);
+		c = mix(c, warm, u_Dream * 0.65);
 	}
 
 	c += texture(u_Bloom, uv).rgb * u_BloomStrength;

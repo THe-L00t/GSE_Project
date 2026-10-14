@@ -70,6 +70,7 @@ void Game::Update(float dt, const bool* keys)
 		UpdateRoute(dt, keys);
 
 	UpdateSurvival(dt);
+	UpdateScreenFx(dt);
 	UpdateCamera(dt);
 	scene.RemoveDestroyed();
 }
@@ -276,6 +277,7 @@ void Game::Render()
 	wp.driftX = windDriftX;
 	wp.driftZ = windDriftZ;
 	renderer->SetWeather(wp);
+	renderer->SetScreenFx(screenFx);
 	camera->Apply(renderer);
 
 	if (level == LEVEL_ROUTE) PrepareChunkView();

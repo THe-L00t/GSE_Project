@@ -311,6 +311,9 @@ private:
 	float WindAgainst(const Vec3& moveDir) const;   // [-1,1], positive when walking into the wind
 	void DrawWeatherHud();
 
+	// GameFx.cpp: screen moods that follow the story and the body
+	void UpdateScreenFx(float dt);
+
 	Renderer* renderer = nullptr;
 	int   level = LEVEL_VILLAGE;
 	float levelTimer = 0.0f;      // seconds since the current level began
@@ -440,6 +443,8 @@ private:
 	float snowCover = 0.0f;       // [0,1] snow lying on the ground
 	float wetness = 0.0f;         // [0,1] rain soaked into the ground
 	float seasonWeight[SEASON_COUNT] = { 1.0f, 0.0f, 0.0f, 0.0f };   // eases between seasons
+
+	ScreenFx screenFx;
 
 	PerfStats perf;
 	bool  optionsOpen = false;

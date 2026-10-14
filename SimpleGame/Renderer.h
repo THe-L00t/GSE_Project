@@ -44,6 +44,12 @@ struct WeatherParams
 	float driftZ = 0.0f;
 };
 
+// Full-screen moods, composited in Post.fs before tone mapping.
+struct ScreenFx
+{
+	float dream = 0.0f;       // [0,1] a dream fragment playing: warm, faded, the edges melting
+};
+
 // Graphics options; ApplySettings rebuilds only what a change touches.
 struct RenderSettings
 {
@@ -102,6 +108,7 @@ public:
 	void SetCamera(const Mat4& view, const Mat4& proj, const Vec3& eye, float pxPerUnit);
 	void SetFrame(float dayTime, float exposure, const Vec3& fogCenter, float seconds);
 	void SetWeather(const WeatherParams& params) { weather = params; }
+	void SetScreenFx(const ScreenFx& fx) { screenFx = fx; }
 
 	// Point lights for the lit shader; the first kMaxLights added each frame are kept.
 	void ClearLights();
@@ -236,6 +243,7 @@ private:
 		GLint time = -1;
 		GLint volume = -1;
 		GLint volumeOn = -1;
+		GLint dream = -1;
 		GLint positionAttrib = -1;
 	};
 
@@ -382,6 +390,7 @@ private:
 	float sporeExposure = 0.0f;
 	float time = 0.0f;
 	WeatherParams weather;
+	ScreenFx screenFx;
 	bool  torchOn = false;
 	Vec3  torchPos;
 	Vec3  torchDir{ 0.0f, 0.0f, 1.0f };

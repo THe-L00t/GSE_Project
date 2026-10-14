@@ -490,6 +490,7 @@ void Renderer::CacheUniformLocations()
 	post.positionAttrib = glGetAttribLocation(postShader, "a_Position");
 	post.volume = glGetUniformLocation(postShader, "u_Volume");
 	post.volumeOn = glGetUniformLocation(postShader, "u_VolumeOn");
+	post.dream = glGetUniformLocation(postShader, "u_Dream");
 
 	volume.invViewProj = glGetUniformLocation(volumeShader, "u_InvViewProj");
 	volume.lightViewProj = glGetUniformLocation(volumeShader, "u_LightViewProj");
@@ -733,6 +734,7 @@ void Renderer::EndScene()
 	glUniform1f(post.bloomStrength, 0.65f);
 	glUniform1f(post.sporeExposure, sporeExposure);
 	glUniform1f(post.time, time);
+	glUniform1f(post.dream, screenFx.dream);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vboScreen);
 	glEnableVertexAttribArray(post.positionAttrib);

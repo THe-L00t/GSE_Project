@@ -189,6 +189,7 @@
     <ClCompile Include="GameRoute.cpp" />
     <ClCompile Include="GameSurvival.cpp" />
     <ClCompile Include="GameVillage.cpp" />
+    <ClCompile Include="GameFx.cpp" />
     <ClCompile Include="GameOptions.cpp" />
     <ClCompile Include="GameWeather.cpp" />
     <ClCompile Include="Mesh.cpp" />
