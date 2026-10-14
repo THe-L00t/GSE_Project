@@ -308,7 +308,7 @@ void Game::UpdateVillage(float dt, const bool* keys)
 	else
 	{
 		// Nature Insight slows exposure; the water's edge clears it.
-		float rate = 0.028f * NatureGuard(natureInsight);
+		float rate = 0.0196f * NatureGuard(natureInsight);
 		if (water->ShoreDistance(player->Position()) < water->clearRange) rate = -0.075f;
 
 		// Rolling holds your breath.

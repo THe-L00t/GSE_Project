@@ -155,7 +155,7 @@ void Game::UpdateRoute(float dt, const bool* keys)
 
 	// Deeper, more overgrown chunks carry thicker spores. Nature Insight slows it; thirst speeds it up.
 	const ChunkActor* here = EnsureChunk(playerChunkX, playerChunkZ);
-	float rate = 0.012f * (float)here->stage * NatureGuard(natureInsight) * (waterMeter <= 0.0f ? 1.6f : 1.0f);
+	float rate = 0.0084f * (float)here->stage * NatureGuard(natureInsight) * (waterMeter <= 0.0f ? 1.6f : 1.0f);
 	if (player->rollTimer > 0.0f) rate = 0.0f;
 
 	// Rain washes the spores out of the air, and a gale scatters them.
