@@ -366,11 +366,24 @@ void Game::ActivateChunk(int cx, int cz)
 	state.cz = cz;
 	if (state.respawnAt.size() != chunk.spawns.size()) state.respawnAt.assign(chunk.spawns.size(), 0.0f);
 	if (state.itemTaken.size() != chunk.items.size()) state.itemTaken.assign(chunk.items.size(), false);
+	if (state.swarmCleared.size() != chunk.swarms.size()) state.swarmCleared.assign(chunk.swarms.size(), false);
 
 	for (size_t i = 0; i < chunk.spawns.size(); ++i)
 	{
 		if (state.respawnAt[i] > time) continue;
-		SpawnEnemy(chunk.spawns[i].enemyType, chunk.spawns[i].level, chunk.spawns[i].pos, cx, cz, (int)i);
+		const ChunkSpawn& spawn = chunk.spawns[i];
+		EnemyActor* e = SpawnEnemy(spawn.enemyType, spawn.level, spawn.pos, cx, cz, (int)i);
+		e->swarm = spawn.swarm;
+		if (spawn.guardOf >= 0)
+		{
+			// The watcher lies still beside the one it keeps, facing them.
+			const Vec3& keep = chunk.sleepers[spawn.guardOf].pos;
+			e->guarding = true;
+			e->guardPos = keep;
+			e->holdsPlace = true;
+			e->homeYaw = atan2f(keep.x - spawn.pos.x, keep.z - spawn.pos.z);
+			e->SetYaw(e->homeYaw);
+		}
 	}
 
 	for (size_t i = 0; i < chunk.items.size(); ++i)

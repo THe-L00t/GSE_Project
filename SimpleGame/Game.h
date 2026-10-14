@@ -113,6 +113,7 @@ struct ChunkState
 	int   cz = 0;
 	std::vector<float> respawnAt;   // game time when each spawn may appear again
 	std::vector<bool>  itemTaken;
+	std::vector<bool>  swarmCleared;   // a car's mites driven off once leaves its find behind for good
 };
 
 class Game

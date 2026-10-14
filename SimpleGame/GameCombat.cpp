@@ -17,6 +17,7 @@ namespace
 	const float kRespawnDelay = 90.0f;
 	const float kHerbHeal = 0.4f;        // fraction of max health
 	const float kLoreRange = 9.0f;
+	const float kGuardRange = 3.5f;      // how close to a sleeper wakes the boar beside them
 
 	const Vec3 kXpColor(0.75f, 0.95f, 0.55f);
 	const Vec3 kHurtColor(1.0f, 0.45f, 0.40f);
@@ -127,6 +128,29 @@ void Game::KillEnemy(EnemyActor& e)
 		ChunkState& state = chunkStates[ChunkMap::Key(e.chunkX, e.chunkZ)];
 		if (e.spawnIndex < (int)state.respawnAt.size())
 			state.respawnAt[e.spawnIndex] = time + kRespawnDelay;
+	}
+
+	// The last mite off a car lays open what it was crowding: something left inside.
+	if (e.swarm >= 0 && e.spawnIndex >= 0)
+	{
+		ChunkState& state = chunkStates[ChunkMap::Key(e.chunkX, e.chunkZ)];
+		bool others = false;
+		std::vector<EnemyActor*> enemies = LiveEnemies();
+		for (size_t i = 0; i < enemies.size() && !others; ++i)
+		{
+			const EnemyActor& o = *enemies[i];
+			others = o.alive && o.swarm == e.swarm && o.chunkX == e.chunkX && o.chunkZ == e.chunkZ;
+		}
+
+		if (!others && e.swarm < (int)state.swarmCleared.size() && !state.swarmCleared[e.swarm])
+		{
+			state.swarmCleared[e.swarm] = true;
+			const Vec3& car = routeMap.Get(e.chunkX, e.chunkZ).swarms[e.swarm];
+			float roll = combatRng.Unit();
+			int type = roll < 0.4f ? ITEM_RELIC : (roll < 0.7f ? ITEM_CLEAN_WATER : ITEM_HERB);
+			DropItem(type, car + Vec3(0.0f, 0.0f, -1.7f), 0, 0, -1);
+			ShowMessage("진드기를 다 치우자 차 안의 물건이 보인다.", 3.5f);
+		}
 	}
 
 	float find = FindScale(stats);
@@ -275,10 +299,11 @@ void Game::UpdateEnemy(EnemyActor& e, float dt)
 			}
 			MoveToward(pos, yaw, e.moveTarget, speed * 0.35f, dt);
 		}
-		if (playerAwake && dist < info.aggroRange)
+		if (playerAwake && (dist < info.aggroRange || (e.guarding && DistXZ(player->Position(), e.guardPos) < kGuardRange)))
 		{
 			e.state = ENEMY_CHASE;
 			e.provoked = true;
+			if (e.guarding) ShowMessage("잠든 이 곁의 멧돼지가 깨어난다! 지키던 잠에 다가온 것을 쫓아낸다.", 3.5f);
 		}
 		break;
 

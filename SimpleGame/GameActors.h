@@ -227,6 +227,9 @@ public:
 	int   chunkX = 0;
 	int   chunkZ = 0;
 	int   spawnIndex = -1;  // index into the owning chunk's spawns, -1 when scripted
+	int   swarm = -1;       // index into the owning chunk's swarms
+	bool  guarding = false; // wakes when anyone comes near guardPos, not only near itself
+	Vec3  guardPos;
 };
 
 class ItemActor : public Actor

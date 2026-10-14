@@ -36,6 +36,15 @@ struct ChunkSpawn
 	int  enemyType = 0;
 	int  level = 1;
 	Vec3 pos;
+	int  swarm = -1;      // mites crowding a car: index into Chunk::swarms
+	int  guardOf = -1;    // a boar asleep beside a sleeper: index into Chunk::sleepers
+};
+
+// Someone who lay down by the road and did not wake. Drawn as one of the chunk's props.
+struct ChunkSleeper
+{
+	Vec3  pos;
+	float yaw = 0.0f;
 };
 
 struct ChunkItem
@@ -56,6 +65,8 @@ struct Chunk
 	std::vector<ChunkProp>  props;
 	std::vector<ChunkSpawn> spawns;
 	std::vector<ChunkItem>  items;
+	std::vector<Vec3>       swarms;    // the cars the mites gather on
+	std::vector<ChunkSleeper> sleepers;
 };
 
 class ChunkMap

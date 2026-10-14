@@ -208,6 +208,8 @@ namespace
 			h = HashInt(h, s.level);
 			h = HashInt(h, Quantise(s.pos.x));
 			h = HashInt(h, Quantise(s.pos.z));
+			h = HashInt(h, s.swarm);
+			h = HashInt(h, s.guardOf);
 		}
 		for (size_t i = 0; i < c.items.size(); ++i)
 		{
@@ -372,6 +374,47 @@ Chunk ChunkMap::Generate(int cx, int cz, uint64_t seed, int parentDir) const
 			spawn.enemyType = type;
 			spawn.level = 1 + ring / 2 + (rng.Chance(0.3f) ? 1 : 0);
 			c.spawns.push_back(spawn);
+		}
+
+		// Mites gather on what the old world left full of memory: an abandoned car draws a swarm.
+		if (ring >= 2)
+		{
+			size_t propCount = c.props.size();
+			for (size_t j = 0; j < propCount; ++j)
+			{
+				if (c.props[j].model != MODEL_CAR || !rng.Chance(0.7f)) continue;
+
+				int swarm = (int)c.swarms.size();
+				c.swarms.push_back(c.props[j].pos);
+				int mites = 2 + rng.RangeInt(0, 1);
+				for (int k = 0; k < mites; ++k)
+				{
+					float angle = (float)k * 2.1f + rng.Range(0.0f, 1.0f);
+					ChunkSpawn spawn;
+					spawn.enemyType = ENEMY_SPORE_MITE;
+					spawn.level = 1 + ring / 2;
+					spawn.pos = c.props[j].pos + Vec3(sinf(angle) * 2.2f, 0.0f, cosf(angle) * 2.2f);
+					spawn.swarm = swarm;
+					c.spawns.push_back(spawn);
+				}
+			}
+
+			// Now and then a sleeper by the road, and a boar asleep at their side, keeping watch.
+			ChunkSleeper sleeper;
+			if (rng.Chance(0.3f) && FindOpenSpot(rng, c, footprints, 1.6f, true, false, sleeper.pos))
+			{
+				sleeper.yaw = rng.Range(0.0f, 2.0f * kPi);
+				int index = (int)c.sleepers.size();
+				c.sleepers.push_back(sleeper);
+				AddFixedProp(c, footprints, MODEL_SLEEPER, sleeper.pos, sleeper.yaw, 1.0f, 0.0f);
+
+				ChunkSpawn guard;
+				guard.enemyType = ENEMY_MOSS_BOAR;
+				guard.level = 1 + ring / 2;
+				guard.pos = sleeper.pos + Vec3(sinf(sleeper.yaw + 1.6f) * 1.8f, 0.0f, cosf(sleeper.yaw + 1.6f) * 1.8f);
+				guard.guardOf = index;
+				c.spawns.push_back(guard);
+			}
 		}
 
 		if (rng.Chance(0.55f))
