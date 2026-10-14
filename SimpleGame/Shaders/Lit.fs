@@ -186,9 +186,11 @@ void main()
 	{
 		float r = length(v_Local.xz) * 2.0;
 		// With real shadows the blob only needs to add a soft contact darkening.
-		float strength = mix(0.38, 0.22, u_ShadowOn);
-		float alpha = (1.0 - smoothstep(0.3, 1.0, r)) * strength * (1.0 - fog);
-		FragColor = vec4(0.0, 0.0, 0.0, alpha);
+		// Footprints use the same disc, with their own colour and strength and a firmer edge.
+		bool print = v_Emissive > 0.0;
+		float strength = print ? v_Emissive : mix(0.38, 0.22, u_ShadowOn);
+		float alpha = (1.0 - smoothstep(print ? 0.55 : 0.3, 1.0, r)) * strength * (1.0 - fog);
+		FragColor = vec4(print ? v_Tint : vec3(0.0), alpha);
 		return;
 	}
 

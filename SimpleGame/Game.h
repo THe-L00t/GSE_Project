@@ -150,6 +150,16 @@ struct Wisp
 	float maxLife = 1.0f;
 };
 
+// Pressed into snow or wet ground, fading over a while.
+struct Footprint
+{
+	Vec3  pos;
+	float yaw = 0.0f;
+	float born = 0.0f;
+	float strength = 0.0f;
+	Vec3  color;
+};
+
 // What has happened to a generated chunk's creatures and finds since it was first visited.
 struct ChunkState
 {
@@ -311,8 +321,10 @@ private:
 	float WindAgainst(const Vec3& moveDir) const;   // [-1,1], positive when walking into the wind
 	void DrawWeatherHud();
 
-	// GameFx.cpp: screen moods that follow the story and the body
+	// GameFx.cpp: screen moods that follow the story and the body, and the marks left on the ground
 	void UpdateScreenFx(float dt);
+	void UpdateFootprints();
+	void DrawFootprints();
 
 	Renderer* renderer = nullptr;
 	int   level = LEVEL_VILLAGE;
@@ -445,6 +457,9 @@ private:
 	float seasonWeight[SEASON_COUNT] = { 1.0f, 0.0f, 0.0f, 0.0f };   // eases between seasons
 
 	ScreenFx screenFx;
+	std::vector<Footprint> footprints;
+	Vec3  lastPrintPos;
+	bool  printLeft = false;
 
 	PerfStats perf;
 	bool  optionsOpen = false;

@@ -108,6 +108,7 @@ void Game::StartRoute()
 	chunkStates.clear();
 	popups.clear();
 	wisps.clear();
+	footprints.clear();
 
 	player->SetPosition(safePoint->Position());
 	player->SetYaw(0.0f);

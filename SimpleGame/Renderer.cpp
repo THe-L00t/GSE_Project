@@ -1027,6 +1027,22 @@ void Renderer::DrawShadow(const Vec3& pos, float radius)
 	discQueue.push_back(instance);
 }
 
+void Renderer::DrawDecal(const Vec3& pos, float yaw, float sizeX, float sizeZ, const Vec3& color, float strength)
+{
+	if (shadowPass || MODEL_SHADOW >= (int)meshes.size() || strength <= 0.001f) return;
+
+	Mat4 model = Mul(Mul(MatTranslate(Vec3(pos.x, 0.0f, pos.z)), MatRotateY(yaw)), MatScale(Vec3(sizeX, 1.0f, sizeZ)));
+
+	// Rides the blob shadow queue; a non-zero emissive tells Lit.fs it is a decal.
+	Instance instance = {};
+	for (int i = 0; i < 16; ++i) instance.model[i] = model.m[i];
+	instance.tint[0] = color.x;
+	instance.tint[1] = color.y;
+	instance.tint[2] = color.z;
+	instance.emissive = strength;
+	discQueue.push_back(instance);
+}
+
 void Renderer::FlushModels()
 {
 	// Pack every queued instance into one buffer; each mesh then draws its run in one call.
