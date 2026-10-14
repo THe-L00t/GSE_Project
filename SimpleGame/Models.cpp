@@ -110,6 +110,26 @@ namespace
 	}
 }
 
+OccluderSize ModelOccluder(int id)
+{
+	// Canopy or roof reach and top height, rounded up from the recipes below.
+	switch (id)
+	{
+	case MODEL_TREE:     return { 2.0f, 5.6f };
+	case MODEL_PINE:     return { 1.6f, 5.2f };
+	case MODEL_GINKGO:   return { 2.6f, 8.0f };
+	case MODEL_HOUSE_A:
+	case MODEL_HOUSE_B:  return { 0.75f, 1.7f };
+	case MODEL_SHED:     return { 0.8f, 1.6f };
+	case MODEL_BUS_STOP: return { 1.7f, 2.6f };
+	case MODEL_CAR:      return { 2.0f, 1.5f };
+	case MODEL_TRUCK:    return { 2.3f, 2.0f };
+	case MODEL_ROCK:     return { 0.9f, 1.0f };
+	case MODEL_RUIN:     return { 1.8f, 1.9f };
+	default:             return { 0.0f, 0.0f };
+	}
+}
+
 const char* ModelName(int id)
 {
 	static_assert(sizeof(kModelNames) / sizeof(kModelNames[0]) == MODEL_COUNT, "model name table out of sync with ModelId");

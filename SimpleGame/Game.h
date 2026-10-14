@@ -324,6 +324,7 @@ private:
 	// GameFx.cpp: screen moods that follow the story and the body, and the marks left on the ground
 	void UpdateScreenFx(float dt);
 	Vec3 ShakeOffset() const;
+	bool PlayerHidden() const;   // a tree, roof or car stands between the eye and the player
 	void UpdateFootprints();
 	void DrawFootprints();
 
@@ -460,6 +461,7 @@ private:
 	ScreenFx screenFx;
 	float hurtFlash = 0.0f;       // [0,1] the red at the edges from the last blow, fading
 	float shake = 0.0f;           // [0,1] camera shake from the last blow
+	float cutaway = 0.0f;         // [0,1] how open the view through occluders is
 	std::vector<Footprint> footprints;
 	Vec3  lastPrintPos;
 	bool  printLeft = false;

@@ -10,7 +10,7 @@ layout(location = 2) in vec3  a_Color;
 layout(location = 3) in float a_Anim;
 layout(location = 4) in mat4  i_Model;
 layout(location = 8) in vec4  i_TintEmissive;
-layout(location = 9) in vec3  i_PhaseFlash;   // phase, flash, dissolve
+layout(location = 9) in vec4  i_PhaseFlash;   // phase, flash, dissolve, cutaway
 
 uniform mat4  u_ViewProj;
 uniform mat4  u_Model;
@@ -25,6 +25,7 @@ out vec3  v_Tint;
 out float v_Emissive;
 out float v_Flash;
 out float v_Dissolve;
+out float v_Cutaway;
 
 const int ANIM_BREATHE = 1;
 const int ANIM_SWAY = 2;
@@ -90,6 +91,7 @@ void main()
 	v_Emissive = i_TintEmissive.a;
 	v_Flash = i_PhaseFlash.y;
 	v_Dissolve = i_PhaseFlash.z;
+	v_Cutaway = i_PhaseFlash.w;
 	v_Local = a_Position;
 	gl_Position = u_ViewProj * world;
 }

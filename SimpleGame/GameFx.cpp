@@ -3,6 +3,8 @@
 
 #include <algorithm>
 
+#include "Models.h"
+
 namespace
 {
 	// Meter values where the screen starts to show the body: frost a little before the shiver message,
@@ -17,6 +19,8 @@ namespace
 	const Vec3 kVillageGrade(1.00f, 1.00f, 1.00f);
 	const Vec3 kRouteGrade(0.97f, 1.00f, 1.03f);
 	const Vec3 kTownGrade(1.06f, 1.00f, 0.86f);
+
+	const float kCutawayFade = 0.2f;      // seconds for the view through a tree to open or close
 
 	const int   kMaxFootprints = 64;
 	const float kStride = 0.62f;          // ground covered between two prints
@@ -61,6 +65,37 @@ void Game::UpdateScreenFx(float dt)
 	screenFx.grade.x = Approach(screenFx.grade.x, grade.x, 0.8f, dt);
 	screenFx.grade.y = Approach(screenFx.grade.y, grade.y, 0.8f, dt);
 	screenFx.grade.z = Approach(screenFx.grade.z, grade.z, 0.8f, dt);
+
+	// Open a view through whatever stands between the eye and the player, and close it again once clear.
+	bool hidden = deathTimer < 0.0f && PlayerHidden();
+	cutaway = hidden ? Minf(cutaway + dt / kCutawayFade, 1.0f) : Maxf(cutaway - dt / kCutawayFade, 0.0f);
+}
+
+bool Game::PlayerHidden() const
+{
+	// An object of height H standing s in front of the player, toward the eye, covers them on screen once
+	// H reaches s * tan(elevation); sideways it has to overlap the player's width.
+	Vec3 toEye(sinf(camera->Yaw()), 0.0f, cosf(camera->Yaw()));
+	float lift = tanf(camera->elevation);
+	Vec3 pos = player->Position();
+
+	std::vector<PropActor*> props;
+	SceneGraph::Collect(scene.Root(), ACTOR_PROP, props);
+	for (size_t i = 0; i < props.size(); ++i)
+	{
+		OccluderSize o = ModelOccluder(props[i]->model);
+		if (o.radius <= 0.0f) continue;
+
+		const Vec3& s = props[i]->Scale();
+		float reach = o.radius * Maxf(s.x, s.z);
+		Vec3 d = props[i]->WorldPosition() - pos;
+		float ahead = d.x * toEye.x + d.z * toEye.z;
+		float side = fabsf(d.x * toEye.z - d.z * toEye.x);
+		if (side > reach + 0.5f) continue;
+		if (ahead < -reach * 0.5f || ahead > o.height * s.y / lift + reach) continue;
+		return true;
+	}
+	return false;
 }
 
 Vec3 Game::ShakeOffset() const

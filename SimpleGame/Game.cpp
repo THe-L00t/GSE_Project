@@ -279,6 +279,7 @@ void Game::Render()
 	wp.driftZ = windDriftZ;
 	renderer->SetWeather(wp);
 	renderer->SetScreenFx(screenFx);
+	renderer->SetCutaway(player->Position(), cutaway);
 
 	// Only the view shakes; the fog and the light gathering keep the steady position.
 	camera->SetPosition(view + ShakeOffset());

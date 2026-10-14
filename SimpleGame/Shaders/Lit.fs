@@ -13,6 +13,7 @@ in vec3  v_Tint;
 in float v_Emissive;
 in float v_Flash;
 in float v_Dissolve;
+in float v_Cutaway;
 
 uniform int   u_Mode;
 uniform vec3  u_FogOrigin;      // camera target; fog thickens away from it
@@ -35,6 +36,8 @@ uniform vec3  u_LightColor[kMaxLights];
 const int kMaxGlows = 12;
 uniform int   u_GlowCount;
 uniform vec4  u_GlowPos[kMaxGlows];
+
+uniform vec4  u_Cutaway;        // player's feet xyz, w how open the view through occluders is
 
 uniform vec4  u_TorchPos;       // xyz, w = 1 while the torch is lit
 uniform vec3  u_TorchDir;
@@ -144,6 +147,41 @@ vec3 PointLights(vec3 pos, vec3 n)
 	return sum;
 }
 
+const float kCutRadius = 1.6;   // the player and a little of the ground around them
+
+float CapsuleSdf(vec3 p, vec3 a, vec3 b, float radius)
+{
+	vec3 pa = p - a;
+	vec3 ba = b - a;
+	float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+	return length(pa - ba * h) - radius;
+}
+
+// Sphere-traces a capsule around the player from this fragment, away from the eye. Reaching it means the
+// fragment stands between the eye and the player; the closest pass of the ray gives a soft edge.
+// The view is orthographic, so every ray runs the same way and the hole is a cylinder.
+float CutawayMask(vec3 pos)
+{
+	vec3 toEye = normalize(u_CamPos - u_FogOrigin);
+	vec3 a = u_Cutaway.xyz + vec3(0.0, 0.3, 0.0);
+	vec3 b = u_Cutaway.xyz + vec3(0.0, 1.7, 0.0);
+
+	// Only what is nearer the eye than the player can hide them.
+	if (dot(pos - (a + b) * 0.5, toEye) < 0.2) return 0.0;
+
+	float t = 0.0;
+	float closest = 1e3;
+	for (int i = 0; i < 32; ++i)
+	{
+		float d = CapsuleSdf(pos - toEye * t, a, b, kCutRadius);
+		closest = min(closest, d);
+		if (d < 0.01) break;
+		t += max(d * 0.8, 0.05);
+		if (t > 40.0) break;
+	}
+	return 1.0 - smoothstep(0.0, 0.45, closest);
+}
+
 // Each firefly leaves a small yellow-green pool of light on whatever is just below it.
 vec3 FireflyGlow(vec3 pos)
 {
@@ -203,6 +241,16 @@ void main()
 		float gone = v_Dissolve * 1.02;
 		if (cut < gone) discard;
 		release = 1.0 - smoothstep(0.0, 0.08, cut - gone);
+	}
+
+	// A tree or roof in front of the player opens up; dithered, so the hole thins out at its edge instead of
+	// ending on a hard line, and what is left of the edge picks up a faint spore light.
+	float seeRim = 0.0;
+	if (u_Mode == 0 && v_Cutaway > 0.5 && u_Cutaway.w > 0.001)
+	{
+		float opening = CutawayMask(v_WorldPos) * u_Cutaway.w;
+		if (opening > hash21(gl_FragCoord.xy)) discard;
+		seeRim = opening;
 	}
 
 	vec3 n = normalize(v_Normal);
@@ -377,7 +425,7 @@ void main()
 	// Muted palette: only spores and light are allowed to be saturated.
 	float luma = dot(color, vec3(0.299, 0.587, 0.114));
 	color = mix(vec3(luma), color, env.saturation);
-	color += vec3(0.55, 0.95, 0.80) * release * 2.2;
+	color += vec3(0.55, 0.95, 0.80) * (release * 2.2 + seeRim * 0.25);
 
 	color = mix(color, env.fogColor, fog);
 

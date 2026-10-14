@@ -52,6 +52,15 @@ enum ModelId
 	MODEL_COUNT
 };
 
+// How far a model reaches around and above its origin, in its own units, when it could hide the player.
+// Zero for models that are never cut away to show what stands behind them.
+struct OccluderSize
+{
+	float radius;
+	float height;
+};
+OccluderSize ModelOccluder(int id);
+
 const char* ModelName(int id);
 ModelRecipe BuildRecipe(int id);
 

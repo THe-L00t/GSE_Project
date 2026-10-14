@@ -453,6 +453,7 @@ void Renderer::CacheUniformLocations()
 	lit.torchDir = glGetUniformLocation(litShader, "u_TorchDir");
 	lit.glowCount = glGetUniformLocation(litShader, "u_GlowCount");
 	lit.glowPos = glGetUniformLocation(litShader, "u_GlowPos");
+	lit.cutaway = glGetUniformLocation(litShader, "u_Cutaway");
 
 	shadow.viewProj = glGetUniformLocation(shadowShader, "u_ViewProj");
 	shadow.model = glGetUniformLocation(shadowShader, "u_Model");
@@ -858,6 +859,12 @@ void Renderer::SetTorch(bool on, const Vec3& pos, const Vec3& dir)
 	torchDir = dir;
 }
 
+void Renderer::SetCutaway(const Vec3& playerPos, float strength)
+{
+	cutawayPos = playerPos;
+	cutawayStrength = strength;
+}
+
 int Renderer::TakeDrawCalls()
 {
 	int count = drawCalls;
@@ -943,6 +950,7 @@ void Renderer::BindLit(const Mat4& model, int mode)
 	UploadWeather(lit.season, lit.weather);
 	glUniform4f(lit.torchPos, torchPos.x, torchPos.y, torchPos.z, torchOn ? 1.0f : 0.0f);
 	glUniform3f(lit.torchDir, torchDir.x, torchDir.y, torchDir.z);
+	glUniform4f(lit.cutaway, cutawayPos.x, cutawayPos.y, cutawayPos.z, cutawayStrength);
 
 	// Uniforms stay with the program, so the light list goes up once per change.
 	if (lightsDirty)
@@ -1010,6 +1018,7 @@ void Renderer::DrawModel(int id, const Mat4& model, const DrawParams& params)
 	instance.phase = params.phase;
 	instance.flash = params.flash;
 	instance.dissolve = params.dissolve;
+	instance.cutaway = ModelOccluder(id).radius > 0.0f ? 1.0f : 0.0f;
 	modelQueue[id].push_back(instance);
 }
 
@@ -1126,7 +1135,7 @@ void Renderer::DrawInstances(int mesh, int start, int count)
 	for (int c = 0; c < 4; ++c)
 		glVertexAttribPointer(4 + c, 4, GL_FLOAT, GL_FALSE, stride, (void*)(base + sizeof(float) * 4 * c));
 	glVertexAttribPointer(8, 4, GL_FLOAT, GL_FALSE, stride, (void*)(base + sizeof(float) * 16));
-	glVertexAttribPointer(9, 3, GL_FLOAT, GL_FALSE, stride, (void*)(base + sizeof(float) * 20));
+	glVertexAttribPointer(9, 4, GL_FLOAT, GL_FALSE, stride, (void*)(base + sizeof(float) * 20));
 
 	glDrawArraysInstanced(GL_TRIANGLES, 0, meshes[mesh].count, count);
 	++drawCalls;

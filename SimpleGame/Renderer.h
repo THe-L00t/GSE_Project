@@ -121,6 +121,10 @@ public:
 	// The hand torch is a spotlight of its own, lit in Lit.fs and scattered in the light-shaft pass.
 	void SetTorch(bool on, const Vec3& pos, const Vec3& dir);
 
+	// Trees, roofs and cars in front of the player are cut open in a cylinder along the view, ray-marched
+	// in Lit.fs. Strength 0 turns it off.
+	void SetCutaway(const Vec3& playerPos, float strength);
+
 	// Models and blob shadows are queued and drawn one call per mesh when the pass ends.
 	void DrawModel(int id, const Mat4& model, const DrawParams& params);
 	void DrawModel(int id, const Vec3& pos, float yaw, const Vec3& scale, const DrawParams& params);
@@ -166,6 +170,7 @@ private:
 		float phase;
 		float flash;
 		float dissolve;
+		float cutaway;    // 1 for models that open up when they hide the player
 	};
 
 	struct LitLocations
@@ -196,6 +201,7 @@ private:
 		GLint torchDir = -1;
 		GLint glowCount = -1;
 		GLint glowPos = -1;
+		GLint cutaway = -1;
 	};
 
 	struct ShadowLocations
@@ -409,6 +415,8 @@ private:
 	bool  torchOn = false;
 	Vec3  torchPos;
 	Vec3  torchDir{ 0.0f, 0.0f, 1.0f };
+	Vec3  cutawayPos;
+	float cutawayStrength = 0.0f;
 
 	// Quarter-resolution light shafts, beside the bloom buffers; [1] is the blur scratch.
 	GLuint volumeFbo[2] = { 0, 0 };
