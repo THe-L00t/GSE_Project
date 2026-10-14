@@ -366,6 +366,8 @@ private:
 	float snowLevel = 0.0f;
 	float windLevel = 0.0f;
 	float windAngle = 0.0f;       // direction the wind blows toward, on the XZ plane
+	float windDriftX = 0.0f;      // how far the wind has carried the air, for the particles
+	float windDriftZ = 0.0f;
 	float snowCover = 0.0f;       // [0,1] snow lying on the ground
 	float wetness = 0.0f;         // [0,1] rain soaked into the ground
 	float seasonWeight[SEASON_COUNT] = { 1.0f, 0.0f, 0.0f, 0.0f };   // eases between seasons

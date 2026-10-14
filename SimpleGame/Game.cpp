@@ -258,7 +258,8 @@ void Game::Render()
 	wp.snow = snowLevel;
 	wp.wind = windLevel;
 	wp.wetness = wetness;
-	wp.windAngle = windAngle;
+	wp.driftX = windDriftX;
+	wp.driftZ = windDriftZ;
 	renderer->SetWeather(wp);
 	camera->Apply(renderer);
 
@@ -278,6 +279,7 @@ void Game::Render()
 	renderer->DrawSpores(Vec3(view.x, 0.0f, view.z), Vec3(70.0f, 16.0f, 70.0f),
 						 Vec3(0.55f, 0.95f, 0.80f), sporeVisual * (1.0f - 0.5f * rainLevel), 0.13f);
 	renderer->DrawAmbientMotes(Vec3(view.x, 0.0f, view.z));
+	renderer->DrawWeather(Vec3(view.x, 0.0f, view.z));
 
 	renderer->EndScene();
 	renderer->BeginUI();

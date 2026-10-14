@@ -384,7 +384,7 @@ void Renderer::CacheUniformLocations()
 	particle.style = glGetUniformLocation(particleShader, "u_Style");
 	particle.season = glGetUniformLocation(particleShader, "u_Season");
 	particle.weather = glGetUniformLocation(particleShader, "u_Weather");
-	particle.windDir = glGetUniformLocation(particleShader, "u_WindDir");
+	particle.windDrift = glGetUniformLocation(particleShader, "u_WindDrift");
 	particle.seedAttrib = glGetAttribLocation(particleShader, "a_Seed");
 	particle.randAttrib = glGetAttribLocation(particleShader, "a_Rand");
 
@@ -913,6 +913,15 @@ void Renderer::DrawAmbientMotes(const Vec3& center)
 	DrawMotes(2, 1000, 1400, center, Vec3(60.0f, 9.0f, 60.0f), Vec3(0.95f, 0.92f, 0.78f), 0.35f, 0.05f);
 }
 
+void Renderer::DrawWeather(const Vec3& center)
+{
+	// Heavier weather draws more of its slice, so a drizzle is sparse rather than faint.
+	float leaves = weather.autumn * (0.12f + 0.88f * weather.wind);
+	DrawMotes(3, 0, (int)(2600.0f * weather.rain), center, Vec3(46.0f, 14.0f, 46.0f), Vec3(0.72f, 0.80f, 0.88f), Saturatef(weather.rain * 1.5f), 0.6f);
+	DrawMotes(4, 2600, (int)(2400.0f * weather.snow), center, Vec3(50.0f, 14.0f, 50.0f), Vec3(0.95f, 0.97f, 1.00f), Saturatef(weather.snow * 1.5f), 0.16f);
+	DrawMotes(5, 5000, (int)(700.0f * leaves), center, Vec3(50.0f, 8.0f, 50.0f), Vec3(1.00f, 1.00f, 1.00f), Saturatef(leaves * 2.0f), 0.32f);
+}
+
 void Renderer::DrawMotes(int style, int first, int count, const Vec3& center, const Vec3& field, const Vec3& color, float densityScale, float size)
 {
 	// Motes blend over the models and test against their depth.
@@ -934,7 +943,7 @@ void Renderer::DrawMotes(int style, int first, int count, const Vec3& center, co
 	glUniform1f(particle.densityScale, densityScale);
 	glUniform1f(particle.timeOfDay, timeOfDay);
 	UploadWeather(particle.season, particle.weather);
-	glUniform2f(particle.windDir, sinf(weather.windAngle), cosf(weather.windAngle));
+	glUniform2f(particle.windDrift, weather.driftX, weather.driftZ);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vboSpores);
 	glEnableVertexAttribArray(particle.seedAttrib);
@@ -945,8 +954,8 @@ void Renderer::DrawMotes(int style, int first, int count, const Vec3& center, co
 		glVertexAttribPointer(particle.randAttrib, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, (void*)(sizeof(float) * 3));
 	}
 
-	// Spores glow: additive, and they must not occlude one another.
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+	// Spores glow: additive, and they must not occlude one another. Rain, snow and leaves are lit, not glowing.
+	glBlendFunc(GL_SRC_ALPHA, style >= 3 ? GL_ONE_MINUS_SRC_ALPHA : GL_ONE);
 	glDepthMask(GL_FALSE);
 
 	glDrawArrays(GL_POINTS, first, count);

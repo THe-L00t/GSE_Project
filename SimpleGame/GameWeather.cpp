@@ -94,6 +94,10 @@ void Game::UpdateWeather(float dt)
 	snowLevel = Approach(snowLevel, snowTarget, 0.20f, gameDt);
 	windLevel = Approach(windLevel, windTarget, 0.30f, gameDt);
 
+	// Wrapped at 1000: every drift rate in Particle.vs turns that into a whole number of field widths.
+	windDriftX = fmodf(windDriftX + sinf(windAngle) * windLevel * dt, 1000.0f);
+	windDriftZ = fmodf(windDriftZ + cosf(windAngle) * windLevel * dt, 1000.0f);
+
 	for (int i = 0; i < SEASON_COUNT; ++i)
 		seasonWeight[i] = Approach(seasonWeight[i], i == season ? 1.0f : 0.0f, 0.05f, gameDt);
 

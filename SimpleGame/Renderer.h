@@ -39,7 +39,8 @@ struct WeatherParams
 	float snow = 0.0f;
 	float wind = 0.0f;
 	float wetness = 0.0f;
-	float windAngle = 0.0f;   // direction the wind blows toward
+	float driftX = 0.0f;      // wind travel integrated over time, in gale-seconds
+	float driftZ = 0.0f;
 };
 
 class Renderer
@@ -85,6 +86,7 @@ public:
 	void DrawWater(const Vec3& center, float sizeX, float sizeZ);
 	void DrawSpores(const Vec3& center, const Vec3& field, const Vec3& color, float densityScale, float size);
 	void DrawAmbientMotes(const Vec3& center);   // fireflies by night, pollen by day
+	void DrawWeather(const Vec3& center);        // rain, snow and leaves from the SetWeather values
 
 	void BeginUI();
 	void EndUI();
@@ -182,7 +184,7 @@ private:
 		GLint style = -1;
 		GLint season = -1;
 		GLint weather = -1;
-		GLint windDir = -1;
+		GLint windDrift = -1;
 		GLint seedAttrib = -1;
 		GLint randAttrib = -1;
 	};
