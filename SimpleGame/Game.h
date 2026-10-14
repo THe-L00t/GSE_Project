@@ -210,7 +210,7 @@ private:
 	void UpdateEnemy(EnemyActor& e, float dt);
 	void UpdateItems();
 	void UpdateCombatTimers(float dt);
-	void SpawnEnemy(int type, int enemyLevel, const Vec3& pos, int chunkX, int chunkZ, int spawnIndex);
+	EnemyActor* SpawnEnemy(int type, int enemyLevel, const Vec3& pos, int chunkX, int chunkZ, int spawnIndex);
 	ItemActor* DropItem(int type, const Vec3& pos, int chunkX, int chunkZ, int spawnIndex);
 	void PickUp(ItemActor& item);
 	void EquipWeapon();
@@ -305,6 +305,7 @@ private:
 	LanternActor* lantern = nullptr;
 	Actor*        safePoint = nullptr;   // where the long sleep ends
 	WaterActor*   reservoir = nullptr;   // hidden east of the road; the lantern deer knows the way
+	bool  busQueueSeen = false;  // the husks lined up at the bus stop, still waiting
 	bool  reservoirFound = false;
 	bool  townReached = false;
 	float townCardTimer = -1.0f;

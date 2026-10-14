@@ -77,6 +77,17 @@ void Game::StartRoute()
 		ItemActor* can = DropItem(ITEM_CANNED_FOOD, Vec3(RoadCenter(kBusStopZ) + 3.7f, 0.0f, kBusStopZ), 0, 0, -1);
 		can->landmark = true;
 	}
+	// Husks queue at the shelter, facing the road, for a bus that never came back.
+	busQueueSeen = false;
+	for (int i = 0; i < 3; ++i)
+	{
+		float z = kBusStopZ - 2.4f - 1.5f * (float)i;
+		EnemyActor* husk = SpawnEnemy(ENEMY_HUSK, 1, Vec3(RoadCenter(z) + 4.6f, 0.0f, z), 0, kBusStopChunkZ, -1);
+		husk->holdsPlace = true;
+		husk->homeYaw = -kPi * 0.5f;
+		husk->SetYaw(husk->homeYaw);
+	}
+
 	if (!relicFound[RELIC_BADGE])
 	{
 		ItemActor* badge = DropItem(ITEM_RELIC, Vec3(RoadCenter(kTownGateZ) + 8.5f, 0.0f, kTownGateZ + 4.0f), 0, 0, -1);
@@ -452,6 +463,12 @@ void Game::ResolveRouteCollisions(Vec3& pos, float radius)
 void Game::UpdateLandmarks(float dt)
 {
 	const Vec3& pos = player->Position();
+
+	if (!busQueueSeen && DistXZ(pos, Vec3(RoadCenter(kBusStopZ) + 4.6f, 0.0f, kBusStopZ - 4.0f)) < 14.0f)
+	{
+		busQueueSeen = true;
+		ShowMessage("정류장 앞에 허물들이 줄을 서 있다. 오지 않는 버스를 아직 기다리는 것처럼.", 5.0f);
+	}
 
 	if (!reservoirFound && reservoir->ShoreDistance(pos) < 3.0f)
 	{

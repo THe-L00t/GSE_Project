@@ -221,6 +221,8 @@ public:
 	bool  strikeHit = false;
 	bool  alive = true;
 	bool  provoked = false;   // struck or startled: gives chase much further
+	bool  holdsPlace = false; // stands at home facing homeYaw instead of wandering
+	float homeYaw = 0.0f;
 	float flash = 0.0f;
 	int   chunkX = 0;
 	int   chunkZ = 0;

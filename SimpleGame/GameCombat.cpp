@@ -260,12 +260,21 @@ void Game::UpdateEnemy(EnemyActor& e, float dt)
 	{
 	case ENEMY_IDLE:
 		e.stateTimer -= dt;
-		if (e.stateTimer <= 0.0f)
+		if (e.holdsPlace)
 		{
-			e.moveTarget = e.home + Vec3(combatRng.Range(-4.0f, 4.0f), 0.0f, combatRng.Range(-4.0f, 4.0f));
-			e.stateTimer = combatRng.Range(2.0f, 4.5f);
+			// Back to its place, then still again, facing the way it always faced.
+			MoveToward(pos, yaw, e.home, speed * 0.5f, dt);
+			if (DistXZ(pos, e.home) < 0.1f) yaw = e.homeYaw;
 		}
-		MoveToward(pos, yaw, e.moveTarget, speed * 0.35f, dt);
+		else
+		{
+			if (e.stateTimer <= 0.0f)
+			{
+				e.moveTarget = e.home + Vec3(combatRng.Range(-4.0f, 4.0f), 0.0f, combatRng.Range(-4.0f, 4.0f));
+				e.stateTimer = combatRng.Range(2.0f, 4.5f);
+			}
+			MoveToward(pos, yaw, e.moveTarget, speed * 0.35f, dt);
+		}
 		if (playerAwake && dist < info.aggroRange)
 		{
 			e.state = ENEMY_CHASE;
@@ -394,7 +403,7 @@ void Game::UpdateCombatTimers(float dt)
 		[](const Popup& p) { return p.timer <= 0.0f; }), popups.end());
 }
 
-void Game::SpawnEnemy(int type, int enemyLevel, const Vec3& pos, int chunkX, int chunkZ, int spawnIndex)
+EnemyActor* Game::SpawnEnemy(int type, int enemyLevel, const Vec3& pos, int chunkX, int chunkZ, int spawnIndex)
 {
 	const EnemyInfo& info = GetEnemyInfo(type);
 
@@ -409,6 +418,7 @@ void Game::SpawnEnemy(int type, int enemyLevel, const Vec3& pos, int chunkX, int
 	e->chunkX = chunkX;
 	e->chunkZ = chunkZ;
 	e->spawnIndex = spawnIndex;
+	return e;
 }
 
 ItemActor* Game::DropItem(int type, const Vec3& pos, int chunkX, int chunkZ, int spawnIndex)
