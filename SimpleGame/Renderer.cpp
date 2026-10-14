@@ -1008,7 +1008,8 @@ void Renderer::FlushModels()
 {
 	// Pack every queued instance into one buffer; each mesh then draws its run in one call.
 	instanceData.clear();
-	std::vector<int> first(meshes.size() + 1, 0);
+	std::vector<int>& first = instanceFirst;
+	first.assign(meshes.size() + 1, 0);
 	for (size_t id = 0; id < meshes.size(); ++id)
 	{
 		first[id] = (int)instanceData.size();
@@ -1034,7 +1035,12 @@ void Renderer::FlushModels()
 	}
 
 	glBindBuffer(GL_ARRAY_BUFFER, vboInstances);
-	glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(instanceData.size() * sizeof(Instance)), &instanceData[0], GL_STREAM_DRAW);
+	// Grow the buffer rarely and orphan it every flush: a fresh allocation per flush made the driver
+	// reallocate, and writing into storage the GPU still reads would make it wait.
+	GLsizeiptr bytes = (GLsizeiptr)(instanceData.size() * sizeof(Instance));
+	if (bytes > instanceCapacity) instanceCapacity = bytes * 2;
+	glBufferData(GL_ARRAY_BUFFER, instanceCapacity, NULL, GL_STREAM_DRAW);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, bytes, &instanceData[0]);
 
 	for (GLuint loc = 4; loc <= 9; ++loc)
 	{

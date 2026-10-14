@@ -368,6 +368,8 @@ private:
 	std::vector<std::vector<Instance>> modelQueue;
 	std::vector<Instance> discQueue;
 	std::vector<Instance> instanceData;
+	std::vector<int>      instanceFirst;
+	GLsizeiptr            instanceCapacity = 0;
 	GLuint vboInstances = 0;
 
 	Mat4  viewProj;
