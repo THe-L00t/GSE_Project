@@ -340,6 +340,8 @@ void Game::GatherLights(const Vec3& view)
 		Vec3 facing(sinf(deers[i]->Yaw()), 0.0f, cosf(deers[i]->Yaw()));
 		Vec3 pos = deers[i]->WorldPosition() + facing * 0.7f + Vec3(0.0f, 2.4f, 0.0f);
 		lights.push_back({ pos, Vec3(0.95f, 0.85f, 0.50f) * 1.6f, 6.0f, DistXZ(pos, view) });
+		if (deers[i]->carriesGrandma)
+			lights.push_back({ pos + Vec3(0.0f, 0.3f, 0.0f), Vec3(1.00f, 0.62f, 0.32f) * 1.2f, 4.0f, DistXZ(pos, view) + 0.01f });
 	}
 
 	std::vector<ItemActor*> items = LiveItems();

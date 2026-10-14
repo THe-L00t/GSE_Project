@@ -163,6 +163,7 @@ public:
 	float speed = 1.3f;
 	bool  leading = false;
 	bool  arrived = false;
+	bool  carriesGrandma = false;  // after she sleeps, one more warm light rides on its antlers
 	float stepPhase = 0.0f;
 };
 

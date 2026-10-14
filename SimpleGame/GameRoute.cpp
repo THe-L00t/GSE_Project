@@ -525,7 +525,8 @@ void Game::UpdateRouteDeer(float dt)
 		deer->goal = kReservoirCenter + Vec3(-kReservoirSizeX * 0.5f - 1.5f, 0.0f, 0.0f);
 		deer->speed = 2.4f;
 		deer->leading = true;
-		ShowMessage("등불 사슴이 어둠 속에서 걸어 나와 너를 기다린다.", 5.0f);
+		deer->carriesGrandma = true;
+		ShowMessage("등불 사슴이 어둠 속에서 걸어 나와 너를 기다린다. 뿔에 못 보던 따뜻한 불빛이 하나 늘어 있다.", 6.0f);
 		return;
 	}
 

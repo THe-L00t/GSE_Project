@@ -194,6 +194,15 @@ void DeerActor::Draw(const DrawContext& dc) const
 
 	dc.renderer->DrawShadow(WorldPosition(), 0.7f);
 	dc.renderer->DrawModel(MODEL_DEER, WorldMatrix(), params);
+
+	if (carriesGrandma)
+	{
+		DrawParams glow;
+		glow.phase = stepPhase * 0.3f;
+		glow.tint = Vec3(1.0f, 0.72f, 0.40f);
+		glow.emissive = 0.9f;
+		dc.renderer->DrawModel(MODEL_DREAM_MOTE, Mul(WorldMatrix(), MatTranslate(Vec3(0.15f, 1.35f, 0.75f))), glow);
+	}
 }
 
 ExitActor::ExitActor()
