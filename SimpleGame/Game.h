@@ -97,6 +97,29 @@ enum Weather
 	WEATHER_COUNT
 };
 
+// Rows of the graphics options panel (F4).
+enum OptionRow
+{
+	OPT_PRESET,
+	OPT_SCALE,
+	OPT_MSAA,
+	OPT_SHADOW,
+	OPT_VOLUMETRIC,
+	OPT_PARTICLES,
+	OPT_VSYNC,
+	OPT_FPS,
+	OPT_COUNT
+};
+
+enum QualityPreset
+{
+	PRESET_LOW,
+	PRESET_MEDIUM,
+	PRESET_HIGH,
+	PRESET_ULTRA,
+	PRESET_COUNT      // one past the presets: "custom"
+};
+
 // Frame timing gathered by the main loop, once a second.
 struct PerfStats
 {
@@ -149,6 +172,9 @@ public:
 	// GameMonitor.cpp: a read-only snapshot for the browser monitor
 	std::string MonitorJson() const;
 	void SetPerf(const PerfStats& stats) { perf = stats; }
+
+	// GameOptions.cpp: graphics options, saved to Options.txt when the panel closes
+	void ToggleOptions();
 
 private:
 	// Game.cpp: shared by every level
@@ -255,6 +281,14 @@ private:
 	void DrawSurvivalHud();
 	void DrawBagPanel();
 	void DrawJournalPanel();
+
+	void LoadOptions();
+	void SaveOptions() const;
+	void ApplyOptions();
+	void SetPreset(int preset);
+	void HandleOptionsKey(unsigned char key);
+	void DrawOptionsPanel();
+	void DrawFpsOverlay();
 
 	// GameWeather.cpp: seasons turn with the days, and each season rolls its own weather
 	void UpdateWeather(float dt);
@@ -390,6 +424,9 @@ private:
 	float seasonWeight[SEASON_COUNT] = { 1.0f, 0.0f, 0.0f, 0.0f };   // eases between seasons
 
 	PerfStats perf;
+	bool  optionsOpen = false;
+	int   optionsCursor = 0;
+	int   optionChoice[OPT_COUNT] = { PRESET_HIGH, 4, 2, 2, 1, 3, 0, 1 };   // vsync on, FPS hidden
 
 	std::string message;
 	float messageTimer = 0.0f;

@@ -6,6 +6,7 @@
 
 #include "Models.h"
 #include "Random.h"
+#include "Dependencies\wglew.h"
 
 // ASCII only: the original template's CP949 comments turned into mojibake in UTF-8 tools.
 
@@ -74,15 +75,34 @@ void Renderer::Resize(int sizeX, int sizeY)
 	windowSizeX = sizeX;
 	windowSizeY = sizeY;
 	glViewport(0, 0, sizeX, sizeY);
-
-	if (sizeX != targetWidth || sizeY != targetHeight)
-		CreateTargets(sizeX, sizeY);
+	CreateTargets(sizeX, sizeY);
 }
 
-void Renderer::CreateTargets(int sizeX, int sizeY)
+void Renderer::ApplySettings(const RenderSettings& next)
+{
+	bool targets = next.renderScale != settings.renderScale || next.msaa != settings.msaa;
+	bool shadows = next.shadowSize != settings.shadowSize;
+	settings = next;
+
+	if (targets) CreateTargets((int)windowSizeX, (int)windowSizeY);
+	if (shadows)
+	{
+		DeleteShadowMap();
+		CreateShadowMap();
+	}
+	if (WGLEW_EXT_swap_control) wglSwapIntervalEXT(settings.vsync ? 1 : 0);
+}
+
+void Renderer::CreateTargets(int windowX, int windowY)
 {
 	DeleteTargets();
-	if (postShader == 0 || sizeX <= 0 || sizeY <= 0) return;
+	if (postShader == 0 || windowX <= 0 || windowY <= 0) return;
+
+	// The scene can render below window resolution; the composite pass scales it up.
+	int sizeX = (int)((float)windowX * settings.renderScale + 0.5f);
+	int sizeY = (int)((float)windowY * settings.renderScale + 0.5f);
+	if (sizeX < 1) sizeX = 1;
+	if (sizeY < 1) sizeY = 1;
 
 	targetWidth = sizeX;
 	targetHeight = sizeY;
@@ -105,10 +125,10 @@ void Renderer::CreateTargets(int sizeX, int sizeY)
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, sceneDepth);
 	bool ok = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
 
-	// 4x MSAA smooths the long diagonal edges the quarter view is full of.
+	// MSAA smooths the long diagonal edges the quarter view is full of.
 	GLint maxSamples = 0;
 	glGetIntegerv(GL_MAX_SAMPLES, &maxSamples);
-	samples = maxSamples < 4 ? (int)maxSamples : 4;
+	samples = maxSamples < settings.msaa ? (int)maxSamples : settings.msaa;
 	if (samples > 1)
 	{
 		glGenRenderbuffers(1, &msColor);
@@ -161,13 +181,23 @@ void Renderer::CreateTargets(int sizeX, int sizeY)
 		<< ", MSAA x" << (samples > 1 ? samples : 1) << "\n";
 }
 
+void Renderer::DeleteShadowMap()
+{
+	if (shadowFbo) glDeleteFramebuffers(1, &shadowFbo);
+	if (shadowTex) glDeleteTextures(1, &shadowTex);
+	shadowFbo = shadowTex = 0;
+	shadowReady = false;
+	shadowSize = 0;
+}
+
 void Renderer::CreateShadowMap()
 {
-	if (shadowShader == 0 || litShader == 0) return;
+	if (shadowShader == 0 || litShader == 0 || settings.shadowSize <= 0) return;
+	shadowSize = settings.shadowSize;
 
 	glGenTextures(1, &shadowTex);
 	glBindTexture(GL_TEXTURE_2D, shadowTex);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, kShadowSize, kShadowSize, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, shadowSize, shadowSize, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -251,7 +281,7 @@ void Renderer::BeginShadowPass(const Vec3& focus)
 	float lx = m[0] * focus.x + m[4] * focus.y + m[8] * focus.z + m[12];
 	float ly = m[1] * focus.x + m[5] * focus.y + m[9] * focus.z + m[13];
 	float lz = m[2] * focus.x + m[6] * focus.y + m[10] * focus.z + m[14];
-	float texel = half * 2.0f / (float)kShadowSize;
+	float texel = half * 2.0f / (float)shadowSize;
 	lx = floorf(lx / texel) * texel;
 	ly = floorf(ly / texel) * texel;
 
@@ -263,7 +293,7 @@ void Renderer::BeginShadowPass(const Vec3& focus)
 	glActiveTexture(GL_TEXTURE0);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, shadowFbo);
-	glViewport(0, 0, kShadowSize, kShadowSize);
+	glViewport(0, 0, shadowSize, shadowSize);
 	glEnable(GL_DEPTH_TEST);
 	glDepthMask(GL_TRUE);
 	glClear(GL_DEPTH_BUFFER_BIT);
@@ -714,7 +744,8 @@ void Renderer::SetCamera(const Mat4& view, const Mat4& proj, const Vec3& eye, fl
 {
 	viewProj = Mul(proj, view);
 	camPos = eye;
-	pixelsPerUnit = pxPerUnit;
+	// Point sprites are sized in target pixels, which shrink with the render scale.
+	pixelsPerUnit = pxPerUnit * (postReady ? (float)targetHeight / (float)windowSizeY : 1.0f);
 }
 
 bool Renderer::WorldToScreen(const Vec3& pos, float& sx, float& sy) const
@@ -973,7 +1004,7 @@ void Renderer::DrawWater(const Vec3& center, float sizeX, float sizeZ)
 
 void Renderer::DrawSpores(const Vec3& center, const Vec3& field, const Vec3& color, float densityScale, float size)
 {
-	DrawMotes(0, 0, sporeCount, center, field, color, densityScale, size);
+	DrawMotes(0, 0, (int)((float)sporeCount * settings.particles), center, field, color, densityScale, size);
 }
 
 void Renderer::DrawAmbientMotes(const Vec3& center)
@@ -987,9 +1018,9 @@ void Renderer::DrawWeather(const Vec3& center)
 {
 	// Heavier weather draws more of its slice, so a drizzle is sparse rather than faint.
 	float leaves = weather.autumn * (0.12f + 0.88f * weather.wind);
-	DrawMotes(3, 0, (int)(2600.0f * weather.rain), center, Vec3(46.0f, 14.0f, 46.0f), Vec3(0.72f, 0.80f, 0.88f), Saturatef(weather.rain * 1.5f), 0.6f);
-	DrawMotes(4, 2600, (int)(2400.0f * weather.snow), center, Vec3(50.0f, 14.0f, 50.0f), Vec3(0.95f, 0.97f, 1.00f), Saturatef(weather.snow * 1.5f), 0.16f);
-	DrawMotes(5, 5000, (int)(700.0f * leaves), center, Vec3(50.0f, 8.0f, 50.0f), Vec3(1.00f, 1.00f, 1.00f), Saturatef(leaves * 2.0f), 0.32f);
+	DrawMotes(3, 0, (int)(2600.0f * weather.rain * settings.particles), center, Vec3(46.0f, 14.0f, 46.0f), Vec3(0.72f, 0.80f, 0.88f), Saturatef(weather.rain * 1.5f), 0.6f);
+	DrawMotes(4, 2600, (int)(2400.0f * weather.snow * settings.particles), center, Vec3(50.0f, 14.0f, 50.0f), Vec3(0.95f, 0.97f, 1.00f), Saturatef(weather.snow * 1.5f), 0.16f);
+	DrawMotes(5, 5000, (int)(700.0f * leaves * settings.particles), center, Vec3(50.0f, 8.0f, 50.0f), Vec3(1.00f, 1.00f, 1.00f), Saturatef(leaves * 2.0f), 0.32f);
 }
 
 void Renderer::DrawMotes(int style, int first, int count, const Vec3& center, const Vec3& field, const Vec3& color, float densityScale, float size)

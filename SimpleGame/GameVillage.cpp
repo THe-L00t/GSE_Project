@@ -922,7 +922,7 @@ void Game::ObjectiveText(char* buf, size_t size) const
 void Game::VillageHelp(char* buf, size_t size) const
 {
 	// Keys appear as the day teaches them.
-	sprintf_s(buf, size, "WASD 이동   SPACE 구르기   E 상호작용%s%s   T 시간   F2 건너뛰기   ESC 종료",
+	sprintf_s(buf, size, "WASD 이동   SPACE 구르기   E 상호작용%s%s   T 시간   F2 건너뛰기   F4 옵션   ESC 종료",
 			  tutorial >= TUT_FORAGE ? "   I 배낭   F 먹기" : "",
 			  torchOwned ? "   L 손전등   B 도감" : "");
 }

@@ -43,6 +43,17 @@ struct WeatherParams
 	float driftZ = 0.0f;
 };
 
+// Graphics options; ApplySettings rebuilds only what a change touches.
+struct RenderSettings
+{
+	float renderScale = 1.0f;      // scene resolution relative to the window
+	int   msaa = 4;                // 0, 2, 4 or 8 samples
+	int   shadowSize = 2048;       // 0 turns sun shadows off
+	int   volumetric = 1;          // light shafts: 0 off, 1 low, 2 high
+	float particles = 1.0f;        // share of spores, rain, snow and leaves drawn
+	bool  vsync = true;
+};
+
 // GPU milliseconds per stage, read back a couple of frames late so the queries never stall.
 struct GpuTimes
 {
@@ -59,6 +70,10 @@ public:
 	~Renderer();
 
 	bool IsInitialized();
+
+	void ApplySettings(const RenderSettings& next);
+	const RenderSettings& Settings() const { return settings; }
+	bool ShadowsEnabled() const { return shadowReady; }
 
 	// Call once per frame, before swapping buffers.
 	void EndFrame();
@@ -258,6 +273,7 @@ private:
 	void DeleteTargets();
 	void BindSceneTarget();
 	void CreateShadowMap();
+	void DeleteShadowMap();
 	void CreateNoiseTexture();
 	void DrawPostPass(GLuint target, int width, int height, int mode, GLuint source, float sourceWidth, float sourceHeight);
 
@@ -303,7 +319,8 @@ private:
 	int    targetHeight = 0;
 	bool   postReady = false;
 
-	static const int kShadowSize = 2048;
+	RenderSettings settings;
+	int    shadowSize = 0;         // size of the shadow map that exists now
 	GLuint shadowShader = 0;
 	GLuint shadowFbo = 0;
 	GLuint shadowTex = 0;

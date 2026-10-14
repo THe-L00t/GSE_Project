@@ -24,6 +24,8 @@ Game::Game(Renderer* r)
 	for (int i = 0; i < SEASON_COUNT; ++i) seasonWeight[i] = i == season ? 1.0f : 0.0f;
 	if (season == SEASON_WINTER) snowCover = 0.2f;
 
+	LoadOptions();
+
 	worldNode = scene.Root()->AddChild(new Actor(ACTOR_NODE));
 
 	player = scene.Root()->AddChild(new PlayerActor());
@@ -132,6 +134,12 @@ void Game::UpdateCamera(float dt)
 void Game::OnKeyDown(unsigned char key)
 {
 	if (key >= 'A' && key <= 'Z') key = key - 'A' + 'a';
+
+	if (optionsOpen)
+	{
+		HandleOptionsKey(key);
+		return;
+	}
 
 	if (statPanelOpen)
 	{
@@ -269,8 +277,11 @@ void Game::Render()
 	player->UpdatePose(deathTimer);
 
 	// The same scene twice: once as depth from the sun, then lit with those shadows.
-	renderer->BeginShadowPass(view);
-	scene.Draw(renderer, view);
+	if (renderer->ShadowsEnabled())
+	{
+		renderer->BeginShadowPass(view);
+		scene.Draw(renderer, view);
+	}
 	renderer->EndShadowPass();
 
 	scene.Draw(renderer, view);
@@ -294,6 +305,8 @@ void Game::Render()
 	else
 		DrawRouteHud();
 
+	DrawFpsOverlay();
+	DrawOptionsPanel();
 	renderer->EndUI();
 }
 

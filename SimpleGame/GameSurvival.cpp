@@ -24,7 +24,7 @@ namespace
 
 bool Game::MenuOpen() const
 {
-	return statPanelOpen || bagOpen || journalOpen || packOpen;
+	return statPanelOpen || bagOpen || journalOpen || packOpen || optionsOpen;
 }
 
 void Game::UpdateSurvival(float dt)

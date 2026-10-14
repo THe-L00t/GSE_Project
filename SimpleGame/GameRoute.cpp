@@ -623,7 +623,7 @@ void Game::DrawRouteHud()
 	DrawCombatHud();
 	DrawPopups();
 	DrawSurvivalHud();
-	DrawCommonHud("WASD 이동  SPACE 구르기  J 공격  Q 약초  R 마시기  F 먹기  L 손전등  I 배낭  B 도감  C 능력치  E 사용");
+	DrawCommonHud("WASD 이동  SPACE 구르기  J 공격  Q 약초  R 마시기  F 먹기  L 손전등  I 배낭  B 도감  C 능력치  E 사용  F4 옵션");
 	DrawTitleCard("32번 국도", "처음 나선 바깥");
 	DrawTitleCardAt("은행나무 읍내", "첫 길의 끝", townCardTimer);
 	DrawStatPanel();
