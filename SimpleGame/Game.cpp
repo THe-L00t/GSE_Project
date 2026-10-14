@@ -45,6 +45,13 @@ void Game::Update(float dt, const bool* keys)
 	// Panels pause the world so choices can be made calmly.
 	if (MenuOpen()) return;
 
+	// A landed blow holds the world still for a moment; drawing carries on, so the frozen frame reads.
+	if (hitStop > 0.0f)
+	{
+		hitStop -= dt;
+		return;
+	}
+
 	time += dt;
 	levelTimer += dt;
 	++tick;

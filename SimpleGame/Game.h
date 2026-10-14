@@ -393,6 +393,7 @@ private:
 	bool  enemySeen[ENEMY_TYPE_COUNT] = {};
 	float deathTimer = -1.0f;     // >= 0 while sinking into the long sleep
 	float levelUpTimer = 0.0f;
+	float hitStop = 0.0f;         // > 0 while a landed blow freezes the world
 	Rng   combatRng{ 0x5EED5EEDULL };
 
 	std::vector<Popup> popups;

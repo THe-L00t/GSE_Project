@@ -19,6 +19,10 @@ namespace
 	const float kLoreRange = 9.0f;
 	const float kGuardRange = 3.5f;      // how close to a sleeper wakes the boar beside them
 
+	// Seconds the world freezes on a landed blow. Time-based: one frame at a high frame rate is too short to see.
+	const float kHitStop = 0.05f;
+	const float kKillStop = 0.09f;
+
 	const Vec3 kXpColor(0.75f, 0.95f, 0.55f);
 	const Vec3 kHurtColor(1.0f, 0.45f, 0.40f);
 	const Vec3 kHealColor(0.55f, 0.95f, 0.55f);
@@ -95,6 +99,7 @@ void Game::DamageEnemy(EnemyActor& e, float amount, const Vec3& push)
 	e.health -= amount;
 	e.flash = 1.0f;
 	e.provoked = true;
+	hitStop = Maxf(hitStop, kHitStop);
 	e.knockback = FlatDirection(push) * (e.type == ENEMY_MOSS_BOAR ? 2.5f : 6.0f);
 
 	char text[16];
@@ -122,6 +127,7 @@ void Game::KillEnemy(EnemyActor& e)
 	e.state = ENEMY_DYING;
 	e.stateTimer = kDyingTime;
 	++kills[e.type];
+	hitStop = Maxf(hitStop, kKillStop);
 
 	if (e.spawnIndex >= 0)
 	{
