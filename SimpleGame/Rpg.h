@@ -44,6 +44,8 @@ enum ItemType
 	ITEM_BERRIES,
 	ITEM_VEGETABLE,
 	ITEM_CANNED_FOOD,
+	ITEM_MEAT,           // from a moss boar; better roasted at a lantern
+	ITEM_COOKED_MEAT,
 	ITEM_TYPE_COUNT
 };
 

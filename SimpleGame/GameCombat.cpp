@@ -146,8 +146,9 @@ void Game::KillEnemy(EnemyActor& e)
 		{
 			state.swarmCleared[e.swarm] = true;
 			const Vec3& car = routeMap.Get(e.chunkX, e.chunkZ).swarms[e.swarm];
+			// Someone's road food was still in the glovebox.
 			float roll = combatRng.Unit();
-			int type = roll < 0.4f ? ITEM_RELIC : (roll < 0.7f ? ITEM_CLEAN_WATER : ITEM_HERB);
+			int type = roll < 0.30f ? ITEM_RELIC : (roll < 0.55f ? ITEM_CANNED_FOOD : (roll < 0.80f ? ITEM_CLEAN_WATER : ITEM_HERB));
 			DropItem(type, car + Vec3(0.0f, 0.0f, -1.7f), 0, 0, -1);
 			ShowMessage("진드기를 다 치우자 차 안의 물건이 보인다.", 3.5f);
 		}
@@ -156,6 +157,7 @@ void Game::KillEnemy(EnemyActor& e)
 	float find = FindScale(stats);
 	if (combatRng.Chance(info.herbChance * find)) DropItem(ITEM_HERB, e.Position() + Vec3(0.4f, 0.0f, 0.2f), 0, 0, -1);
 	if (combatRng.Chance(info.waterChance * find)) DropItem(ITEM_CLEAN_WATER, e.Position() + Vec3(-0.4f, 0.0f, 0.1f), 0, 0, -1);
+	if (e.type == ENEMY_MOSS_BOAR) DropItem(ITEM_MEAT, e.Position() + Vec3(-0.2f, 0.0f, -0.5f), 0, 0, -1);
 	bool relic = combatRng.Chance(info.relicChance * find);
 	if (relic) DropItem(ITEM_RELIC, e.Position() + Vec3(0.0f, 0.0f, -0.4f), 0, 0, -1);
 
@@ -167,7 +169,7 @@ void Game::KillEnemy(EnemyActor& e)
 			ShowMessage(relic ? "허물이 주저앉는다. 안주머니에서 누군가의 물건이 떨어진다."
 							  : "허물이 주저앉는다. 빈 옷만 남는다.", 3.0f);
 		else if (e.type == ENEMY_MOSS_BOAR)
-			ShowMessage("멧돼지가 이끼 속으로 무너진다. 지키던 잠이 풀린다.", 3.0f);
+			ShowMessage("멧돼지가 이끼 속으로 무너진다. 지키던 잠이 풀리고, 고기 한 덩이가 남는다.", 3.5f);
 		else if (relic)
 			ShowMessage("진드기가 터지며 붙잡혀 있던 것이 풀려난다.", 3.0f);
 	}
@@ -479,8 +481,9 @@ void Game::PickUp(ItemActor& item)
 		FindRelic(item.relicId);
 		break;
 	case ITEM_CANNED_FOOD:
+		// Only the first can is a journal entry; later ones are just food.
 		++inventory[item.type];
-		FindRelic(RELIC_PEACHES);
+		if (!relicFound[RELIC_PEACHES]) FindRelic(RELIC_PEACHES);
 		break;
 	default:
 		++inventory[item.type];
@@ -673,7 +676,8 @@ void Game::DrawCombatHud()
 	renderer->DrawBarPx(104.0f, 148.0f, 228.0f, 8.0f, (float)stats.xp / (float)need,
 						Vec3(0.40f, 0.55f, 0.75f), Vec3(0.60f, 0.85f, 0.95f));
 
-	int meals = inventory[ITEM_BERRIES] + inventory[ITEM_VEGETABLE] + inventory[ITEM_CANNED_FOOD];
+	int meals = inventory[ITEM_BERRIES] + inventory[ITEM_VEGETABLE] + inventory[ITEM_CANNED_FOOD]
+			  + inventory[ITEM_MEAT] + inventory[ITEM_COOKED_MEAT];
 	sprintf_s(buf, sizeof(buf), "%s   약초 %d [Q]  물 %d [R]  음식 %d [F]",
 			  player->weapon ? "파이프" : "맨손", inventory[ITEM_HERB], inventory[ITEM_CLEAN_WATER], meals);
 	renderer->DrawTexts(32, 176, buf, kHudDim, false);

@@ -14,7 +14,9 @@ namespace
 	const float kFlaskClear = 0.45f;
 	const float kLowMark = 25.0f;
 
-	const int kEatOrder[] = { ITEM_BERRIES, ITEM_VEGETABLE, ITEM_CANNED_FOOD };
+	// Smallest first; raw meat waits behind roasted, so it is kept for the lantern fire as long as possible.
+	const int kEatOrder[] = { ITEM_BERRIES, ITEM_VEGETABLE, ITEM_COOKED_MEAT, ITEM_MEAT, ITEM_CANNED_FOOD };
+	const int kEatOrderCount = (int)(sizeof(kEatOrder) / sizeof(kEatOrder[0]));
 
 	bool Crossed(float before, float after, float mark)
 	{
@@ -92,7 +94,7 @@ void Game::EatFood()
 	if (deathTimer >= 0.0f) return;
 
 	int pick = -1;
-	for (int i = 0; i < 3 && pick < 0; ++i)
+	for (int i = 0; i < kEatOrderCount && pick < 0; ++i)
 	{
 		if (inventory[kEatOrder[i]] > 0) pick = kEatOrder[i];
 	}
@@ -252,7 +254,7 @@ void Game::DrawBagPanel()
 
 	renderer->DrawFade(Vec3(0.02f, 0.03f, 0.04f), 0.55f);
 
-	float pw = 520.0f, ph = 330.0f;
+	float pw = 560.0f, ph = 390.0f;
 	float px = (float)w * 0.5f - pw * 0.5f;
 	float py = (float)h * 0.5f - ph * 0.5f;
 	renderer->DrawRectPx(px, py, pw, ph, Vec3(0.10f, 0.11f, 0.10f), 0.94f);
@@ -266,9 +268,9 @@ void Game::DrawBagPanel()
 	renderer->DrawTexts(x, y, buf, kHudInk, true);
 	y += 38;
 
-	const int shown[] = { ITEM_CLEAN_WATER, ITEM_BERRIES, ITEM_VEGETABLE, ITEM_CANNED_FOOD, ITEM_HERB };
-	const char* keys[] = { "[R] 마시기", "[F] 먹기", "[F] 먹기", "[F] 먹기", "[Q] 치료" };
-	for (int i = 0; i < 5; ++i)
+	const int shown[] = { ITEM_CLEAN_WATER, ITEM_BERRIES, ITEM_VEGETABLE, ITEM_COOKED_MEAT, ITEM_MEAT, ITEM_CANNED_FOOD, ITEM_HERB };
+	const char* keys[] = { "[R] 마시기", "[F] 먹기", "[F] 먹기", "[F] 먹기", "석등에서 [E] 굽기", "[F] 먹기", "[Q] 치료" };
+	for (int i = 0; i < 7; ++i)
 	{
 		int type = shown[i];
 		Vec3 color = inventory[type] > 0 ? kHudInk : kHudDim;

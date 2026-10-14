@@ -15,7 +15,7 @@ namespace
 		"herb", "water_flask", "relic",
 		"shadow", "ground",
 		"grandma", "shed", "garden_bed", "vegetable", "berry_red", "berry_pale", "deer",
-		"canned_food", "bus_stop", "ginkgo", "pole",
+		"canned_food", "bus_stop", "ginkgo", "pole", "meat", "cooked_meat",
 	};
 
 	const Vec3 kMoss(0.24f, 0.38f, 0.24f);
@@ -664,6 +664,19 @@ ModelRecipe BuildRecipe(int id)
 		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 1.2f, 0.0f), Vec3(0.40f, 2.4f, 0.40f), kDarkMoss, ANIM_SWAY);
 		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 0.1f, 0.0f), Vec3(0.9f, 0.3f, 0.9f), moss);
 		break;
+
+	case MODEL_MEAT:
+	case MODEL_COOKED_MEAT:
+	{
+		// A haunch on the bone; roasting darkens it and adds a glaze.
+		bool cooked = id == MODEL_COOKED_MEAT;
+		Vec3 flesh = cooked ? Vec3(0.46f, 0.27f, 0.13f) : Vec3(0.62f, 0.27f, 0.24f);
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 0.26f, 0.0f), Vec3(0.40f, 0.26f, 0.28f), flesh, pickup);
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.06f, 0.33f, 0.0f), Vec3(0.24f, 0.10f, 0.20f), cooked ? Vec3(0.62f, 0.40f, 0.18f) : Vec3(0.80f, 0.62f, 0.56f), pickup | (cooked ? ANIM_PULSE : 0));
+		r.Add(SHAPE_CYLINDER, Vec3(-0.28f, 0.26f, 0.0f), Vec3(0.07f, 0.26f, 0.07f), Vec3(0.86f, 0.84f, 0.76f), pickup).Rotated(Vec3(0.0f, 0.0f, halfPi));
+		r.Add(SHAPE_ELLIPSOID, Vec3(-0.42f, 0.26f, 0.0f), Vec3(0.10f, 0.10f, 0.12f), Vec3(0.88f, 0.86f, 0.78f), pickup);
+		break;
+	}
 
 	default:
 		r.Add(SHAPE_BOX, Vec3(0.0f, 0.5f, 0.0f), Vec3(1.0f, 1.0f, 1.0f), Vec3(1.0f, 0.0f, 1.0f));

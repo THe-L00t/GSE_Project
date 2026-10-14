@@ -503,7 +503,22 @@ void Game::UpdateLandmarks(float dt)
 	}
 
 	prompt.clear();
-	if (deathTimer < 0.0f && reservoir->ShoreDistance(pos) < 1.8f) prompt = "[E]  물 마시고 물병 채우기";
+	if (deathTimer >= 0.0f) return;
+	if (NearLanternFire())
+	{
+		char buf[128];
+		sprintf_s(buf, sizeof(buf), "[E]  석등 불에 고기 굽기 (%d)", inventory[ITEM_MEAT]);
+		prompt = buf;
+	}
+	else if (reservoir->ShoreDistance(pos) < 1.8f)
+	{
+		prompt = "[E]  물 마시고 물병 채우기";
+	}
+}
+
+bool Game::NearLanternFire() const
+{
+	return inventory[ITEM_MEAT] > 0 && DistXZ(player->Position(), lantern->WorldPosition()) < 2.4f;
 }
 
 void Game::UpdateRouteDeer(float dt)
@@ -579,7 +594,22 @@ void Game::UpdateRouteDeer(float dt)
 
 void Game::TryRouteInteract()
 {
-	if (deathTimer >= 0.0f || reservoir->ShoreDistance(player->Position()) >= 1.8f) return;
+	if (deathTimer >= 0.0f) return;
+
+	// The lantern's flame roasts whatever raw meat is in the bag, all at once.
+	if (NearLanternFire())
+	{
+		int count = inventory[ITEM_MEAT];
+		inventory[ITEM_COOKED_MEAT] += count;
+		inventory[ITEM_MEAT] = 0;
+
+		char buf[256];
+		sprintf_s(buf, sizeof(buf), "석등 불에 고기 %d덩이를 굽는다. 기름 냄새가 안개 속으로 번진다.", count);
+		ShowMessage(buf, 3.5f);
+		return;
+	}
+
+	if (reservoir->ShoreDistance(player->Position()) >= 1.8f) return;
 
 	waterMeter = 100.0f;
 	int room = kBagCapacity - BagCount();

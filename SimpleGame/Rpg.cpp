@@ -24,6 +24,8 @@ namespace
 		{ "열매",         MODEL_BERRY_RED,   "빨간 열매 한 줌. F로 먹는다." },
 		{ "무",           MODEL_VEGETABLE,   "텃밭에서 뽑은 무. F로 먹는다." },
 		{ "복숭아 통조림", MODEL_CANNED_FOOD, "개화 전에 밀봉된 복숭아 통조림. F로 먹는다." },
+		{ "멧돼지 고기",  MODEL_MEAT,        "멧돼지 고기 한 덩이. 석등 불에 구우면 훨씬 든든하다." },
+		{ "구운 고기",    MODEL_COOKED_MEAT, "석등 불에 구운 고기. F로 먹는다." },
 	};
 
 	// name, model, health, damage, speed, radius, aggro, attack range, windup, recover, lunge, xp, herb, water, relic, lore
@@ -127,6 +129,8 @@ float FoodValue(int itemType)
 	case ITEM_BERRIES:     return 15.0f;
 	case ITEM_VEGETABLE:   return 20.0f;
 	case ITEM_CANNED_FOOD: return 45.0f;
+	case ITEM_MEAT:        return 25.0f;
+	case ITEM_COOKED_MEAT: return 50.0f;
 	default:               return 0.0f;
 	}
 }

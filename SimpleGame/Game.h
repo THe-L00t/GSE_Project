@@ -235,6 +235,7 @@ private:
 	void UpdateLandmarks(float dt);
 	void UpdateRouteDeer(float dt);
 	void TryRouteInteract();
+	bool NearLanternFire() const;   // close enough to roast, with raw meat in the bag
 	void DrawRouteHud();
 	void DrawGuideCard();
 
