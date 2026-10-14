@@ -163,7 +163,7 @@ private:
 	void TryInteract();
 	void TalkToGrandmother();
 	void SetTutorial(int next);
-	void Say(const char* const* lines, int count, int next);
+	void Say(const char* const* lines, int count, int next, const char* speaker = "할머니");
 	void AdvanceDialog();
 	bool DialogOpen() const { return dialogIndex < dialogLines.size(); }
 	void Pick(ForageActor& f);
@@ -277,7 +277,7 @@ private:
 	bool  riceEaten = false;
 	bool  sleepAfterDialog = false;
 	int   fragments = 0;
-	int   fragmentGoal = 3;
+	int   fragmentGoal = 4;
 	bool  letterOpen = false;
 	float sleepTimer = -1.0f;         // >= 0 while the night passes
 	float transitionTimer = -1.0f;    // >= 0 while leaving the village
@@ -289,6 +289,7 @@ private:
 	ForageActor*  targetForage = nullptr;
 
 	std::vector<std::string> dialogLines;
+	std::string dialogSpeaker;
 	size_t dialogIndex = 0;
 	int    dialogNext = -1;           // tutorial step to enter once the dialog closes
 

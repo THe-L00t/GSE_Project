@@ -117,6 +117,7 @@ public:
 
 	bool       isGrandma = false;
 	bool       visited = false;
+	int        neighbor = -1;     // which village neighbour, for their name and dream
 	float      phase = 0.0f;      // breathing offset
 	PropActor* mote = nullptr;    // the dream fragment, until it is taken
 };

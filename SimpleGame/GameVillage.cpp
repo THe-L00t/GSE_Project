@@ -21,9 +21,11 @@ namespace
 	const Vec3 kUnitScale(1.0f, 1.0f, 1.0f);
 
 	// Grandmother talks in a country dialect, and always about whether you have eaten.
+	// The spores have already reached her: she yawns, loses her words, and hides the stain on her hand.
 	const char* kWakeLines[] =
 	{
 		"율아, 벌써 일어났냐? 밥은 먹었고? ...안 먹었지. 아이고, 뼈만 남았네.",
+		"(할머니가 하품을 삼키며 소매를 끌어 손등을 덮는다. 푸른 얼룩이 언뜻 보인다.)",
 		"우물에서 물 좀 떠 오너라, 우리 강아지. 그다음에 밥 먹이자.",
 	};
 	const char* kWellHintLines[] =
@@ -32,7 +34,7 @@ namespace
 	};
 	const char* kWaterLines[] =
 	{
-		"아이고 착하다. 너도 좀 마셔라, 어서. 얼굴이 핼쑥하다.",
+		"아이고 착하다. 너도 좀 마셔라, 어서. 얼굴이... 하암... 핼쑥하다.",
 		"자, 이제 텃밭에서 무 몇 개 뽑고, 뒷산에서 열매 좀 따 오너라.",
 		"빨간 것만이다! 허연 건 먹으면 배가 뒤틀린다.",
 	};
@@ -51,7 +53,7 @@ namespace
 	const char* kAteLines[] =
 	{
 		"봐라, 벌써 혈색이 돈다.",
-		"하나만 더. 헛간에 개화 전에 쓰던 손전등이 있다.",
+		"하나만 더. 헛간에... 뭐였더라. 아, 개화 전에 쓰던 손전등이 있다.",
 		"좀 가져오너라. 요즘 밤이 길다. 헛간은 동쪽, 김씨네 집 지나서다.",
 	};
 	const char* kTorchHintLines[] =
@@ -61,11 +63,13 @@ namespace
 	const char* kTorchLines[] =
 	{
 		"그래, 그거다. 너희 할아버지 거다. 배터리 아껴 써라, 더는 없다.",
-		"벌써 해가 진다. 오늘 밤은 집 가까이 있다가 어두워지기 전에 들어와라.",
+		"벌써 해가 진다. 할미는 요새 자꾸 눈이 감기는구나...",
+		"오늘 밤은 집 가까이 있다가 어두워지기 전에 들어와라.",
 	};
 	const char* kDuskHintLines[] =
 	{
 		"멀리 가지 마라, 어두워진다. 오늘 밥은 넉넉히 먹었냐?",
+		"우물이 말라서 할미가 새벽마다 저수지까지 다녔더니... 몸이 무겁구나. 걱정 마라.",
 	};
 	const char* kDeerLines[] =
 	{
@@ -74,8 +78,33 @@ namespace
 	};
 	const char* kBedLines[] =
 	{
-		"배는 불렀냐? ...그럼 자거라.",
+		"배는 불렀냐? ...그럼 자거라. 할미도 눈 좀... 붙여야겠다.",
 		"저 불빛들, 아침이면 없어질 거다.",
+	};
+
+	// The neighbours who lived nearer the water and fell asleep first. Their four dreams are
+	// one day seen from four sides: the morning Grandfather took the Route 32 bus.
+	struct Neighbor
+	{
+		const char* name;
+		const char* note;
+		const char* dream[2];
+	};
+
+	const Neighbor kNeighbors[4] =
+	{
+		{ "김씨 아저씨", "경운기 열쇠를 쥔 채 잠들었다.",
+		  { "정류장 앞, 젊은 할아버지가 손을 흔든다. \"금방 다녀오마.\"",
+			"경운기 소리에 대답이 묻힌다. 그날 버스는 사람으로 가득했다." } },
+		{ "박씨 할머니", "빨래 바구니를 끌어안고 잠들었다.",
+		  { "빨랫줄 너머, 젊은 순임이 버스표 한 장을 접었다 폈다 한다.",
+			"끝내 따라 타지 않는다. 마을에 남을 사람이 있었으니까." } },
+		{ "정미 아주머니", "라디오를 귀에 댄 채 잠들었다.",
+		  { "라디오가 말한다. 도시로 가는 32번 국도 버스는 오늘이 마지막이라고.",
+			"그 뒤로 라디오는 잡음뿐이었다. 순임은 그 잡음을 밤마다 들었다." } },
+		{ "동수", "강아지 목줄을 손목에 감은 채 잠들었다.",
+		  { "흙먼지를 일으키며 버스가 남쪽으로 멀어진다.",
+			"창가의 할아버지가 손전등을 깜빡여 보인다. 한 번, 두 번, 그리고 길 끝." } },
 	};
 
 	const int kPackRows[] = { ITEM_CLEAN_WATER, ITEM_BERRIES, ITEM_VEGETABLE, ITEM_HERB };
@@ -243,7 +272,7 @@ void Game::BuildVillage()
 		{ -4.5f, 17.5f, 0.80f },
 	};
 	for (int i = 0; i < 4; ++i)
-		AddSleeper(Vec3(others[i][0], 0.0f, others[i][1]), others[i][2], false, 1.3f * (float)(i + 1));
+		AddSleeper(Vec3(others[i][0], 0.0f, others[i][1]), others[i][2], false, 1.3f * (float)(i + 1))->neighbor = i;
 
 	villageExit = levelNode->AddChild(new ExitActor());
 	villageExit->SetPosition(Vec3(0.0f, 0.0f, kExitZ));
@@ -446,8 +475,9 @@ void Game::SetTutorial(int next)
 	}
 }
 
-void Game::Say(const char* const* lines, int count, int next)
+void Game::Say(const char* const* lines, int count, int next, const char* speaker)
 {
+	dialogSpeaker = speaker;
 	dialogLines.assign(lines, lines + count);
 	dialogIndex = 0;
 	dialogNext = next;
@@ -661,8 +691,8 @@ void Game::UpdateInteractionTarget()
 	{
 		if (targetSleeper->isGrandma)
 			prompt = (tutorial == TUT_FIND_GRANDMOTHER) ? "[E]  할머니 살펴보기" : "[E]  곁에 앉기";
-		else if (!targetSleeper->visited)
-			prompt = "[E]  곁에서 쉬기";
+		else if (!targetSleeper->visited && targetSleeper->neighbor >= 0)
+			prompt = std::string("[E]  곁에서 쉬기 - ") + kNeighbors[targetSleeper->neighbor].name;
 
 		targetSpot = prompt.empty() ? SPOT_NONE : SPOT_SLEEPER;
 	}
@@ -768,7 +798,17 @@ void Game::TryInteract()
 				s.mote = nullptr;
 			}
 			++fragments;
-			AddInsight(1, "꿈 조각: 다른 누군가의 눈으로 본 첫봄.");
+			AddInsight(1, "꿈 조각을 얻었다.");
+
+			// The sleeper's memory, seen for a moment; the last one joins the four into one day.
+			const Neighbor& n = kNeighbors[s.neighbor >= 0 ? s.neighbor : 0];
+			char noteLine[256];
+			sprintf_s(noteLine, sizeof(noteLine), "(%s. %s)", n.name, n.note);
+			const char* lines[4] = { noteLine, n.dream[0], n.dream[1],
+									 "(네 꿈이 하나로 이어진다. 할아버지가 32번 국도 버스를 타고 떠나던 날.)" };
+			char speaker[64];
+			sprintf_s(speaker, sizeof(speaker), "꿈 조각 · %s", n.name);
+			Say(lines, fragments >= fragmentGoal ? 4 : 3, -1, speaker);
 		}
 		break;
 	}
@@ -928,7 +968,7 @@ void Game::DrawDialog()
 	renderer->DrawRectPx(px, py, pw, ph, Vec3(0.08f, 0.09f, 0.08f), 0.88f);
 	renderer->DrawRectPx(px, py, 4.0f, ph, Vec3(0.85f, 0.70f, 0.45f), 0.9f);
 
-	renderer->DrawTexts((int)px + 24, (int)py + 28, "할머니", Vec3(0.92f, 0.80f, 0.58f), false);
+	renderer->DrawTexts((int)px + 24, (int)py + 28, dialogSpeaker.c_str(), Vec3(0.92f, 0.80f, 0.58f), false);
 	renderer->DrawTexts((int)px + 24, (int)py + 58, dialogLines[dialogIndex].c_str(), kHudInk, false);
 
 	char buf[16];
