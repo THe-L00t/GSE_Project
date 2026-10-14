@@ -48,6 +48,8 @@ struct WeatherParams
 struct ScreenFx
 {
 	float dream = 0.0f;       // [0,1] a dream fragment playing: warm, faded, the edges melting
+	float frost = 0.0f;       // [0,1] cold: a blue cast, frost creeping in from the edges
+	float hunger = 0.0f;      // [0,1] hunger or thirst: colour drains, sight narrows
 };
 
 // Graphics options; ApplySettings rebuilds only what a change touches.
@@ -244,6 +246,8 @@ private:
 		GLint volume = -1;
 		GLint volumeOn = -1;
 		GLint dream = -1;
+		GLint frost = -1;
+		GLint hunger = -1;
 		GLint positionAttrib = -1;
 	};
 
