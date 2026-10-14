@@ -308,8 +308,10 @@ void Game::Render()
 	renderer->EndScene();
 	renderer->BeginUI();
 
-	// Entering Route 32, the fog lifts off the road.
-	float haze = 0.08f + sporeExposure * 0.34f + routeIntroHaze * 0.7f;
+	// Entering Route 32, the fog lifts off the road. Reaching town it swells for a breath, then lifts off the rooftops.
+	float townHaze = 0.0f;
+	if (townCardTimer >= 0.0f) townHaze = SmoothStep(0.0f, 0.8f, townCardTimer) * (1.0f - SmoothStep(0.8f, 5.0f, townCardTimer)) * 0.6f;
+	float haze = 0.08f + sporeExposure * 0.34f + routeIntroHaze * 0.7f + townHaze;
 	float vignette = 0.28f + sporeExposure * 0.42f;
 	renderer->DrawAtmosphere(vignette, haze, Vec3(0.42f, 0.70f, 0.62f));
 

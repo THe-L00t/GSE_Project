@@ -19,6 +19,7 @@ uniform float     u_Time;
 uniform float     u_Dream;          // a dream fragment playing
 uniform float     u_Frost;          // cold
 uniform float     u_Hunger;         // hunger or thirst, whichever is worse
+uniform vec3      u_Grade;          // the region's colour cast
 
 layout(location = 0) out vec4 FragColor;
 
@@ -112,6 +113,9 @@ vec3 Composite(vec2 uv)
 		c.r = mix(c.r, red, amount * 0.7);
 		c.b = mix(c.b, blue, amount * 0.7);
 	}
+
+	// Each region keeps its own light: the open road a touch cool, the ginkgo town warm.
+	c *= u_Grade;
 
 	// Remembered colour: faded toward a warm sepia and lifted, an old photograph left in the sun.
 	if (u_Dream > 0.002)

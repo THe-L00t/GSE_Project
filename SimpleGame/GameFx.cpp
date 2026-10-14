@@ -10,6 +10,11 @@ namespace
 	const float kFrostFrom = 45.0f;
 	const float kHungerFrom = 25.0f;
 
+	// Region colour casts: home is neutral, the open road a touch cool, the ginkgo town warm and gold.
+	const Vec3 kVillageGrade(1.00f, 1.00f, 1.00f);
+	const Vec3 kRouteGrade(0.97f, 1.00f, 1.03f);
+	const Vec3 kTownGrade(1.06f, 1.00f, 0.86f);
+
 	const int   kMaxFootprints = 64;
 	const float kStride = 0.62f;          // ground covered between two prints
 	const float kPrintLife = 20.0f;       // seconds until a print has faded away
@@ -35,6 +40,17 @@ void Game::UpdateScreenFx(float dt)
 	}
 	screenFx.frost = Approach(screenFx.frost, frost, 1.5f, dt);
 	screenFx.hunger = Approach(screenFx.hunger, hunger, 1.5f, dt);
+
+	// The cast eases over a few seconds, so stepping onto the road or into town reads as a change of light.
+	Vec3 grade = kVillageGrade;
+	if (level == LEVEL_ROUTE)
+	{
+		float town = SmoothStep(kTownGateZ - 14.0f, kTownGateZ + 4.0f, player->Position().z);
+		grade = LerpV(kRouteGrade, kTownGrade, town);
+	}
+	screenFx.grade.x = Approach(screenFx.grade.x, grade.x, 0.8f, dt);
+	screenFx.grade.y = Approach(screenFx.grade.y, grade.y, 0.8f, dt);
+	screenFx.grade.z = Approach(screenFx.grade.z, grade.z, 0.8f, dt);
 }
 
 void Game::UpdateFootprints()
