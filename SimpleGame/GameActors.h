@@ -254,4 +254,5 @@ public:
 	int   spawnIndex = -1;  // index into the owning chunk's items, -1 for drops and scripted items
 	int   relicId = -1;     // the journal entry a relic fills; -1 picks one not yet found
 	bool  landmark = false; // placed by the level; never forgotten when left behind
+	float sparkle = 0.0f;   // a relic's glint this frame, set by the game
 };

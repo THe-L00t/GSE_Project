@@ -83,6 +83,8 @@ void Game::Update(float dt, const bool* keys)
 	UpdateSurvival(dt);
 	UpdateScreenFx(dt);
 	UpdateFootprints();
+	UpdateWorldFx(dt);
+	UpdateWisps(dt);
 	UpdateCamera(dt);
 	scene.RemoveDestroyed();
 }
@@ -296,6 +298,8 @@ void Game::Render()
 	wp.driftX = windDriftX;
 	wp.driftZ = windDriftZ;
 	renderer->SetWeather(wp);
+	screenFx.tiltShift = SmoothStep(kFarView - 2.0f, kNearView, camera->orthoHeight);
+	screenFx.focus = player->Position() + Vec3(0.0f, 0.9f, 0.0f);
 	renderer->SetScreenFx(screenFx);
 	renderer->SetCutaway(player->Position(), cutaway);
 

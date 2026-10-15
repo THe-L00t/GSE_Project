@@ -451,18 +451,6 @@ void Game::UpdateCombatTimers(float dt)
 
 	popups.erase(std::remove_if(popups.begin(), popups.end(),
 		[](const Popup& p) { return p.timer <= 0.0f; }), popups.end());
-
-	for (size_t i = 0; i < wisps.size(); ++i)
-	{
-		Wisp& w = wisps[i];
-		w.life -= dt;
-		w.vel = w.vel * (1.0f - 0.9f * dt);
-		w.pos = w.pos + w.vel * dt;
-		w.pos.x += sinf(time * 2.3f + (float)i * 1.7f) * 0.35f * dt;
-	}
-
-	wisps.erase(std::remove_if(wisps.begin(), wisps.end(),
-		[](const Wisp& w) { return w.life <= 0.0f; }), wisps.end());
 }
 
 void Game::DrawWisps()
@@ -471,11 +459,13 @@ void Game::DrawWisps()
 	{
 		const Wisp& w = wisps[i];
 		float k = Saturatef(w.life / w.maxLife);
-		float s = 1.3f * k;
+		// One being drawn in keeps its size until it is taken.
+		float s = w.size * (w.seek > 0.0f ? 0.6f + 0.4f * k : k);
 
 		DrawParams params;
-		params.emissive = 0.6f + 1.4f * k;
-		renderer->DrawModel(MODEL_WISP, w.pos, 0.0f, Vec3(s, s, s), params);
+		params.tint = w.tint;
+		params.emissive = (0.6f + 1.4f * k) * w.glow;
+		renderer->DrawModel(w.plain ? MODEL_MOTE : MODEL_WISP, w.pos, 0.0f, Vec3(s, s, s), params);
 	}
 }
 
@@ -513,6 +503,24 @@ void Game::PickUp(ItemActor& item)
 	const ItemInfo& info = GetItemInfo(item.type);
 	if (item.type != ITEM_RELIC) ShowMessage(info.pickupText, 3.5f);
 	++pickups[item.type];
+
+	// What is taken comes apart into light that gathers into whoever took it; a relic in a warm burst.
+	bool relic = item.type == ITEM_RELIC;
+	for (int i = 0, n = relic ? 16 : 5; i < n; ++i)
+	{
+		float a = fxRng.Range(0.0f, 2.0f * kPi);
+		Wisp w;
+		w.pos = item.Position() + Vec3(0.0f, 0.4f, 0.0f);
+		w.vel = Vec3(cosf(a) * 2.2f, fxRng.Range(1.0f, 2.6f), sinf(a) * 2.2f);
+		w.maxLife = w.life = 1.6f;
+		w.tint = relic ? Vec3(1.00f, 0.90f, 0.62f) : Vec3(0.75f, 1.00f, 0.85f);
+		w.size = 0.7f;
+		w.glow = 1.6f;
+		w.seek = 1.0f;
+		w.sway = 0.0f;
+		w.plain = true;
+		wisps.push_back(w);
+	}
 
 	if (item.spawnIndex >= 0)
 	{

@@ -506,6 +506,10 @@ void Renderer::CacheUniformLocations()
 	post.hunger = glGetUniformLocation(postShader, "u_Hunger");
 	post.grade = glGetUniformLocation(postShader, "u_Grade");
 	post.hurt = glGetUniformLocation(postShader, "u_Hurt");
+	post.focus = glGetUniformLocation(postShader, "u_Focus");
+	post.tiltShift = glGetUniformLocation(postShader, "u_TiltShift");
+	post.memo = glGetUniformLocation(postShader, "u_Memo");
+	post.recall = glGetUniformLocation(postShader, "u_Recall");
 
 	volume.invViewProj = glGetUniformLocation(volumeShader, "u_InvViewProj");
 	volume.lightViewProj = glGetUniformLocation(volumeShader, "u_LightViewProj");
@@ -754,6 +758,12 @@ void Renderer::EndScene()
 	glUniform1f(post.hunger, screenFx.hunger);
 	glUniform3f(post.grade, screenFx.grade.x, screenFx.grade.y, screenFx.grade.z);
 	glUniform1f(post.hurt, screenFx.hurt);
+	float focusU = 0.5f, focusV = 0.5f;
+	ProjectUv(screenFx.focus, focusU, focusV);
+	glUniform2f(post.focus, focusU, focusV);
+	glUniform1f(post.tiltShift, screenFx.tiltShift);
+	glUniform1f(post.memo, screenFx.memo);
+	glUniform1f(post.recall, screenFx.recall);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vboScreen);
 	glEnableVertexAttribArray(post.positionAttrib);
@@ -890,6 +900,15 @@ bool Renderer::WorldToScreen(const Vec3& pos, float& sx, float& sy) const
 
 	sx = (cx / cw * 0.5f + 0.5f) * (float)windowSizeX;
 	sy = (0.5f - cy / cw * 0.5f) * (float)windowSizeY;
+	return true;
+}
+
+bool Renderer::ProjectUv(const Vec3& pos, float& u, float& v) const
+{
+	float sx, sy;
+	if (!WorldToScreen(pos, sx, sy)) return false;
+	u = sx / (float)windowSizeX;
+	v = 1.0f - sy / (float)windowSizeY;
 	return true;
 }
 

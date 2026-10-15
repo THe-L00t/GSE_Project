@@ -159,13 +159,22 @@ struct Popup
 	char  text[32] = "";
 };
 
-// A mote of light let go when a creature is released; it drifts up and shrinks away.
+// A mote of light let go when a creature is released; it drifts up and shrinks away. The same mote is
+// a relic's glint, a find drawn into the player, an ember, a trail of light, or dust when it does not glow.
 struct Wisp
 {
 	Vec3  pos;
 	Vec3  vel;
 	float life = 0.0f;
 	float maxLife = 1.0f;
+	Vec3  tint{ 1.0f, 1.0f, 1.0f };
+	float size = 1.3f;
+	float glow = 1.0f;        // 0 for dust, lit like everything else instead of shining
+	float drag = 0.9f;
+	float lift = 0.0f;        // upward acceleration; negative lets it settle
+	float sway = 0.35f;
+	float seek = 0.0f;        // > 0 draws it into the player
+	bool  plain = false;      // a round mote, without the released spore's streak
 };
 
 // Pressed into snow or wet ground, fading over a while.
@@ -349,6 +358,8 @@ private:
 	bool PlayerHidden() const;   // a tree, roof or car stands between the eye and the player
 	void UpdateFootprints();
 	void DrawFootprints();
+	void UpdateWorldFx(float dt);   // glints, embers, trails and dust thrown off by what is happening
+	void UpdateWisps(float dt);
 
 	// GameStory.cpp: the story the road tells as you grow, find and travel
 	void UpdateStory(float dt);

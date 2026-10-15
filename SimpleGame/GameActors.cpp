@@ -305,7 +305,7 @@ void ItemActor::Draw(const DrawContext& dc) const
 {
 	DrawParams params;
 	params.phase = phase;
-	params.emissive = 0.35f;
+	params.emissive = 0.35f + sparkle * 1.4f;
 
 	dc.renderer->DrawShadow(WorldPosition(), 0.3f);
 	dc.renderer->DrawModel(GetItemInfo(type).model, WorldMatrix(), params);

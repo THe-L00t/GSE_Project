@@ -52,6 +52,10 @@ struct ScreenFx
 	float hunger = 0.0f;      // [0,1] hunger or thirst: colour drains, sight narrows
 	Vec3  grade{ 1.0f, 1.0f, 1.0f };   // the region's colour cast
 	float hurt = 0.0f;        // [0,1] red at the edges after a blow
+	float tiltShift = 0.0f;   // [0,1] zoomed in: the view above and below the focus goes soft
+	Vec3  focus;              // world point the tilt-shift keeps sharp
+	float memo = 0.0f;        // [0,1] grandmother's map note: the scene sketched on paper
+	float recall = 0.0f;      // [0,1] a memory: sepia and dim corners
 };
 
 // Graphics options; ApplySettings rebuilds only what a change touches.
@@ -265,6 +269,10 @@ private:
 		GLint hunger = -1;
 		GLint grade = -1;
 		GLint hurt = -1;
+		GLint focus = -1;
+		GLint tiltShift = -1;
+		GLint memo = -1;
+		GLint recall = -1;
 		GLint positionAttrib = -1;
 	};
 
@@ -311,6 +319,7 @@ private:
 	void CacheUniformLocations();
 	void LoadModels();
 	void GetGLPosition(float x, float y, float* newX, float* newY);
+	bool ProjectUv(const Vec3& pos, float& u, float& v) const;   // texture coordinates, bottom-left origin
 
 	void BindLit(const Mat4& model, int mode);
 	void BindMesh(int id);

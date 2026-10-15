@@ -27,6 +27,10 @@ namespace
 	const float kPrintLife = 20.0f;       // seconds until a print has faded away
 	const float kSnowForPrints = 0.25f;   // snow cover or wetness the ground needs before it takes a print
 	const float kWetForPrints = 0.35f;
+
+	const int   kMaxWisps = 400;
+	const float kGlintRange = 24.0f;      // relics further off neither twinkle nor shed glints
+	const Vec3  kRelicLight(1.00f, 0.90f, 0.62f);
 }
 
 void Game::UpdateScreenFx(float dt)
@@ -34,6 +38,12 @@ void Game::UpdateScreenFx(float dt)
 	// A dream fragment is a dialog spoken by the dream; the screen drifts in slowly and wakes a little faster.
 	bool dreaming = DialogOpen() && dialogSpeaker.find("꿈 조각") == 0;
 	screenFx.dream = Approach(screenFx.dream, dreaming ? 1.0f : 0.0f, dreaming ? 1.4f : 2.2f, dt);
+
+	// Grandmother's map notes read as a sketch on her paper; Hayul's memories as an old photograph.
+	bool memo = DialogOpen() && dialogSpeaker == "할머니의 지도 메모";
+	bool recall = DialogOpen() && (dialogSpeaker == "하율" || dialogSpeaker == "기억 속 할머니");
+	screenFx.memo = Approach(screenFx.memo, memo ? 1.0f : 0.0f, 2.5f, dt);
+	screenFx.recall = Approach(screenFx.recall, recall ? 1.0f : 0.0f, recall ? 1.6f : 2.4f, dt);
 
 	// The body only shows out on the road, and not while the long sleep takes over the screen.
 	float frost = 0.0f;
@@ -149,4 +159,69 @@ void Game::DrawFootprints()
 		float fade = 1.0f - Saturatef((time - f.born) / kPrintLife);
 		renderer->DrawDecal(f.pos, f.yaw, 0.14f, 0.28f, f.color, f.strength * fade);
 	}
+}
+
+void Game::UpdateWorldFx(float dt)
+{
+	Vec3 playerPos = player->Position();
+
+	// A relic lying out catches the light now and then, and sheds a glint that rises and goes out.
+	std::vector<ItemActor*> items = LiveItems();
+	for (size_t i = 0; i < items.size(); ++i)
+	{
+		ItemActor& item = *items[i];
+		if (item.type != ITEM_RELIC || DistXZ(item.Position(), playerPos) > kGlintRange)
+		{
+			item.sparkle = 0.0f;
+			continue;
+		}
+		item.sparkle = powf(Maxf(sinf(time * 2.6f + item.phase * 3.0f), 0.0f), 12.0f);
+		if (!fxRng.Chance(dt * 2.5f)) continue;
+
+		Wisp w;
+		w.pos = item.Position() + Vec3(fxRng.Range(-0.3f, 0.3f), fxRng.Range(0.3f, 0.8f), fxRng.Range(-0.3f, 0.3f));
+		w.vel = Vec3(0.0f, 0.35f, 0.0f);
+		w.maxLife = w.life = 0.7f;
+		w.tint = kRelicLight;
+		w.size = 0.5f;
+		w.glow = 1.6f;
+		w.sway = 0.1f;
+		w.plain = true;
+		wisps.push_back(w);
+	}
+}
+
+void Game::UpdateWisps(float dt)
+{
+	Vec3 chest = player->Position() + Vec3(0.0f, 1.0f, 0.0f);
+	for (size_t i = 0; i < wisps.size(); ++i)
+	{
+		Wisp& w = wisps[i];
+		w.life -= dt;
+
+		// Flung out first, then drawn in harder and harder; taken once it reaches the chest.
+		if (w.seek > 0.0f)
+		{
+			Vec3 to = chest - w.pos;
+			float dist = Length(to);
+			if (dist < 0.25f)
+			{
+				w.life = 0.0f;
+				continue;
+			}
+			float age = 1.0f - Saturatef(w.life / w.maxLife);
+			Vec3 want = to * ((2.0f + 12.0f * age) / dist);
+			w.vel = LerpV(w.vel, want, 1.0f - expf(-w.seek * 6.0f * age * dt));
+		}
+
+		w.vel = w.vel * (1.0f - w.drag * dt);
+		w.vel.y += w.lift * dt;
+		w.pos = w.pos + w.vel * dt;
+		w.pos.x += sinf(time * 2.3f + (float)i * 1.7f) * w.sway * dt;
+		if (w.pos.y < 0.04f) w.pos.y = 0.04f;
+	}
+
+	wisps.erase(std::remove_if(wisps.begin(), wisps.end(),
+		[](const Wisp& w) { return w.life <= 0.0f; }), wisps.end());
+	if ((int)wisps.size() > kMaxWisps) wisps.erase(wisps.begin(), wisps.begin() + ((int)wisps.size() - kMaxWisps));
 }

@@ -21,6 +21,10 @@ uniform float     u_Frost;          // cold
 uniform float     u_Hunger;         // hunger or thirst, whichever is worse
 uniform vec3      u_Grade;          // the region's colour cast
 uniform float     u_Hurt;           // a fresh blow, or health running low
+uniform vec2      u_Focus;          // the player on screen, kept sharp
+uniform float     u_TiltShift;      // drawn in close, the rows above and below go soft
+uniform float     u_Memo;           // grandmother's map note: paper and pencil
+uniform float     u_Recall;         // a memory: sepia, the edges dimmed
 
 layout(location = 0) out vec4 FragColor;
 
@@ -91,12 +95,14 @@ vec3 Composite(vec2 uv)
 	vec3 c = texture(u_Source, uv).rgb;
 
 	// Heavy spore exposure blurs the edges of sight and lets the colours slip apart; a dream melts them the same way.
+	// Drawn in close, the rows above and below the player soften like a lens focused on a miniature.
 	vec2 fromCenter = uv - vec2(0.5);
 	float edge = smoothstep(0.18, 0.72, length(fromCenter * vec2(1.15, 1.0)));
 	float amount = edge * max(smoothstep(0.10, 0.90, u_SporeExposure), u_Dream * 0.9);
-	if (amount > 0.002)
+	float tilt = u_TiltShift * smoothstep(0.08, 0.42, abs(uv.y - u_Focus.y));
+	if (amount > 0.002 || tilt > 0.002)
 	{
-		float radius = amount * 7.0;
+		float radius = max(amount * 7.0, tilt * 6.0);
 		float spin = hash12(gl_FragCoord.xy) * 6.2831853;
 		vec3 acc = c;
 		for (int i = 0; i < 8; ++i)
@@ -105,18 +111,48 @@ vec3 Composite(vec2 uv)
 			acc += texture(u_Source, uv + vec2(cos(a), sin(a)) * radius * u_Texel).rgb;
 		}
 		acc /= 9.0;
+		c = mix(c, acc, max(amount, tilt));
 
 		vec2 shift = fromCenter * amount * 0.014;
 		float red = texture(u_Source, uv + shift).r;
 		float blue = texture(u_Source, uv - shift).b;
-
-		c = mix(c, acc, amount);
 		c.r = mix(c.r, red, amount * 0.7);
 		c.b = mix(c.b, blue, amount * 0.7);
 	}
 
 	// Each region keeps its own light: the open road a touch cool, the ginkgo town warm.
 	c *= u_Grade;
+
+	float radial = length(fromCenter * vec2(1.15, 1.0));
+
+	// A map note reads as the scene sketched on old paper: graphite along the edges, hatching in the shadows.
+	if (u_Memo > 0.002)
+	{
+		vec2 px = gl_FragCoord.xy;
+		vec2 o = u_Texel * 1.5;
+		const vec3 kLuma = vec3(0.299, 0.587, 0.114);
+		float gx = dot(texture(u_Source, uv + vec2(o.x, 0.0)).rgb - texture(u_Source, uv - vec2(o.x, 0.0)).rgb, kLuma);
+		float gy = dot(texture(u_Source, uv + vec2(0.0, o.y)).rgb - texture(u_Source, uv - vec2(0.0, o.y)).rgb, kLuma);
+		float luma = dot(c, kLuma);
+
+		float fiber = valueNoise(px * vec2(0.9, 0.07)) * 0.5 + valueNoise(px * 0.3) * 0.5;
+		vec3 paper = vec3(0.93, 0.89, 0.78) * (0.90 + 0.12 * fiber);
+		float line = clamp(length(vec2(gx, gy)) * 5.0, 0.0, 1.0);
+		float hatch = smoothstep(0.55, 0.85, fract((px.x + px.y) * 0.16 + valueNoise(px * 0.05) * 0.6));
+		float shade = 1.0 - smoothstep(0.06, 0.40, luma);
+		float graphite = max(line, hatch * shade * 0.8) * (0.75 + 0.25 * fiber);
+		vec3 sketch = paper * (1.0 - graphite * 0.62) * mix(0.78, 1.0, smoothstep(0.0, 0.5, luma));
+		c = mix(c, sketch, u_Memo * 0.78);
+	}
+
+	// A memory: an old photograph, browned and dim at the corners, without the dream's waver.
+	if (u_Recall > 0.002)
+	{
+		float luma = dot(c, vec3(0.299, 0.587, 0.114));
+		vec3 sepia = luma * vec3(1.12, 0.94, 0.72) + vec3(0.04, 0.025, 0.0);
+		c = mix(c, sepia, u_Recall * 0.8);
+		c *= 1.0 - smoothstep(0.30, 0.85, radial) * u_Recall * 0.65;
+	}
 
 	// Remembered colour: faded toward a warm sepia and lifted, an old photograph left in the sun.
 	if (u_Dream > 0.002)
@@ -125,8 +161,6 @@ vec3 Composite(vec2 uv)
 		vec3 warm = luma * vec3(1.15, 0.98, 0.78) + vec3(0.05, 0.035, 0.01);
 		c = mix(c, warm, u_Dream * 0.65);
 	}
-
-	float radial = length(fromCenter * vec2(1.15, 1.0));
 
 	// Hunger and thirst drain the colour first, then close sight in from the edges.
 	if (u_Hunger > 0.002)
@@ -152,7 +186,7 @@ vec3 Composite(vec2 uv)
 	if (u_Hurt > 0.002)
 		c = mix(c, vec3(0.50, 0.04, 0.03), smoothstep(0.35, 0.80, radial) * u_Hurt * 0.7);
 
-	c += texture(u_Bloom, uv).rgb * u_BloomStrength;
+	c += texture(u_Bloom, uv).rgb * u_BloomStrength * (1.0 - u_Memo * 0.7);
 	c += texture(u_Volume, uv).rgb * u_VolumeOn;
 	c = ToneMap(c);
 
