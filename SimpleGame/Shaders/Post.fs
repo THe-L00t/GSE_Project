@@ -26,6 +26,7 @@ uniform float     u_TiltShift;      // drawn in close, the rows above and below 
 uniform float     u_Memo;           // grandmother's map note: paper and pencil
 uniform float     u_Recall;         // a memory: sepia, the edges dimmed
 uniform vec3      u_Ripple;         // xy centre on screen, z how far the level-up wave has run (0 none)
+uniform vec4      u_Heat[2];        // lantern flames: xy on screen, z one world unit in screen heights, w strength
 
 layout(location = 0) out vec4 FragColor;
 
@@ -101,6 +102,17 @@ vec3 Composite(vec2 uv)
 		float r = length(d);
 		float band = 1.0 - smoothstep(0.0, 0.07, abs(r - u_Ripple.z * 1.1));
 		uv -= d / max(r, 0.0001) / aspect * band * 0.014 * (1.0 - u_Ripple.z);
+	}
+
+	// Air shimmers in a column over each lantern flame, widest at the fire and thinning as it rises.
+	for (int i = 0; i < 2; ++i)
+	{
+		if (u_Heat[i].w <= 0.0) continue;
+		vec2 d = (uv - u_Heat[i].xy) * vec2(u_Texel.y / u_Texel.x, 1.0) / u_Heat[i].z;
+		float width = 0.45 + max(d.y, 0.0) * 0.25;
+		float column = (1.0 - smoothstep(0.3, 1.0, abs(d.x) / width)) * smoothstep(-0.3, 0.1, d.y) * (1.0 - smoothstep(0.8, 2.6, d.y));
+		float wobble = sin(uv.y * 180.0 - u_Time * 7.0 + d.x * 3.0) * 0.6 + sin(uv.y * 97.0 - u_Time * 4.3) * 0.4;
+		uv.x += wobble * column * u_Heat[i].w * 0.0016;
 	}
 
 	vec3 c = texture(u_Source, uv).rgb;

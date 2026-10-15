@@ -35,6 +35,12 @@ namespace
 
 	const float kRippleTime = 1.1f;       // seconds the level-up wave takes to cross the screen
 	const float kRingTime = 1.3f;         // and the rings of light on the ground to spread and fade
+
+	const float kFlameHeight = 1.35f;     // the fire in a stone lantern's window
+	const float kHeatRange = 18.0f;       // lanterns further than this from the player neither shimmer nor spark
+	const Vec3  kEmberColor(1.00f, 0.55f, 0.22f);
+	const float kTrailStep = 0.25f;       // ground the deer covers between two motes of its trail
+	const Vec3  kDeerLight(1.00f, 0.85f, 0.50f);
 }
 
 void Game::UpdateScreenFx(float dt)
@@ -244,6 +250,80 @@ void Game::UpdateWorldFx(float dt)
 			w.drag = 2.5f;
 			w.lift = -1.5f;
 			w.sway = 0.0f;
+			w.plain = true;
+			wisps.push_back(w);
+		}
+	}
+
+	// The two lanterns nearest the player shimmer the air above them; every lantern close by throws embers.
+	std::vector<LanternActor*> lanterns;
+	SceneGraph::Collect(scene.Root(), ACTOR_LANTERN, lanterns);
+	float nearest[2] = { kHeatRange, kHeatRange };
+	screenFx.heatStrength[0] = screenFx.heatStrength[1] = 0.0f;
+	for (size_t i = 0; i < lanterns.size(); ++i)
+	{
+		Vec3 flame = lanterns[i]->WorldPosition() + Vec3(0.0f, kFlameHeight, 0.0f);
+		float dist = DistXZ(flame, playerPos);
+		if (dist >= kHeatRange) continue;
+
+		int slot = dist < nearest[0] ? 0 : (dist < nearest[1] ? 1 : -1);
+		if (slot == 0)
+		{
+			nearest[1] = nearest[0];
+			screenFx.heat[1] = screenFx.heat[0];
+			screenFx.heatStrength[1] = screenFx.heatStrength[0];
+		}
+		if (slot >= 0)
+		{
+			nearest[slot] = dist;
+			screenFx.heat[slot] = flame;
+			screenFx.heatStrength[slot] = 1.0f;
+		}
+
+		if (!fxRng.Chance(dt * 5.0f)) continue;
+		Wisp w;
+		w.pos = flame + Vec3(fxRng.Range(-0.12f, 0.12f), 0.0f, fxRng.Range(-0.12f, 0.12f));
+		w.vel = Vec3(fxRng.Range(-0.2f, 0.2f), fxRng.Range(0.6f, 1.1f), fxRng.Range(-0.2f, 0.2f));
+		w.maxLife = w.life = fxRng.Range(1.2f, 2.0f);
+		w.tint = kEmberColor;
+		w.size = 0.35f;
+		w.glow = 2.2f;
+		w.drag = 0.6f;
+		w.lift = 0.2f;
+		w.sway = 0.5f;
+		w.plain = true;
+		wisps.push_back(w);
+	}
+
+	// The light in the deer's antlers leaves a fading trail along the way it walked.
+	std::vector<DeerActor*> deers;
+	SceneGraph::Collect(scene.Root(), ACTOR_DEER, deers);
+	for (size_t i = 0; i < deers.size(); ++i)
+	{
+		DeerActor& d = *deers[i];
+		Vec3 facing(sinf(d.Yaw()), 0.0f, cosf(d.Yaw()));
+		Vec3 light = d.WorldPosition() + facing * 0.7f + Vec3(0.0f, 2.4f, 0.0f);
+		float moved = Length(light - d.trailFrom);
+		if (!d.trailStarted || moved > 3.0f)
+		{
+			d.trailFrom = light;
+			d.trailStarted = true;
+			continue;
+		}
+
+		Vec3 step = (light - d.trailFrom) * (kTrailStep / Maxf(moved, 0.001f));
+		for (; moved >= kTrailStep; moved -= kTrailStep)
+		{
+			d.trailFrom = d.trailFrom + step;
+			Wisp w;
+			w.pos = d.trailFrom + Vec3(fxRng.Range(-0.08f, 0.08f), fxRng.Range(-0.08f, 0.08f), fxRng.Range(-0.08f, 0.08f));
+			w.vel = Vec3(0.0f, -0.15f, 0.0f);
+			w.maxLife = w.life = 1.6f;
+			w.tint = d.carriesGrandma ? Vec3(1.00f, 0.72f, 0.42f) : kDeerLight;
+			w.size = 0.45f;
+			w.glow = 1.8f;
+			w.drag = 0.5f;
+			w.sway = 0.15f;
 			w.plain = true;
 			wisps.push_back(w);
 		}

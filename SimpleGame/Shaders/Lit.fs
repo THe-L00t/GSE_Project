@@ -67,6 +67,23 @@ float valueNoise(vec2 p)
 	return texture(u_Noise, (i + f + 0.5) / 256.0).r;
 }
 
+// Rings spreading from raindrops: one drop per cell at its own moment, kept inside its cell so a single
+// lookup is enough. xy tilts the normal outward from the drop, z is how bright the ring is.
+vec3 Raindrops(vec2 p, float rate)
+{
+	vec2 cell = floor(p);
+	float h = hash21(cell);
+	float h2 = hash21(cell + 17.31);
+	float cycle = u_Time * rate + h * 7.0;
+	float phase = fract(cycle);
+	float live = step(hash21(cell + floor(cycle) * 3.7), 0.6);   // not every cell gets a drop each round
+
+	vec2 d = fract(p) - (0.3 + 0.4 * vec2(h, h2));
+	float r = length(d);
+	float ring = (1.0 - smoothstep(0.0, 0.04, abs(r - phase * 0.3))) * (1.0 - phase) * live;
+	return vec3(d / max(r, 0.001) * ring, ring);
+}
+
 float fbm(vec2 p)
 {
 	float v = 0.0;
@@ -318,6 +335,15 @@ void main()
 			float puddle = smoothstep(0.62, 0.78, valueNoise(p * 0.45 + 3.0)) * u_Weather.w;
 			base *= 1.0 - 0.25 * u_Weather.w - 0.20 * puddle;
 			gloss = puddle * 0.8;
+
+			// While it is still raining the puddles are stippled with spreading rings that catch the sun.
+			if (u_Weather.x > 0.02 && puddle > 0.02)
+			{
+				vec3 drop = Raindrops(p * 2.2, 1.1) + Raindrops(p * 2.2 + 0.5, 1.37);
+				float wet = puddle * u_Weather.x;
+				n = normalize(n + vec3(drop.x, 0.0, drop.y) * 0.5 * wet);
+				base += vec3(0.05) * drop.z * wet;
+			}
 		}
 
 		// Snow lies in drifts first, then covers everything; the road keeps its wheel ruts longest.
@@ -339,6 +365,11 @@ void main()
 		float w2 = sin(p.y * 1.70 - u_Time * 0.55);
 		float w3 = sin((p.x + p.y) * 0.65 + u_Time * 0.35);
 		n = normalize(vec3(w1 * 0.05 + w3 * 0.03, 1.0, w2 * 0.05 + w3 * 0.03));
+
+		// Rain stipples the surface with rings; even on a dry day a drip lands now and then.
+		vec3 drop = Raindrops(p * 1.6, 0.9) * mix(0.12, 1.0, u_Weather.x);
+		if (u_Weather.x > 0.02) drop += Raindrops(p * 2.3 + 0.5, 1.3) * u_Weather.x;
+		n = normalize(n + vec3(drop.x, 0.0, drop.y) * 0.35);
 
 		vec3 eye = normalize(u_CamPos - v_WorldPos);
 		float fres = pow(1.0 - clamp(dot(n, eye), 0.0, 1.0), 3.0);

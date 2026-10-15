@@ -171,6 +171,8 @@ public:
 	bool  arrived = false;
 	bool  carriesGrandma = false;  // after she sleeps, one more warm light rides on its antlers
 	float stepPhase = 0.0f;
+	Vec3  trailFrom;               // where the antler light last dropped a mote behind it
+	bool  trailStarted = false;
 };
 
 // The player leaves the level once past this line, heading +Z.

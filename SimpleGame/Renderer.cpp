@@ -511,6 +511,7 @@ void Renderer::CacheUniformLocations()
 	post.memo = glGetUniformLocation(postShader, "u_Memo");
 	post.recall = glGetUniformLocation(postShader, "u_Recall");
 	post.ripple = glGetUniformLocation(postShader, "u_Ripple");
+	post.heat = glGetUniformLocation(postShader, "u_Heat");
 
 	volume.invViewProj = glGetUniformLocation(volumeShader, "u_InvViewProj");
 	volume.lightViewProj = glGetUniformLocation(volumeShader, "u_LightViewProj");
@@ -768,6 +769,17 @@ void Renderer::EndScene()
 	float rippleU = 0.5f, rippleV = 0.5f;
 	ProjectUv(screenFx.rippleAt, rippleU, rippleV);
 	glUniform3f(post.ripple, rippleU, rippleV, screenFx.ripple);
+
+	// One world unit in screen heights: the orthographic view keeps it the same everywhere on screen.
+	float heat[8] = {};
+	for (int i = 0; i < 2; ++i)
+	{
+		float* h = &heat[i * 4];
+		if (screenFx.heatStrength[i] <= 0.0f || !ProjectUv(screenFx.heat[i], h[0], h[1])) continue;
+		h[2] = pixelsPerUnit / (float)targetHeight;
+		h[3] = screenFx.heatStrength[i];
+	}
+	glUniform4fv(post.heat, 2, heat);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vboScreen);
 	glEnableVertexAttribArray(post.positionAttrib);

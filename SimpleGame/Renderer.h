@@ -58,6 +58,8 @@ struct ScreenFx
 	float recall = 0.0f;      // [0,1] a memory: sepia and dim corners
 	float ripple = 0.0f;      // (0,1) how far the level-up wave has spread from rippleAt; 0 none
 	Vec3  rippleAt;
+	Vec3  heat[2];            // lantern flames the air shimmers over
+	float heatStrength[2] = { 0.0f, 0.0f };
 };
 
 // Graphics options; ApplySettings rebuilds only what a change touches.
@@ -277,6 +279,7 @@ private:
 		GLint memo = -1;
 		GLint recall = -1;
 		GLint ripple = -1;
+		GLint heat = -1;
 		GLint positionAttrib = -1;
 	};
 
