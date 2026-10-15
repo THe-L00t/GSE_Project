@@ -152,6 +152,7 @@ void Game::UpdateRoute(float dt, const bool* keys)
 	UpdateRouteForage();
 	UpdateRouteDeer(dt);
 	UpdateGuide();
+	UpdateStory(dt);
 
 	// Deeper, more overgrown chunks carry thicker spores. Nature Insight slows it; thirst speeds it up.
 	const ChunkActor* here = EnsureChunk(playerChunkX, playerChunkZ);
@@ -513,12 +514,14 @@ void Game::UpdateLandmarks(float dt)
 	{
 		busQueueSeen = true;
 		ShowMessage("정류장 앞에 허물들이 줄을 서 있다. 오지 않는 버스를 아직 기다리는 것처럼.", 5.0f);
+		MarkMemo(MEMO_BUS_STOP);
 	}
 
 	if (!reservoirFound && reservoir->ShoreDistance(pos) < 3.0f)
 	{
 		reservoirFound = true;
 		AddInsight(1, "땅이 움푹 꺼진 곳에 물이 숨어 있었다.");
+		MarkMemo(MEMO_RESERVOIR);
 	}
 
 	if (!townReached && pos.z > kTownGateZ && fabsf(pos.x - RoadCenter(pos.z)) < 16.0f)
@@ -526,6 +529,7 @@ void Game::UpdateLandmarks(float dt)
 		townReached = true;
 		townCardTimer = 0.0f;
 		ShowMessage("은행나무 읍내에 닿았다. 원한다면, 길은 계속된다.", 6.0f);
+		MarkMemo(MEMO_TOWN);
 	}
 
 	if (townCardTimer >= 0.0f)
@@ -535,6 +539,7 @@ void Game::UpdateLandmarks(float dt)
 	}
 
 	prompt.clear();
+	restIndex = -1;
 	if (deathTimer >= 0.0f) return;
 	if (NearLanternFire())
 	{
@@ -545,6 +550,10 @@ void Game::UpdateLandmarks(float dt)
 	else if (reservoir->ShoreDistance(pos) < 1.8f)
 	{
 		prompt = "[E]  물 마시고 물병 채우기";
+	}
+	else if (FindRouteSleeper())
+	{
+		prompt = "[E]  잠든 이 곁에서 쉬기";
 	}
 }
 
@@ -598,6 +607,7 @@ void Game::PickRouteBush(ForageActor& bush)
 
 	int take = room < 2 ? room : 2;
 	inventory[ITEM_BERRIES] += take;
+	NoteFirstFind(ITEM_BERRIES);
 	ChunkState& state = chunkStates[ChunkMap::Key(bush.chunkX, bush.chunkZ)];
 	if (bush.spawnIndex < (int)state.bushRegrowAt.size()) state.bushRegrowAt[bush.spawnIndex] = time + kBushRegrow;
 
@@ -684,6 +694,11 @@ void Game::UpdateRouteDeer(float dt)
 
 void Game::TryRouteInteract()
 {
+	if (DialogOpen())
+	{
+		AdvanceDialog();
+		return;
+	}
 	if (deathTimer >= 0.0f) return;
 
 	if (targetForage)
@@ -702,6 +717,12 @@ void Game::TryRouteInteract()
 		char buf[256];
 		sprintf_s(buf, sizeof(buf), "석등 불에 고기 %d덩이를 굽는다. 기름 냄새가 안개 속으로 번진다.", count);
 		ShowMessage(buf, 3.5f);
+		return;
+	}
+
+	if (restIndex >= 0)
+	{
+		RestBySleeper();
 		return;
 	}
 
@@ -752,6 +773,7 @@ void Game::DrawRouteHud()
 	DrawCommonHud("WASD 이동  SPACE 구르기  J 공격  Q 약초  R 마시기  F 먹기  L 손전등  I 배낭  B 도감  C 능력치  E 사용  F4 옵션");
 	DrawTitleCard("32번 국도", "처음 나선 바깥");
 	DrawTitleCardAt("은행나무 읍내", "첫 길의 끝", townCardTimer);
+	DrawDialog();
 	DrawStatPanel();
 	DrawBagPanel();
 	DrawJournalPanel();

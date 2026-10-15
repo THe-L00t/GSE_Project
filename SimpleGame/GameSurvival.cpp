@@ -179,6 +179,7 @@ void Game::FindRelic(int id)
 		char buf[256];
 		sprintf_s(buf, sizeof(buf), "유물 도감에 새 기록: %s  (B로 읽기)", RelicName(id));
 		ShowMessage(buf, 4.5f);
+		if (level == LEVEL_ROUTE) TellRelicOwner(id);
 	}
 	else
 	{
@@ -207,6 +208,7 @@ bool Game::HandleMenuKey(unsigned char key)
 	if (journalOpen)
 	{
 		if (key == 'b' || key == 27) journalOpen = false;
+		else if (key == '\t') journalPage = 1 - journalPage;
 		return true;
 	}
 	return false;
@@ -316,6 +318,17 @@ void Game::DrawJournalPanel()
 
 	int x = (int)px + 36;
 	int y = (int)py + 44;
+	renderer->DrawTexts(x, (int)(py + ph) - 18, "[B] 닫기", kHudAccent, false);
+	renderer->DrawTexts(x + 120, (int)(py + ph) - 18, journalPage == 0 ? "[Tab] 할머니의 지도" : "[Tab] 유물 도감", kHudDim, false);
+
+	if (journalPage == 1)
+	{
+		renderer->DrawTexts(x, y, "할머니의 지도", kHudInk, true);
+		renderer->DrawTexts(x + 250, y, "여백에 남긴 메모들", kHudDim, false);
+		DrawMemoPage(x, y + 36);
+		return;
+	}
+
 	renderer->DrawTexts(x, y, "유물 도감", kHudInk, true);
 	renderer->DrawTexts(x + 250, y, "옛 세상이 남기고 간 것들", kHudDim, false);
 	y += 36;
@@ -333,6 +346,4 @@ void Game::DrawJournalPanel()
 		}
 		y += 44;
 	}
-
-	renderer->DrawTexts(x, (int)(py + ph) - 18, "[B] 닫기", kHudAccent, false);
 }

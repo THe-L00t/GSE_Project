@@ -47,6 +47,15 @@ void Game::Update(float dt, const bool* keys)
 	// Panels pause the world so choices can be made calmly.
 	if (MenuOpen()) return;
 
+	// On the road a story beat holds the world still like a panel; the dream on screen still eases in.
+	if (level == LEVEL_ROUTE && DialogOpen())
+	{
+		time += dt;
+		prompt = "[E]  계속";
+		UpdateScreenFx(dt);
+		return;
+	}
+
 	// A landed blow holds the world still for a moment; drawing carries on, so the frozen frame reads.
 	if (hitStop > 0.0f)
 	{
@@ -237,7 +246,7 @@ void Game::OnKeyDown(unsigned char key)
 
 void Game::OnMouseDown()
 {
-	if (!statPanelOpen && level == LEVEL_ROUTE) Attack();
+	if (!statPanelOpen && level == LEVEL_ROUTE && !DialogOpen()) Attack();
 }
 
 void Game::ZoomBy(float steps)

@@ -536,6 +536,7 @@ void Game::PickUp(ItemActor& item)
 		break;
 	default:
 		++inventory[item.type];
+		NoteFirstFind(item.type);
 		break;
 	}
 }

@@ -79,6 +79,24 @@ enum RouteGuide
 	GUIDE_EXPLORE
 };
 
+// Notes grandmother left in the margins of the map, each read on reaching its place (ContentDesign.md 5).
+enum StoryMemo
+{
+	MEMO_ROAD,
+	MEMO_BUS_STOP,
+	MEMO_RESERVOIR,
+	MEMO_TOWN,
+	MEMO_TREE,
+	MEMO_COUNT
+};
+
+// A dialog waiting for a quiet moment on the road.
+struct StoryBeat
+{
+	std::string speaker;
+	std::vector<std::string> lines;
+};
+
 enum Season
 {
 	SEASON_SPRING,
@@ -170,6 +188,7 @@ struct ChunkState
 	std::vector<bool>  itemTaken;
 	std::vector<bool>  swarmCleared;   // a car's mites driven off once leaves its find behind for good
 	std::vector<float> bushRegrowAt;   // game time when each picked bush fruits again
+	std::vector<bool>  sleeperRested;  // a dream already seen beside this sleeper
 };
 
 class Game
@@ -331,6 +350,17 @@ private:
 	void UpdateFootprints();
 	void DrawFootprints();
 
+	// GameStory.cpp: the story the road tells as you grow, find and travel
+	void UpdateStory(float dt);
+	void QueueStory(const char* speaker, const char* const* lines, int count);
+	bool StoryCalm() const;   // nothing hostile close or closing in
+	void MarkMemo(int memo);
+	void NoteFirstFind(int itemType);
+	void TellRelicOwner(int relic);
+	bool FindRouteSleeper();  // a sleeper close by, unvisited and unguarded; sets the rest target
+	void RestBySleeper();
+	void DrawMemoPage(int x, int y);
+
 	Renderer* renderer = nullptr;
 	int   level = LEVEL_VILLAGE;
 	float levelTimer = 0.0f;      // seconds since the current level began
@@ -418,6 +448,7 @@ private:
 	float torchBattery = 100.0f;
 	bool  bagOpen = false;
 	bool  journalOpen = false;
+	int   journalPage = 0;        // 0 the relics, 1 grandmother's map notes
 	bool  packOpen = false;       // the departure: choosing what goes in the bag
 	int   mealsEaten = 0;
 	bool  enemySeen[ENEMY_TYPE_COUNT] = {};
@@ -469,6 +500,17 @@ private:
 	std::vector<Footprint> footprints;
 	Vec3  lastPrintPos;
 	bool  printLeft = false;
+
+	std::vector<StoryBeat> storyQueue;
+	float storyCalm = 0.0f;       // seconds the road has been quiet
+	bool  memoSeen[MEMO_COUNT] = {};
+	int   nextRecall = 4;         // the level whose memory comes back next
+	bool  firstFound[ITEM_TYPE_COUNT] = {};
+	int   relicsTold = 0;         // relic count milestones already spoken
+	int   roadDreams = 0;         // dreams seen beside the road's sleepers
+	int   restChunkX = 0;
+	int   restChunkZ = 0;
+	int   restIndex = -1;         // the sleeper the interaction key would rest beside
 
 	PerfStats perf;
 	bool  optionsOpen = false;
