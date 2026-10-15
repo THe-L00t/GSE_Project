@@ -1,7 +1,7 @@
 #version 330
 
-// Spore field. Every particle is animated on the GPU from a static seed and
-// wrapped inside a box that follows the camera, so the field never runs out.
+// Spore field. Every particle is animated on the GPU from a static seed fixed in the world,
+// wrapped into a box around the camera, so the field never runs out.
 // Style 0: spores. Style 1: fireflies low over the ground. Style 2: pollen and dust.
 // Style 3: rain. Style 4: snow. Style 5: autumn leaves.
 
@@ -87,14 +87,17 @@ void main()
 		fadeOut = 1.0 - smoothstep(0.55, 1.00, s.y);
 	}
 
-	vec3 world;
-	world.x = u_Center.x + (s.x - 0.5) * u_Field.x;
-	world.z = u_Center.z + (s.z - 0.5) * u_Field.z;
-	world.y = s.y * u_Field.y;
+	// The seed tiles the world with the field's period; only the copy nearest the camera is drawn,
+	// so a mote stays put as you walk past and only hops across at the far edge of the box.
+	vec2 halfField = u_Field.xz * 0.5;
+	vec2 d = mod(s.xz * u_Field.xz - u_Center.xz + halfField, u_Field.xz) - halfField;
+	vec3 world = vec3(u_Center.x + d.x, s.y * u_Field.y, u_Center.z + d.y);
+	vec2 edge = abs(d) / halfField;
+	float edgeFade = 1.0 - smoothstep(0.82, 1.0, max(edge.x, edge.y));
 
 	gl_Position = u_ViewProj * vec4(world, 1.0);
 
-	v_Alpha = fadeIn * fadeOut;
+	v_Alpha = fadeIn * fadeOut * edgeFade;
 	v_Rand = a_Rand.x;
 
 	gl_PointSize = max(2.0, u_Size * u_PixelsPerUnit * (0.55 + a_Rand.x * 0.9));

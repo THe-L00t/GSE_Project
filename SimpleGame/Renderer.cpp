@@ -1210,7 +1210,11 @@ void Renderer::PlaceFireflyLights(const Vec3& center)
 		sz -= floorf(sz);
 		float sy = 0.15f + 0.7f * s[1] + sinf(time * 0.8f + r[2] * 6.283f) * 0.08f;
 
-		Vec3 pos(center.x + (sx - 0.5f) * kFireflyField.x, sy * kFireflyField.y, center.z + (sz - 0.5f) * kFireflyField.z);
+		float dx = sx * kFireflyField.x - center.x + kFireflyField.x * 0.5f;
+		float dz = sz * kFireflyField.z - center.z + kFireflyField.z * 0.5f;
+		dx -= floorf(dx / kFireflyField.x) * kFireflyField.x + kFireflyField.x * 0.5f;
+		dz -= floorf(dz / kFireflyField.z) * kFireflyField.z + kFireflyField.z * 0.5f;
+		Vec3 pos(center.x + dx, sy * kFireflyField.y, center.z + dz);
 		float dist = DistXZ(pos, fogOrigin);
 		if (dist > 16.0f) continue;
 
