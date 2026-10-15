@@ -325,6 +325,7 @@ void Game::Render()
 	scene.Draw(renderer, view);
 	DrawWisps();
 	DrawFootprints();
+	DrawLevelUpRings();
 
 	// Spores last: additive, and they should sit over everything. Rain beats them down.
 	renderer->DrawSpores(Vec3(view.x, 0.0f, view.z), Vec3(70.0f, 16.0f, 70.0f),

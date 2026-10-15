@@ -15,6 +15,7 @@
 #include "GameActors.h"
 
 const float kInteractRange = 2.3f;
+const float kLevelUpTime = 3.0f;    // seconds the level-up banner and its light last
 
 const Vec3 kHudPanel(0.03f, 0.05f, 0.05f);
 const Vec3 kHudInk(0.90f, 0.93f, 0.90f);
@@ -360,6 +361,7 @@ private:
 	void DrawFootprints();
 	void UpdateWorldFx(float dt);   // glints, embers, trails and dust thrown off by what is happening
 	void UpdateWisps(float dt);
+	void DrawLevelUpRings();
 
 	// GameStory.cpp: the story the road tells as you grow, find and travel
 	void UpdateStory(float dt);
@@ -511,6 +513,8 @@ private:
 	std::vector<Footprint> footprints;
 	Vec3  lastPrintPos;
 	bool  printLeft = false;
+	Vec3  swingTip;               // where the weapon's end was last update, for the trail behind it
+	bool  swingTipValid = false;
 
 	std::vector<StoryBeat> storyQueue;
 	float storyCalm = 0.0f;       // seconds the road has been quiet

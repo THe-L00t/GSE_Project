@@ -31,6 +31,10 @@ namespace
 	const int   kMaxWisps = 400;
 	const float kGlintRange = 24.0f;      // relics further off neither twinkle nor shed glints
 	const Vec3  kRelicLight(1.00f, 0.90f, 0.62f);
+	const Vec3  kSporeLight(0.55f, 0.95f, 0.80f);
+
+	const float kRippleTime = 1.1f;       // seconds the level-up wave takes to cross the screen
+	const float kRingTime = 1.3f;         // and the rings of light on the ground to spread and fade
 }
 
 void Game::UpdateScreenFx(float dt)
@@ -44,6 +48,11 @@ void Game::UpdateScreenFx(float dt)
 	bool recall = DialogOpen() && (dialogSpeaker == "하율" || dialogSpeaker == "기억 속 할머니");
 	screenFx.memo = Approach(screenFx.memo, memo ? 1.0f : 0.0f, 2.5f, dt);
 	screenFx.recall = Approach(screenFx.recall, recall ? 1.0f : 0.0f, recall ? 1.6f : 2.4f, dt);
+
+	// A level-up sends one ring of bent air out from the player in its first moments.
+	float sinceLevelUp = kLevelUpTime - levelUpTimer;
+	screenFx.ripple = (levelUpTimer > 0.0f && sinceLevelUp < kRippleTime) ? Maxf(sinceLevelUp / kRippleTime, 0.001f) : 0.0f;
+	screenFx.rippleAt = player->Position() + Vec3(0.0f, 0.9f, 0.0f);
 
 	// The body only shows out on the road, and not while the long sleep takes over the screen.
 	float frost = 0.0f;
@@ -189,6 +198,73 @@ void Game::UpdateWorldFx(float dt)
 		w.plain = true;
 		wisps.push_back(w);
 	}
+
+	// The pipe's end leaves a short streak of light along its arc, filled in between updates so it never breaks.
+	if (player->swingTimer > 0.0f && player->weapon)
+	{
+		// The pose is otherwise only set while drawing; set it now so the tip is this update's.
+		player->UpdatePose(deathTimer);
+		const float* m = player->weapon->WorldMatrix().m;
+		Vec3 tip(m[4] * 0.92f + m[12], m[5] * 0.92f + m[13], m[6] * 0.92f + m[14]);
+		for (int i = 0; i < 3 && swingTipValid; ++i)
+		{
+			Wisp w;
+			w.pos = LerpV(swingTip, tip, (float)(i + 1) / 3.0f);
+			w.maxLife = w.life = 0.18f;
+			w.tint = Vec3(0.85f, 0.95f, 1.00f);
+			w.size = 0.55f;
+			w.glow = 2.0f;
+			w.drag = 0.0f;
+			w.sway = 0.0f;
+			w.plain = true;
+			wisps.push_back(w);
+		}
+		swingTip = tip;
+		swingTipValid = true;
+	}
+	else
+	{
+		swingTipValid = false;
+	}
+
+	// A roll kicks up dust behind it, or a spray of powder off fresh snow; soaked ground gives none.
+	bool snowy = snowCover > kSnowForPrints;
+	if (player->rollTimer > 0.0f && (snowy || wetness < kWetForPrints))
+	{
+		for (int k = 0; k < 2; ++k)
+		{
+			if (!fxRng.Chance(dt * 24.0f)) continue;
+			Wisp w;
+			w.pos = playerPos + Vec3(fxRng.Range(-0.25f, 0.25f), 0.1f, fxRng.Range(-0.25f, 0.25f));
+			w.vel = player->rollDir * -0.8f + Vec3(fxRng.Range(-0.6f, 0.6f), fxRng.Range(0.6f, 1.2f), fxRng.Range(-0.6f, 0.6f));
+			w.maxLife = w.life = fxRng.Range(0.45f, 0.7f);
+			w.tint = snowy ? Vec3(1.00f, 1.02f, 1.05f) : Vec3(0.55f, 0.50f, 0.42f);
+			w.size = fxRng.Range(1.0f, 1.6f);
+			w.glow = snowy ? 0.15f : 0.0f;
+			w.drag = 2.5f;
+			w.lift = -1.5f;
+			w.sway = 0.0f;
+			w.plain = true;
+			wisps.push_back(w);
+		}
+	}
+}
+
+void Game::DrawLevelUpRings()
+{
+	if (levelUpTimer <= 0.0f) return;
+
+	// Two rings of spore light run out over the ground, and the ground under the feet glows a while longer.
+	float since = kLevelUpTime - levelUpTimer;
+	Vec3 pos = player->Position();
+	for (int i = 0; i < 2; ++i)
+	{
+		float k = (since - 0.25f * (float)i) / kRingTime;
+		if (k <= 0.0f || k >= 1.0f) continue;
+		float size = 1.0f + 5.0f * (1.0f - (1.0f - k) * (1.0f - k));
+		renderer->DrawDecal(pos, 0.0f, size, size, kSporeLight * 2.4f, (1.0f - k) * 0.9f, 0.12f);
+	}
+	renderer->DrawDecal(pos, 0.0f, 1.6f, 1.6f, kSporeLight * 1.8f, Saturatef(levelUpTimer / kLevelUpTime) * 0.5f);
 }
 
 void Game::UpdateWisps(float dt)

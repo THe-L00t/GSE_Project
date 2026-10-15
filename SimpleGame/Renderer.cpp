@@ -510,6 +510,7 @@ void Renderer::CacheUniformLocations()
 	post.tiltShift = glGetUniformLocation(postShader, "u_TiltShift");
 	post.memo = glGetUniformLocation(postShader, "u_Memo");
 	post.recall = glGetUniformLocation(postShader, "u_Recall");
+	post.ripple = glGetUniformLocation(postShader, "u_Ripple");
 
 	volume.invViewProj = glGetUniformLocation(volumeShader, "u_InvViewProj");
 	volume.lightViewProj = glGetUniformLocation(volumeShader, "u_LightViewProj");
@@ -764,6 +765,9 @@ void Renderer::EndScene()
 	glUniform1f(post.tiltShift, screenFx.tiltShift);
 	glUniform1f(post.memo, screenFx.memo);
 	glUniform1f(post.recall, screenFx.recall);
+	float rippleU = 0.5f, rippleV = 0.5f;
+	ProjectUv(screenFx.rippleAt, rippleU, rippleV);
+	glUniform3f(post.ripple, rippleU, rippleV, screenFx.ripple);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vboScreen);
 	glEnableVertexAttribArray(post.positionAttrib);
@@ -1059,7 +1063,7 @@ void Renderer::DrawShadow(const Vec3& pos, float radius)
 	discQueue.push_back(instance);
 }
 
-void Renderer::DrawDecal(const Vec3& pos, float yaw, float sizeX, float sizeZ, const Vec3& color, float strength)
+void Renderer::DrawDecal(const Vec3& pos, float yaw, float sizeX, float sizeZ, const Vec3& color, float strength, float ring)
 {
 	if (shadowPass || MODEL_SHADOW >= (int)meshes.size() || strength <= 0.001f) return;
 
@@ -1072,6 +1076,7 @@ void Renderer::DrawDecal(const Vec3& pos, float yaw, float sizeX, float sizeZ, c
 	instance.tint[1] = color.y;
 	instance.tint[2] = color.z;
 	instance.emissive = strength;
+	instance.flash = ring;
 	discQueue.push_back(instance);
 }
 

@@ -592,7 +592,21 @@ void Game::GrantXp(int amount)
 	if (gained <= 0) return;
 
 	health = MaxHealth(stats);
-	levelUpTimer = 3.0f;
+	levelUpTimer = kLevelUpTime;
+
+	// Spore light wells up around the player and rises away.
+	Vec3 feet = player->Position();
+	for (int i = 0; i < 22; ++i)
+	{
+		float a = fxRng.Range(0.0f, 2.0f * kPi);
+		float r = fxRng.Range(0.3f, 1.1f);
+		Wisp w;
+		w.pos = feet + Vec3(cosf(a) * r, fxRng.Range(0.05f, 0.4f), sinf(a) * r);
+		w.vel = Vec3(cosf(a) * 0.3f, fxRng.Range(1.4f, 2.8f), sinf(a) * 0.3f);
+		w.maxLife = fxRng.Range(1.3f, 2.1f);
+		w.life = w.maxLife;
+		wisps.push_back(w);
+	}
 
 	char buf[256];
 	sprintf_s(buf, sizeof(buf), "레벨 업! 레벨 %d이 되었다. C를 눌러 능력치 %d점을 분배하라.",

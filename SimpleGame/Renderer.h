@@ -56,6 +56,8 @@ struct ScreenFx
 	Vec3  focus;              // world point the tilt-shift keeps sharp
 	float memo = 0.0f;        // [0,1] grandmother's map note: the scene sketched on paper
 	float recall = 0.0f;      // [0,1] a memory: sepia and dim corners
+	float ripple = 0.0f;      // (0,1) how far the level-up wave has spread from rippleAt; 0 none
+	Vec3  rippleAt;
 };
 
 // Graphics options; ApplySettings rebuilds only what a change touches.
@@ -133,7 +135,8 @@ public:
 	void DrawModel(int id, const Mat4& model, const DrawParams& params);
 	void DrawModel(int id, const Vec3& pos, float yaw, const Vec3& scale, const DrawParams& params);
 	void DrawShadow(const Vec3& pos, float radius);
-	void DrawDecal(const Vec3& pos, float yaw, float sizeX, float sizeZ, const Vec3& color, float strength);   // flat on the ground
+	// Flat on the ground. A ring width above zero leaves only a band of that share of the radius at the rim.
+	void DrawDecal(const Vec3& pos, float yaw, float sizeX, float sizeZ, const Vec3& color, float strength, float ring = 0.0f);
 	void DrawGround(const Vec3& center, float extent, const GroundParams& params);
 	void DrawWater(const Vec3& center, float sizeX, float sizeZ);
 	void DrawSpores(const Vec3& center, const Vec3& field, const Vec3& color, float densityScale, float size);
@@ -273,6 +276,7 @@ private:
 		GLint tiltShift = -1;
 		GLint memo = -1;
 		GLint recall = -1;
+		GLint ripple = -1;
 		GLint positionAttrib = -1;
 	};
 

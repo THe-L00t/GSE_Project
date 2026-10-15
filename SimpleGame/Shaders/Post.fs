@@ -25,6 +25,7 @@ uniform vec2      u_Focus;          // the player on screen, kept sharp
 uniform float     u_TiltShift;      // drawn in close, the rows above and below go soft
 uniform float     u_Memo;           // grandmother's map note: paper and pencil
 uniform float     u_Recall;         // a memory: sepia, the edges dimmed
+uniform vec3      u_Ripple;         // xy centre on screen, z how far the level-up wave has run (0 none)
 
 layout(location = 0) out vec4 FragColor;
 
@@ -91,6 +92,16 @@ vec3 Composite(vec2 uv)
 	// In a dream the picture wavers, like air over a summer road.
 	if (u_Dream > 0.002)
 		uv += vec2(sin(uv.y * 22.0 + u_Time * 1.7), cos(uv.x * 18.0 + u_Time * 1.3)) * 0.0025 * u_Dream;
+
+	// Growing stronger bends the air: one ring of refraction runs out from the player and settles.
+	if (u_Ripple.z > 0.0 && u_Ripple.z < 1.0)
+	{
+		vec2 aspect = vec2(u_Texel.y / u_Texel.x, 1.0);
+		vec2 d = (uv - u_Ripple.xy) * aspect;
+		float r = length(d);
+		float band = 1.0 - smoothstep(0.0, 0.07, abs(r - u_Ripple.z * 1.1));
+		uv -= d / max(r, 0.0001) / aspect * band * 0.014 * (1.0 - u_Ripple.z);
+	}
 
 	vec3 c = texture(u_Source, uv).rgb;
 

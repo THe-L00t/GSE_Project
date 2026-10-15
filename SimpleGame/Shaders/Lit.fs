@@ -225,9 +225,12 @@ void main()
 		float r = length(v_Local.xz) * 2.0;
 		// With real shadows the blob only needs to add a soft contact darkening.
 		// Footprints use the same disc, with their own colour and strength and a firmer edge.
+		// A decal with a ring width draws only a band at its rim, for the light that spreads from a level-up.
 		bool print = v_Emissive > 0.0;
 		float strength = print ? v_Emissive : mix(0.38, 0.22, u_ShadowOn);
 		float alpha = (1.0 - smoothstep(print ? 0.55 : 0.3, 1.0, r)) * strength * (1.0 - fog);
+		if (v_Flash > 0.0)
+			alpha = (1.0 - smoothstep(0.0, v_Flash, abs(r - 1.0 + v_Flash))) * strength * (1.0 - fog);
 		FragColor = vec4(print ? v_Tint : vec3(0.0), alpha);
 		return;
 	}
