@@ -13,25 +13,26 @@ namespace
 	const int   kShadows[] = { 0, 1024, 2048, 4096 };
 	const float kParticles[] = { 0.25f, 0.5f, 0.75f, 1.0f };
 
-	const int kChoiceCount[OPT_COUNT] = { PRESET_COUNT + 1, 5, 4, 4, 3, 4, 2, 2 };
+	const int kChoiceCount[OPT_COUNT] = { PRESET_COUNT + 1, 5, 4, 4, 3, 4, 2, 2, 2 };
 
 	const char* kRowNames[OPT_COUNT] =
 	{
-		"품질 프리셋", "렌더 해상도", "안티에일리어싱", "그림자", "빛줄기 (볼류메트릭)", "날씨·포자 입자", "수직 동기화", "FPS 표시",
+		"품질 프리셋", "렌더 해상도", "안티에일리어싱", "그림자", "빛줄기 (볼류메트릭)", "날씨·포자 입자", "주변광 차폐 (SSAO)", "수직 동기화", "FPS 표시",
 	};
 
 	const char* kPresetNames[PRESET_COUNT + 1] = { "낮음", "보통", "높음", "최고", "사용자" };
 
-	// Choice indices for the scale, MSAA, shadow, volumetric and particle rows of each preset.
-	const int kPresets[PRESET_COUNT][5] =
+	// Choice indices for the scale, MSAA, shadow, volumetric, particle and SSAO rows of each preset.
+	const int kPresetRows = 6;
+	const int kPresets[PRESET_COUNT][kPresetRows] =
 	{
-		{ 1, 0, 1, 0, 1 },
-		{ 3, 1, 1, 1, 2 },
-		{ 4, 2, 2, 1, 3 },
-		{ 4, 3, 3, 2, 3 },
+		{ 1, 0, 1, 0, 1, 0 },
+		{ 3, 1, 1, 1, 2, 0 },
+		{ 4, 2, 2, 1, 3, 1 },
+		{ 4, 3, 3, 2, 3, 1 },
 	};
 
-	const char* kRowKeys[OPT_COUNT] = { "preset", "scale", "msaa", "shadow", "volumetric", "particles", "vsync", "fps" };
+	const char* kRowKeys[OPT_COUNT] = { "preset", "scale", "msaa", "shadow", "volumetric", "particles", "ssao", "vsync", "fps" };
 }
 
 void Game::ApplyOptions()
@@ -42,6 +43,7 @@ void Game::ApplyOptions()
 	s.shadowSize = kShadows[optionChoice[OPT_SHADOW]];
 	s.volumetric = optionChoice[OPT_VOLUMETRIC];
 	s.particles = kParticles[optionChoice[OPT_PARTICLES]];
+	s.ssao = optionChoice[OPT_SSAO] == 1;
 	s.vsync = optionChoice[OPT_VSYNC] == 0;
 	renderer->ApplySettings(s);
 }
@@ -51,7 +53,7 @@ void Game::SetPreset(int preset)
 	optionChoice[OPT_PRESET] = preset;
 	if (preset >= PRESET_COUNT) return;
 
-	for (int i = 0; i < 5; ++i)
+	for (int i = 0; i < kPresetRows; ++i)
 		optionChoice[OPT_SCALE + i] = kPresets[preset][i];
 }
 
@@ -114,7 +116,7 @@ void Game::HandleOptionsKey(unsigned char key)
 		else
 		{
 			optionChoice[optionsCursor] = choice;
-			if (optionsCursor <= OPT_PARTICLES) optionChoice[OPT_PRESET] = PRESET_COUNT;
+			if (optionsCursor <= OPT_SSAO) optionChoice[OPT_PRESET] = PRESET_COUNT;
 		}
 		ApplyOptions();
 		break;
@@ -137,7 +139,7 @@ void Game::DrawOptionsPanel()
 
 	renderer->DrawFade(Vec3(0.02f, 0.03f, 0.04f), 0.55f);
 
-	float pw = 600.0f, ph = 380.0f;
+	float pw = 600.0f, ph = 410.0f;
 	float px = (float)w * 0.5f - pw * 0.5f;
 	float py = (float)h * 0.5f - ph * 0.5f;
 	renderer->DrawRectPx(px, py, pw, ph, Vec3(0.10f, 0.11f, 0.10f), 0.94f);
@@ -160,6 +162,7 @@ void Game::DrawOptionsPanel()
 		case OPT_SHADOW:     sprintf_s(value, sizeof(value), c == 0 ? "끔" : "%d", kShadows[c]); break;
 		case OPT_VOLUMETRIC: sprintf_s(value, sizeof(value), "%s", c == 0 ? "끔" : (c == 1 ? "낮음" : "높음")); break;
 		case OPT_PARTICLES:  sprintf_s(value, sizeof(value), "%d%%", (int)(kParticles[c] * 100.0f + 0.5f)); break;
+		case OPT_SSAO:       sprintf_s(value, sizeof(value), "%s", c == 1 ? "켬" : "끔"); break;
 		default:             sprintf_s(value, sizeof(value), "%s", c == 0 ? "켬" : "끔"); break;
 		}
 

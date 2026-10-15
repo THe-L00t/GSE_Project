@@ -125,6 +125,7 @@ enum OptionRow
 	OPT_SHADOW,
 	OPT_VOLUMETRIC,
 	OPT_PARTICLES,
+	OPT_SSAO,
 	OPT_VSYNC,
 	OPT_FPS,
 	OPT_COUNT
@@ -530,7 +531,7 @@ private:
 	PerfStats perf;
 	bool  optionsOpen = false;
 	int   optionsCursor = 0;
-	int   optionChoice[OPT_COUNT] = { PRESET_HIGH, 4, 2, 2, 1, 3, 0, 1 };   // vsync on, FPS hidden
+	int   optionChoice[OPT_COUNT] = { PRESET_HIGH, 4, 2, 2, 1, 3, 1, 0, 1 };   // SSAO on, vsync on, FPS hidden
 
 	std::string message;
 	float messageTimer = 0.0f;

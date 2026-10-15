@@ -27,6 +27,8 @@ uniform float     u_Memo;           // grandmother's map note: paper and pencil
 uniform float     u_Recall;         // a memory: sepia, the edges dimmed
 uniform vec3      u_Ripple;         // xy centre on screen, z how far the level-up wave has run (0 none)
 uniform vec4      u_Heat[2];        // lantern flames: xy on screen, z one world unit in screen heights, w strength
+uniform sampler2D u_Depth;          // scene depth, linear: the view is orthographic
+uniform vec3      u_Ao;             // x on, y world units across the depth range, z one world unit in screen heights
 
 layout(location = 0) out vec4 FragColor;
 
@@ -77,6 +79,27 @@ vec3 Blur(vec2 uv)
 	c += texture(u_Source, uv + u_Direction * 3.2307692308).rgb * 0.0702702703;
 	c += texture(u_Source, uv - u_Direction * 3.2307692308).rgb * 0.0702702703;
 	return c;
+}
+
+// Depth-only ambient occlusion. Each pair of taps straddles the pixel: on a flat or sloping surface their
+// average depth matches the centre, and only where both sides rise toward the eye, in a corner or where
+// something stands on the ground, does the pixel darken. Large gaps are silhouettes, not corners, and fade out.
+float AmbientOcclusion(vec2 uv)
+{
+	float d0 = texture(u_Depth, uv).r * u_Ao.y;
+	vec2 toUv = vec2(u_Texel.x / u_Texel.y, 1.0) * u_Ao.z;
+	float spin = hash12(gl_FragCoord.xy) * 6.2831853;
+	float occ = 0.0;
+	for (int i = 0; i < 6; ++i)
+	{
+		float a = spin + float(i) * 0.5235988;
+		vec2 o = vec2(cos(a), sin(a)) * toUv * (i % 2 == 0 ? 0.45 : 0.9);
+		float da = texture(u_Depth, uv + o).r * u_Ao.y;
+		float db = texture(u_Depth, uv - o).r * u_Ao.y;
+		float crease = d0 - 0.5 * (da + db);
+		occ += smoothstep(0.03, 0.35, crease) * (1.0 - smoothstep(1.0, 2.5, crease));
+	}
+	return 1.0 - occ / 6.0;
 }
 
 // Linear below the shoulder, so the graded palette is kept; highlights roll off instead of clipping.
@@ -142,6 +165,8 @@ vec3 Composite(vec2 uv)
 		c.r = mix(c.r, red, amount * 0.7);
 		c.b = mix(c.b, blue, amount * 0.7);
 	}
+
+	if (u_Ao.x > 0.5) c *= mix(1.0, AmbientOcclusion(uv), 0.6);
 
 	// Each region keeps its own light: the open road a touch cool, the ginkgo town warm.
 	c *= u_Grade;

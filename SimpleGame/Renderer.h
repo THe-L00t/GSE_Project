@@ -70,6 +70,7 @@ struct RenderSettings
 	int   shadowSize = 2048;       // 0 turns sun shadows off
 	int   volumetric = 1;          // light shafts: 0 off, 1 low, 2 high
 	float particles = 1.0f;        // share of spores, rain, snow and leaves drawn
+	bool  ssao = true;             // corners and contacts darkened from the depth buffer
 	bool  vsync = true;
 };
 
@@ -280,6 +281,8 @@ private:
 		GLint recall = -1;
 		GLint ripple = -1;
 		GLint heat = -1;
+		GLint depth = -1;
+		GLint ao = -1;
 		GLint positionAttrib = -1;
 	};
 
@@ -347,6 +350,7 @@ private:
 	void CreateNoiseTexture();
 	void DrawPostPass(GLuint target, int width, int height, int mode, GLuint source, float sourceWidth, float sourceHeight);
 	bool VolumeOn() const;
+	bool AoOn() const;
 	void DrawVolumePass();
 
 	bool initialized = false;
@@ -420,6 +424,7 @@ private:
 	GLuint vboInstances = 0;
 
 	Mat4  viewProj;
+	float depthRange = 1.0f;   // world units across the depth buffer; the view is orthographic, so depth is linear
 	Vec3  camPos;
 	Vec3  fogOrigin;
 	float pixelsPerUnit = 1.0f;

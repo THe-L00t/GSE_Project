@@ -512,6 +512,8 @@ void Renderer::CacheUniformLocations()
 	post.recall = glGetUniformLocation(postShader, "u_Recall");
 	post.ripple = glGetUniformLocation(postShader, "u_Ripple");
 	post.heat = glGetUniformLocation(postShader, "u_Heat");
+	post.depth = glGetUniformLocation(postShader, "u_Depth");
+	post.ao = glGetUniformLocation(postShader, "u_Ao");
 
 	volume.invViewProj = glGetUniformLocation(volumeShader, "u_InvViewProj");
 	volume.lightViewProj = glGetUniformLocation(volumeShader, "u_LightViewProj");
@@ -739,7 +741,7 @@ void Renderer::EndScene()
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, msFbo);
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, sceneFbo);
 		glBlitFramebuffer(0, 0, targetWidth, targetHeight, 0, 0, targetWidth, targetHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-		if (VolumeOn())
+		if (VolumeOn() || AoOn())
 			glBlitFramebuffer(0, 0, targetWidth, targetHeight, 0, 0, targetWidth, targetHeight, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 	}
 
@@ -808,6 +810,8 @@ void Renderer::EndScene()
 		DrawPostPass(volumeFbo[0], bloomWidth, bloomHeight, 1, volumeTex[1], bw, bh);
 	}
 
+	glActiveTexture(GL_TEXTURE4);
+	glBindTexture(GL_TEXTURE_2D, AoOn() ? sceneDepth : 0);
 	glActiveTexture(GL_TEXTURE3);
 	glBindTexture(GL_TEXTURE_2D, VolumeOn() ? volumeTex[0] : 0);
 	glActiveTexture(GL_TEXTURE1);
@@ -815,8 +819,12 @@ void Renderer::EndScene()
 	glActiveTexture(GL_TEXTURE0);
 	glUniform1i(post.volume, 3);
 	glUniform1f(post.volumeOn, VolumeOn() ? 1.0f : 0.0f);
+	glUniform1i(post.depth, 4);
+	glUniform3f(post.ao, AoOn() ? 1.0f : 0.0f, depthRange, pixelsPerUnit / (float)targetHeight);
 	DrawPostPass(0, (int)windowSizeX, (int)windowSizeY, 2, sceneTex, (float)targetWidth, (float)targetHeight);
 
+	glActiveTexture(GL_TEXTURE4);
+	glBindTexture(GL_TEXTURE_2D, 0);
 	glActiveTexture(GL_TEXTURE3);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glActiveTexture(GL_TEXTURE1);
@@ -848,6 +856,11 @@ void Renderer::DrawPostPass(GLuint target, int width, int height, int mode, GLui
 bool Renderer::VolumeOn() const
 {
 	return settings.volumetric > 0 && volumeShader != 0 && volumeReady && postReady;
+}
+
+bool Renderer::AoOn() const
+{
+	return settings.ssao && postReady;
 }
 
 void Renderer::DrawVolumePass()
@@ -901,6 +914,7 @@ int Renderer::TakeDrawCalls()
 void Renderer::SetCamera(const Mat4& view, const Mat4& proj, const Vec3& eye, float pxPerUnit)
 {
 	viewProj = Mul(proj, view);
+	depthRange = 2.0f / Maxf(fabsf(proj.m[10]), 1e-6f);
 	camPos = eye;
 	// Point sprites are sized in target pixels, which shrink with the render scale.
 	pixelsPerUnit = pxPerUnit * (postReady ? (float)targetHeight / (float)windowSizeY : 1.0f);
