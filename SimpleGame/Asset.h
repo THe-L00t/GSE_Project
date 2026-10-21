@@ -112,6 +112,7 @@ private:
 	float speed = 1.0f;
 	std::vector<BonePose> poseA;
 	std::vector<BonePose> poseB;
+	std::vector<BonePose> frozen;   // the pose on screen when a change cut into a fade
 	std::vector<Mat4> global;
 	std::vector<Mat4> skin;
 };

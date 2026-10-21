@@ -25,11 +25,29 @@ namespace
 		return a.Bound() && a.GetSkeleton()->FindClip(clip) >= 0;
 	}
 
-	float MovedSpeed(Vec3& last, const Vec3& now, float dt)
+	// Ground speed from how far the body moved since the last update, smoothed: frame to frame the
+	// distance jitters, and the walk would flicker on and off around its threshold.
+	float GroundSpeed(Vec3& last, float& smooth, const Vec3& now, float dt)
 	{
-		float speed = DistXZ(now, last) / Maxf(dt, 1e-4f);
+		float raw = DistXZ(now, last) / Maxf(dt, 1e-4f);
 		last = now;
-		return speed;
+		smooth = Approach(smooth, raw, 12.0f, dt);
+		return smooth;
+	}
+
+	// Starts moving above one speed and stops only below a lower one.
+	bool Moving(const Animator& a, const char* clip, float speed, float start, float stop)
+	{
+		return speed > (a.IsPlaying(clip) ? stop : start);
+	}
+
+	// A one-shot pinned to a game timer, if the model has it.
+	bool Pin(Animator& a, const char* clip, float fade, float t, float dt)
+	{
+		if (!HasClip(a, clip)) return false;
+		a.Play(clip, fade);
+		a.SetNormalizedTime(t, dt);
+		return true;
 	}
 
 	void Loop(Animator& a, const char* clip, float fade, float speed, float dt)
@@ -79,7 +97,7 @@ void Game::AnimatePlayer(float dt)
 		p.lastPos = p.Position();
 	}
 
-	float moved = MovedSpeed(p.lastPos, p.Position(), dt);
+	float moved = GroundSpeed(p.lastPos, p.animSpeed, p.Position(), dt);
 
 	// A fresh blow interrupts whatever the hands were doing.
 	if (p.hurtTimer > p.lastHurt + 0.01f && HasClip(a, "hit"))
@@ -96,18 +114,14 @@ void Game::AnimatePlayer(float dt)
 	}
 
 	// The roll and the swing run on the game's own timers, so the pose and the hit always agree.
-	if (p.rollTimer > 0.0f)
+	if (p.rollTimer > 0.0f && Pin(a, "roll", 0.04f, 1.0f - p.rollTimer / kRollTime, dt))
 	{
 		p.action = nullptr;
-		a.Play("roll", 0.04f);
-		a.SetNormalizedTime(1.0f - p.rollTimer / kRollTime, dt);
 		return;
 	}
-	if (p.swingTimer > 0.0f)
+	if (p.swingTimer > 0.0f && Pin(a, "attack", 0.04f, 1.0f - p.swingTimer / kSwingTime, dt))
 	{
 		p.action = nullptr;
-		a.Play("attack", 0.04f);
-		a.SetNormalizedTime(1.0f - p.swingTimer / kSwingTime, dt);
 		return;
 	}
 
@@ -121,7 +135,7 @@ void Game::AnimatePlayer(float dt)
 		p.action = nullptr;
 	}
 
-	if (moved > 0.4f)
+	if (Moving(a, "run", moved, 0.6f, 0.3f))
 		Loop(a, "run", 0.12f, Clampf(moved / LocomotionSpeed(MODEL_PLAYER), 0.5f, 1.6f), dt);
 	else
 		Loop(a, "idle", 0.2f, 1.0f, dt);
@@ -141,33 +155,30 @@ void Game::AnimateEnemy(EnemyActor& e, float dt)
 		a.SetTime(e.home.x * 0.37f + e.home.z * 0.21f);
 	}
 
-	float moved = MovedSpeed(e.lastPos, e.Position(), dt);
+	float moved = GroundSpeed(e.lastPos, e.animSpeed, e.Position(), dt);
 
 	if (!e.alive)
 	{
-		a.Play("die", 0.1f);
-		a.SetNormalizedTime(1.0f - Saturatef(e.stateTimer / kDyingTime), dt);
+		Pin(a, "die", 0.1f, 1.0f - Saturatef(e.stateTimer / kDyingTime), dt);
 		return;
 	}
 
+	// The fight's phases run on the creature's state timer, so the pose and the hit always agree.
 	switch (e.state)
 	{
 	case ENEMY_WINDUP:
 		e.asleep = e.waking = false;
-		a.Play("windup", 0.08f);
-		a.SetNormalizedTime(1.0f - Saturatef(e.stateTimer / Maxf(info.windup, 0.01f)), dt);
-		return;
+		if (Pin(a, "windup", 0.08f, 1.0f - Saturatef(e.stateTimer / Maxf(info.windup, 0.01f)), dt)) return;
+		break;
 	case ENEMY_STRIKE:
 	{
 		float length = info.lunge > 0.0f ? 0.4f : 0.15f;
-		a.Play("strike", 0.05f);
-		a.SetNormalizedTime(1.0f - Saturatef(e.stateTimer / length), dt);
-		return;
+		if (Pin(a, "strike", 0.05f, 1.0f - Saturatef(e.stateTimer / length), dt)) return;
+		break;
 	}
 	case ENEMY_RECOVER:
-		a.Play("recover", 0.1f);
-		a.SetNormalizedTime(1.0f - Saturatef(e.stateTimer / Maxf(info.recover, 0.01f)), dt);
-		return;
+		if (Pin(a, "recover", 0.1f, 1.0f - Saturatef(e.stateTimer / Maxf(info.recover, 0.01f)), dt)) return;
+		break;
 	default:
 		break;
 	}
@@ -196,10 +207,10 @@ void Game::AnimateEnemy(EnemyActor& e, float dt)
 		e.waking = false;
 	}
 
-	if (moved > 0.15f)
+	const char* gait = HasClip(a, "run") ? "run" : "walk";
+	if (Moving(a, gait, moved, 0.25f, 0.1f))
 	{
-		const char* clip = HasClip(a, "run") ? "run" : "walk";
-		Loop(a, clip, 0.15f, Clampf(moved / LocomotionSpeed(info.model), 0.4f, 2.5f), dt);
+		Loop(a, gait, 0.15f, Clampf(moved / LocomotionSpeed(info.model), 0.4f, 2.5f), dt);
 	}
 	else
 	{
@@ -283,8 +294,8 @@ void Game::AnimateDeer(float dt)
 		a.Play("idle", 0.0f);
 	}
 
-	float moved = MovedSpeed(deer->lastPos, deer->Position(), dt);
-	if (moved > 0.2f)
+	float moved = GroundSpeed(deer->lastPos, deer->animSpeed, deer->Position(), dt);
+	if (Moving(a, "walk", moved, 0.3f, 0.12f))
 		Loop(a, "walk", 0.2f, Clampf(moved / LocomotionSpeed(MODEL_DEER), 0.5f, 2.2f), dt);
 	else if (deer->arrived && HasClip(a, "drink"))
 		Loop(a, "drink", 0.4f, 1.0f, dt);

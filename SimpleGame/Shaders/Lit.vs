@@ -81,6 +81,8 @@ void main()
 		n = mat3(skin) * n;
 		t = mat3(skin) * t;
 	}
+	// Posed, so a creature collapsing as it is released still comes apart from the ground up.
+	vec3 local = p;
 
 	if ((anim & ANIM_BREATHE) != 0)
 	{
@@ -138,6 +140,6 @@ void main()
 	v_Flash = i_PhaseFlash.y;
 	v_Dissolve = i_PhaseFlash.z;
 	v_Cutaway = i_PhaseFlash.w;
-	v_Local = a_Position;
+	v_Local = local;
 	gl_Position = u_ViewProj * world;
 }

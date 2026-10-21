@@ -71,6 +71,7 @@ public:
 	// The rigged body (GameAnim.cpp). A one-shot action such as eating plays over the walk until it ends.
 	Animator    anim;
 	Vec3        lastPos;
+	float       animSpeed = 0.0f;   // ground speed, smoothed, that picks and paces the walk
 	float       lastHurt = 0.0f;
 	const char* action = nullptr;
 	bool        actionFresh = false;
@@ -189,6 +190,7 @@ public:
 	bool  trailStarted = false;
 	Animator anim;
 	Vec3  lastPos;
+	float animSpeed = 0.0f;
 	int   antlerBone = -2;         // -2 until looked up
 };
 
@@ -259,6 +261,7 @@ public:
 	Vec3  guardPos;
 	Animator anim;
 	Vec3  lastPos;
+	float animSpeed = 0.0f;
 	bool  asleep = false;   // a guard lying by its sleeper; it plays its waking when that ends
 	bool  waking = false;
 };

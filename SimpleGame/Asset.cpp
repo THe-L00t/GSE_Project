@@ -9,6 +9,7 @@ namespace
 {
 	const uint32_t kFlagSkinned = 1;
 	const uint32_t kFlagIndex32 = 2;
+	const int kFrozenPose = -2;     // Animator::previous when fading from a held pose rather than a clip
 
 	struct Reader
 	{
@@ -260,9 +261,18 @@ bool LoadAssetClips(const std::string& path, Skeleton& skeleton)
 			raw.w = Snorm(q[3]);
 			p.q = Normalized(raw);
 		}
+		if (!r.ok) break;
 		skeleton.clips.push_back(clip);
 	}
-	return r.ok;
+
+	// A cut-short file gives no clips at all rather than half a clip of crumpled frames.
+	if (!r.ok)
+	{
+		std::cout << path << ": truncated clips.\n";
+		skeleton.clips.clear();
+		return false;
+	}
+	return true;
 }
 
 void Animator::Bind(const Skeleton* s)
@@ -290,8 +300,17 @@ void Animator::Play(const char* clip, float fadeTime, bool restart)
 
 	if (current >= 0 && fadeTime > 0.0f)
 	{
-		previous = current;
-		previousTime = time;
+		if (previous != -1)
+		{
+			// Cutting into a fade: start from the pose on screen, held still, so nothing jumps.
+			frozen = poseA;
+			previous = kFrozenPose;
+		}
+		else
+		{
+			previous = current;
+			previousTime = time;
+		}
 		fade = fadeLength = fadeTime;
 	}
 	else
@@ -316,9 +335,12 @@ void Animator::Update(float dt)
 
 void Animator::AdvanceFade(float dt)
 {
-	if (previous < 0) return;
-	const AnimClip& before = skeleton->clips[previous];
-	previousTime = WrapOrClamp(previousTime + dt * speed, before.Duration(), before.loop);
+	if (previous == -1) return;
+	if (previous >= 0)
+	{
+		const AnimClip& before = skeleton->clips[previous];
+		previousTime = WrapOrClamp(previousTime + dt * speed, before.Duration(), before.loop);
+	}
 	fade -= dt;
 	if (fade <= 0.0f) previous = -1;
 }
@@ -399,9 +421,12 @@ void Animator::Evaluate()
 	if (skeleton == nullptr || current < 0) return;
 
 	Sample(current, time, poseA);
-	if (previous >= 0 && fadeLength > 0.0f)
+	if (previous != -1 && fadeLength > 0.0f)
 	{
-		Sample(previous, previousTime, poseB);
+		if (previous >= 0)
+			Sample(previous, previousTime, poseB);
+		else
+			poseB = frozen;
 		float w = SmoothStep(0.0f, 1.0f, fade / fadeLength);
 		for (size_t i = 0; i < poseA.size(); ++i)
 		{
