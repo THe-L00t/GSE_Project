@@ -409,6 +409,24 @@ void Game::UpdateEnemy(EnemyActor& e, float dt)
 void Game::UpdateItems()
 {
 	std::vector<ItemActor*> items = LiveItems();
+
+	// A relic lying about shows which entry it will fill: each one not yet found, and no two alike while there is a choice.
+	for (size_t i = 0; i < items.size(); ++i)
+	{
+		ItemActor& item = *items[i];
+		if (item.type != ITEM_RELIC || item.relicId >= 0) continue;
+
+		bool shown[kRelicCount] = {};
+		for (size_t j = 0; j < items.size(); ++j)
+		{
+			if (items[j]->type == ITEM_RELIC && items[j]->relicId >= 0) shown[items[j]->relicId] = true;
+		}
+		for (int r = RELIC_WATCH; r <= RELIC_PHONE && item.relicId < 0; ++r)
+		{
+			if (!relicFound[r] && !shown[r]) item.relicId = r;
+		}
+	}
+
 	for (size_t i = 0; i < items.size(); ++i)
 	{
 		ItemActor& item = *items[i];
@@ -503,6 +521,7 @@ void Game::PickUp(ItemActor& item)
 	const ItemInfo& info = GetItemInfo(item.type);
 	if (item.type != ITEM_RELIC) ShowMessage(info.pickupText, 3.5f);
 	++pickups[item.type];
+	PlayPlayerAction("pickup");
 
 	// What is taken comes apart into light that gathers into whoever took it; a relic in a warm burst.
 	bool relic = item.type == ITEM_RELIC;

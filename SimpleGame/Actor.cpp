@@ -42,6 +42,20 @@ void Actor::SetPitch(float angle, const Vec3& around)
 	MarkDirty();
 }
 
+void Actor::SetLocalMatrix(const Mat4& m)
+{
+	localMatrix = m;
+	hasLocalMatrix = true;
+	MarkDirty();
+}
+
+void Actor::ClearLocalMatrix()
+{
+	if (!hasLocalMatrix) return;
+	hasLocalMatrix = false;
+	MarkDirty();
+}
+
 void Actor::MarkDirty()
 {
 	// A dirty actor's subtree is already dirty.
@@ -56,9 +70,17 @@ const Mat4& Actor::WorldMatrix() const
 {
 	if (dirty)
 	{
-		Mat4 local = Mul(MatTranslate(position), MatRotateY(yaw));
-		if (pitch != 0.0f)
-			local = Mul(local, Mul(Mul(MatTranslate(pivot), MatRotateX(pitch)), MatTranslate(-pivot)));
+		Mat4 local;
+		if (hasLocalMatrix)
+		{
+			local = localMatrix;
+		}
+		else
+		{
+			local = Mul(MatTranslate(position), MatRotateY(yaw));
+			if (pitch != 0.0f)
+				local = Mul(local, Mul(Mul(MatTranslate(pivot), MatRotateX(pitch)), MatTranslate(-pivot)));
+		}
 		local = Mul(local, MatScale(scale));
 
 		world = parent ? Mul(parent->WorldMatrix(), local) : local;

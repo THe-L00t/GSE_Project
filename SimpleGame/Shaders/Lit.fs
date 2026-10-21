@@ -14,6 +14,23 @@ in float v_Emissive;
 in float v_Flash;
 in float v_Dissolve;
 in float v_Cutaway;
+in vec2  v_UV;
+in vec4  v_Tangent;
+in float v_MossMask;
+in float v_MossGrowth;
+in float v_Foliage;
+
+// Blender-made models: x = 1 when textured, y = specular strength, z = glow strength.
+uniform vec4      u_Material;
+uniform sampler2D u_Albedo;
+uniform sampler2D u_NormalMap;
+uniform sampler2D u_Mask;           // r occlusion, g roughness, b glow
+
+// Ground layers made in Blender: 0 grass, 1 moss, 2 dirt, 3 concrete, 4 forest floor.
+uniform float          u_GroundTex;
+uniform sampler2DArray u_GroundAlbedo;
+uniform sampler2DArray u_GroundNormal;
+uniform sampler2DArray u_GroundHeight;
 
 uniform int   u_Mode;
 uniform vec3  u_FogOrigin;      // camera target; fog thickens away from it
@@ -278,6 +295,38 @@ void main()
 	float emissive = v_Emissive + v_Glow;
 	float gloss = 0.0;
 	vec3 reflected = vec3(0.0);     // what still water mirrors, added after the lighting
+	bool textured = u_Mode == 0 && u_Material.x > 0.5;
+	float texAo = 1.0;
+	float rough = 1.0;
+
+	if (textured)
+	{
+		vec3 albedo = texture(u_Albedo, v_UV).rgb;
+		vec3 maskTex = texture(u_Mask, v_UV).rgb;
+		vec3 nt = texture(u_NormalMap, v_UV).rgb * 2.0 - 1.0;
+		vec3 t = normalize(v_Tangent.xyz - n * dot(n, v_Tangent.xyz));
+		vec3 b = cross(n, t) * v_Tangent.w;
+		n = normalize(t * nt.x + b * nt.y + n * max(nt.z, 0.05));
+
+		base = albedo * v_Color * v_Tint;
+		texAo = maskTex.r;
+		rough = maskTex.g;
+		// Glow is painted into the mask and breathes with a pulse; the instance's own glow (a windup's tell,
+		// a relic's glint) lifts the whole model only a little, so the painted lights stay the brightest.
+		emissive = maskTex.b * u_Material.z * (0.75 + 2.5 * v_Glow) + v_Glow * 0.6 * (1.0 - maskTex.b) + v_Emissive * 0.35;
+
+		// The world taking back what was made: moss spreads first where the model was painted to take it.
+		if (v_MossGrowth > 0.001)
+		{
+			float speck = valueNoise(v_WorldPos.xz * 2.3 + v_WorldPos.y * 1.7);
+			float cover = smoothstep(1.0 - v_MossGrowth - 0.06, 1.0 - v_MossGrowth + 0.06, v_MossMask * 0.75 + speck * 0.3);
+			cover *= smoothstep(-0.35, 0.3, n.y);
+			vec3 mossColor = mix(vec3(0.17, 0.29, 0.19), vec3(0.31, 0.45, 0.27), valueNoise(v_WorldPos.xz * 7.0 + v_WorldPos.y * 3.0));
+			base = mix(base, mossColor * v_Tint, cover * 0.92);
+			rough = mix(rough, 1.0, cover);
+			emissive += cover * v_Glow * 0.3;
+		}
+	}
 
 	if (u_Mode == 1)
 	{
@@ -294,14 +343,64 @@ void main()
 		vec3 forest   = vec3(0.13, 0.22, 0.15);
 
 		float road = (1.0 - smoothstep(1.9, 3.2, abs(p.x - roadCenter(p.y)))) * (1.0 - overgrowth * 0.6) * u_Road;
-		vec3 soil = mix(grass, moss, smoothstep(0.35 - overgrowth * 0.3, 0.75 - overgrowth * 0.3, patchMask));
-		vec3 track = mix(dirt, concrete, smoothstep(0.4, 0.7, grain) * (1.0 - overgrowth));
-
-		base = mix(soil, track, road * 0.85);
+		float toMoss = smoothstep(0.35 - overgrowth * 0.3, 0.75 - overgrowth * 0.3, patchMask);
+		float toConcrete = smoothstep(0.4, 0.7, grain) * (1.0 - overgrowth);
+		float onRoad = road * 0.85;
 		// Moss creeping over the road: the land is already turning.
-		base = mix(base, moss, road * smoothstep(0.55 - overgrowth * 0.4, 0.85, patchMask) * 0.55);
-		base = mix(base, forest, smoothstep(0.55, 1.0, overgrowth) * 0.5 * patchMask);
-		base *= 0.85 + 0.30 * grain;
+		float mossOver = road * smoothstep(0.55 - overgrowth * 0.4, 0.85, patchMask) * 0.55;
+		float toForest = smoothstep(0.55, 1.0, overgrowth) * 0.5 * patchMask;
+
+		if (u_GroundTex > 0.5)
+		{
+			// The same mix as the painted ground below, as weights over the Blender layers, sharpened by
+			// each layer's height so moss fills the gaps between stones instead of fading over them.
+			float w[5];
+			float keep = (1.0 - mossOver) * (1.0 - toForest);
+			w[0] = (1.0 - toMoss) * (1.0 - onRoad) * keep;
+			w[1] = toMoss * (1.0 - onRoad) * keep + mossOver * (1.0 - toForest);
+			w[2] = onRoad * (1.0 - toConcrete) * keep;
+			w[3] = onRoad * toConcrete * keep;
+			w[4] = toForest;
+
+			vec2 uv = vec2(p.x, -p.y) * 0.22;
+			float top = 0.0;
+			float h[5];
+			for (int i = 0; i < 5; ++i)
+			{
+				h[i] = texture(u_GroundHeight, vec3(uv, float(i))).r;
+				top = max(top, w[i] + h[i] * 0.5);
+			}
+			float total = 0.0;
+			for (int i = 0; i < 5; ++i)
+			{
+				w[i] = max(w[i] + h[i] * 0.5 - (top - 0.22), 0.0);
+				total += w[i];
+			}
+
+			vec3 albedoSum = vec3(0.0);
+			vec3 normalSum = vec3(0.0);
+			// Every layer is read even at zero weight: a branch per pixel would break the mipmap lookup.
+			for (int i = 0; i < 5; ++i)
+			{
+				float wi = w[i] / max(total, 1e-4);
+				albedoSum += texture(u_GroundAlbedo, vec3(uv, float(i))).rgb * wi;
+				normalSum += (texture(u_GroundNormal, vec3(uv, float(i))).rgb * 2.0 - 1.0) * wi;
+			}
+			base = albedoSum;
+			// Images load top row first, so the baked +v runs toward +z here while u runs along +x.
+			vec3 nt = normalize(normalSum + vec3(0.0, 0.0, 1e-4));
+			n = normalize(vec3(nt.x, nt.z, nt.y));
+			base *= 0.9 + 0.2 * grain;
+		}
+		else
+		{
+			vec3 soil = mix(grass, moss, toMoss);
+			vec3 track = mix(dirt, concrete, toConcrete);
+			base = mix(soil, track, onRoad);
+			base = mix(base, moss, mossOver);
+			base = mix(base, forest, toForest);
+			base *= 0.85 + 0.30 * grain;
+		}
 
 		// Fine detail: grass tufts off the road, pebbles and cracks on it.
 		float tuft = valueNoise(p * vec2(4.1, 1.3)) * valueNoise(p * vec2(1.2, 3.7));
@@ -405,9 +504,10 @@ void main()
 
 	if (u_Mode == 0 && emissive < 0.3)
 	{
-		// Leaves turn in autumn and dull in winter; anything glowing keeps its colour.
+		// Leaves turn in autumn and dull in winter; anything glowing keeps its colour. Blender models say
+		// which parts are leaves; shape recipes are guessed from how green they are.
 		float greenness = base.g - max(base.r, base.b);
-		float foliage = smoothstep(0.015, 0.07, greenness);
+		float foliage = textured ? v_Foliage : smoothstep(0.015, 0.07, greenness);
 		float luma = dot(base, vec3(0.299, 0.587, 0.114));
 		float tone = hash21(floor(v_WorldPos.xz * 0.35));
 		vec3 autumnLeaf = mix(vec3(0.66, 0.26, 0.09), vec3(0.74, 0.56, 0.14), tone) * luma * 2.3;
@@ -430,6 +530,9 @@ void main()
 	// Models darken toward the ground they stand on, which seats them in the scene.
 	float ao = 1.0;
 	if (u_Mode == 0) ao = mix(0.55, 1.0, smoothstep(0.0, 0.9, v_WorldPos.y));
+	// Baked occlusion: deep in crevices for the sky's light, half as much for direct light.
+	float directAo = mix(1.0, texAo, 0.5);
+	ao *= texAo;
 
 	// Lanterns and spore lights matter more once the sun is down.
 	float night = 1.0 - smoothstep(0.10, 0.60, env.sunDir.y);
@@ -437,13 +540,22 @@ void main()
 
 	vec3 viewDir = normalize(u_CamPos - v_WorldPos);
 	vec3 ambient = mix(env.groundColor, env.skyColor, n.y * 0.5 + 0.5);
-	vec3 color = base * (ambient * ao + env.sunColor * wrap * sunVis + lamp);
+	vec3 color = base * (ambient * ao + (env.sunColor * wrap * sunVis + lamp) * directAo);
 
 	if (u_Mode == 0)
 	{
 		// Rim light outlines silhouettes against the ground, tinted by the sky.
 		float rim = pow(1.0 - clamp(dot(n, viewDir), 0.0, 1.0), 3.0);
 		color += (env.skyColor * 0.6 + env.sunColor * 0.25) * rim * 0.35 * ao;
+	}
+
+	// Painted models are mostly matte; glazed jars, glass and wet metal catch a little of the sun.
+	if (textured)
+	{
+		float shine = 1.0 - rough;
+		vec3 halfDir = normalize(viewDir + env.sunDir);
+		float spec = pow(max(dot(n, halfDir), 0.0), mix(10.0, 80.0, shine)) * shine * shine * u_Material.y * 2.0;
+		color += env.sunColor * spec * sunVis * directAo;
 	}
 
 	if (gloss > 0.0)

@@ -112,6 +112,7 @@ void Game::EatFood()
 
 	--inventory[pick];
 	foodMeter = Minf(foodMeter + FoodValue(pick), 100.0f);
+	PlayPlayerAction("eat");
 	++mealsEaten;
 
 	char buf[256];

@@ -9,6 +9,7 @@
 
 const float kPlayerRadius = 0.38f;
 const float kSwingTime = 0.22f;
+const float kRollTime = 0.28f;
 const float kDyingTime = 0.9f;
 const int   kChunkDrawRadius = 1;   // chunks drawn around the camera; covers the orthographic view
 
@@ -66,6 +67,14 @@ public:
 	float swingTimer = 0.0f;      // > 0 while the swing plays
 	float hurtTimer = 0.0f;       // invulnerable while > 0
 	float flash = 0.0f;
+
+	// The rigged body (GameAnim.cpp). A one-shot action such as eating plays over the walk until it ends.
+	Animator    anim;
+	Vec3        lastPos;
+	float       lastHurt = 0.0f;
+	const char* action = nullptr;
+	bool        actionFresh = false;
+	int         gripBone = -2;    // -2 until looked up
 };
 
 // Follows the view, so it never runs out.
@@ -106,6 +115,8 @@ public:
 	float phase = 0.0f;           // offsets shader animation so neighbours do not move in lockstep
 	float emissive = 0.0f;
 	float shadowRadius = 0.0f;    // zero casts no shadow
+	float moss = 0.0f;            // how far the road's moss has grown over it
+	const std::vector<Mat4>* skin = nullptr;   // a shared pose, for rigged models placed as props
 };
 
 class SleeperActor : public Actor
@@ -120,6 +131,7 @@ public:
 	int        neighbor = -1;     // which village neighbour, for their name and dream
 	float      phase = 0.0f;      // breathing offset
 	PropActor* mote = nullptr;    // the dream fragment, until it is taken
+	Animator   anim;
 };
 
 // Grandmother while she is still awake: she stands, breathes and talks.
@@ -132,6 +144,8 @@ public:
 
 	int   model = 0;
 	float phase = 0.0f;
+	Animator anim;
+	float yawnTimer = 6.0f;       // the spores make her yawn now and then
 };
 
 enum ForageKind
@@ -173,6 +187,9 @@ public:
 	float stepPhase = 0.0f;
 	Vec3  trailFrom;               // where the antler light last dropped a mote behind it
 	bool  trailStarted = false;
+	Animator anim;
+	Vec3  lastPos;
+	int   antlerBone = -2;         // -2 until looked up
 };
 
 // The player leaves the level once past this line, heading +Z.
@@ -240,6 +257,10 @@ public:
 	int   swarm = -1;       // index into the owning chunk's swarms
 	bool  guarding = false; // wakes when anyone comes near guardPos, not only near itself
 	Vec3  guardPos;
+	Animator anim;
+	Vec3  lastPos;
+	bool  asleep = false;   // a guard lying by its sleeper; it plays its waking when that ends
+	bool  waking = false;
 };
 
 class ItemActor : public Actor
@@ -258,3 +279,6 @@ public:
 	bool  landmark = false; // placed by the level; never forgotten when left behind
 	float sparkle = 0.0f;   // a relic's glint this frame, set by the game
 };
+
+// The model a relic shows: its own once it knows which entry it fills.
+int RelicModel(int relicId);

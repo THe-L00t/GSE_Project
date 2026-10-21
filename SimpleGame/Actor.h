@@ -92,6 +92,9 @@ public:
 	void SetYaw(float angle);
 	void SetScale(const Vec3& s);
 	void SetPitch(float angle, const Vec3& around);
+	// Replaces position, yaw and pitch with a whole transform relative to the parent, such as a bone.
+	void SetLocalMatrix(const Mat4& m);
+	void ClearLocalMatrix();
 
 	const Mat4& WorldMatrix() const;
 	Vec3        WorldPosition() const;
@@ -119,6 +122,8 @@ private:
 	float pitch = 0.0f;
 	Vec3  pivot;
 	Vec3  scale{ 1.0f, 1.0f, 1.0f };
+	bool  hasLocalMatrix = false;
+	Mat4  localMatrix;
 
 	mutable Mat4 world;
 	mutable bool dirty = true;

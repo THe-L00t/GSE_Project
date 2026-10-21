@@ -160,6 +160,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Actor.h" />
+    <ClInclude Include="Asset.h" />
     <ClInclude Include="ChunkMap.h" />
     <ClInclude Include="DebugMonitor.h" />
     <ClInclude Include="Collision.h" />
@@ -175,15 +176,18 @@
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="SceneGraph.h" />
     <ClInclude Include="stdafx.h" />
+    <ClInclude Include="Texture.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Actor.cpp" />
+    <ClCompile Include="Asset.cpp" />
     <ClCompile Include="ChunkMap.cpp" />
     <ClCompile Include="DebugMonitor.cpp" />
     <ClCompile Include="Font.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="GameActors.cpp" />
+    <ClCompile Include="GameAnim.cpp" />
     <ClCompile Include="GameCombat.cpp" />
     <ClCompile Include="GameMonitor.cpp" />
     <ClCompile Include="GameRoute.cpp" />
@@ -199,6 +203,7 @@
     <ClCompile Include="Rpg.cpp" />
     <ClCompile Include="SceneGraph.cpp" />
     <ClCompile Include="SimpleGame.cpp" />
+    <ClCompile Include="Texture.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

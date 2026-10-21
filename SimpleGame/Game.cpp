@@ -11,7 +11,6 @@ namespace
 {
 	const float kWalkSpeed = 4.2f;
 	const float kRollSpeed = 12.0f;
-	const float kRollTime = 0.28f;
 	const float kRollCooldown = 0.70f;
 	const float kTitleDuration = 8.0f;
 	const float kFarView = 20.0f;      // the usual quarter view, and the furthest out
@@ -80,6 +79,8 @@ void Game::Update(float dt, const bool* keys)
 	else
 		UpdateRoute(dt, keys);
 
+	// Before the effects, which read the pipe's tip off the posed hand.
+	UpdateAnimations(dt);
 	UpdateSurvival(dt);
 	UpdateScreenFx(dt);
 	UpdateFootprints();

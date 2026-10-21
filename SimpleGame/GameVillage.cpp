@@ -156,8 +156,13 @@ void Game::AddFence(const Vec3& from, const Vec3& to)
 		AddProp(MODEL_FENCE_POST, LerpV(from, to, t), kUnitScale, 0.0f, 0.0f, 0.0f);
 	}
 
-	Vec3 mid = LerpV(from, to, 0.5f);
-	AddProp(MODEL_FENCE_RAIL, Vec3(mid.x, 0.62f, mid.z), Vec3(0.08f, 0.12f, len), atan2f(d.x, d.z), 0.0f, 0.0f);
+	// One rail per span, so a weathered plank is never stretched along the whole fence.
+	float span = len / (float)posts;
+	for (int i = 0; i < posts; ++i)
+	{
+		Vec3 mid = LerpV(from, to, ((float)i + 0.5f) / (float)posts);
+		AddProp(MODEL_FENCE_RAIL, Vec3(mid.x, 0.62f, mid.z), Vec3(0.08f, 0.12f, span), atan2f(d.x, d.z), 0.0f, 0.0f);
+	}
 }
 
 SleeperActor* Game::AddSleeper(const Vec3& pos, float yaw, bool grandma, float phase)
@@ -233,6 +238,24 @@ void Game::BuildVillage()
 	}
 
 	AddProp(MODEL_TRUCK, Vec3(11.5f, 0.0f, 15.0f), kUnitScale, 0.30f, 1.05f, 2.2f);
+
+	// Everyday things of a country yard: the jars by grandmother's house, the bench where neighbours sat,
+	// a tiller left by the shed, a gate with no wall left to keep, and the bare hoops of a greenhouse.
+	AddProp(MODEL_JANGDOK, Vec3(3.4f, 0.0f, -11.4f), kUnitScale, 0.0f, 0.9f, 0.6f);
+	AddProp(MODEL_PYEONGSANG, Vec3(4.3f, 0.0f, -6.9f), kUnitScale, 0.2f, 0.9f, 0.7f);
+	AddProp(MODEL_TILLER, Vec3(10.4f, 0.0f, -12.2f), kUnitScale, 0.6f, 0.6f, 0.9f);
+	AddProp(MODEL_GATE, Vec3(9.5f, 0.0f, -2.4f), kUnitScale, 0.12f, 0.0f, 0.0f);
+	for (int side = -1; side <= 1; side += 2)
+	{
+		// Only the wall stubs block; the open leaf lets you through.
+		Actor* stub = levelNode->AddChild(new Actor(ACTOR_NODE));
+		stub->SetPosition(Vec3(9.5f + 1.45f * (float)side, 0.0f, -2.4f - 0.17f * (float)side));
+		stub->collider.shape = COLLIDER_BOX;
+		stub->collider.halfX = 0.4f;
+		stub->collider.halfZ = 0.2f;
+	}
+	AddProp(MODEL_GREENHOUSE, Vec3(17.6f, 0.0f, -8.2f), kUnitScale, 0.0f, 0.0f, 0.0f);
+	AddProp(MODEL_JANGDOK, Vec3(-10.8f, 0.0f, 19.4f), Vec3(0.85f, 0.85f, 0.85f), 1.1f, 0.8f, 0.6f);
 
 	// Road sign toward Route 32
 	const float signZ = 24.5f;
@@ -523,6 +546,7 @@ void Game::TalkToGrandmother()
 void Game::Pick(ForageActor& f)
 {
 	if (f.picked) return;
+	PlayPlayerAction("pickup");
 
 	switch (f.forage)
 	{

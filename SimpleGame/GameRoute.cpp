@@ -458,6 +458,7 @@ ChunkActor* Game::EnsureChunk(int cx, int cz)
 	ChunkActor* chunk = chunkGroup->AddChild(new ChunkActor(routeMap.Get(cx, cz)));
 	chunk->lastTick = tick;
 	chunkActors[key] = chunk;
+	ShareSleeperPose(*chunk);
 	return chunk;
 }
 
@@ -607,6 +608,7 @@ void Game::PickRouteBush(ForageActor& bush)
 
 	int take = room < 2 ? room : 2;
 	inventory[ITEM_BERRIES] += take;
+	PlayPlayerAction("pickup");
 	NoteFirstFind(ITEM_BERRIES);
 	ChunkState& state = chunkStates[ChunkMap::Key(bush.chunkX, bush.chunkZ)];
 	if (bush.spawnIndex < (int)state.bushRegrowAt.size()) state.bushRegrowAt[bush.spawnIndex] = time + kBushRegrow;
@@ -678,11 +680,15 @@ void Game::UpdateRouteDeer(float dt)
 		return;
 	}
 
-	// Leading: it keeps just ahead, and turns to wait when the player falls behind.
+	// Leading: it keeps just ahead, and when the player falls behind it stops and looks back over its
+	// shoulder. Only a deer without that pose turns right round to wait.
 	if (playerDist > 9.0f)
 	{
-		Vec3 toPlayer = player->Position() - pos;
-		deer->SetYaw(atan2f(toPlayer.x, toPlayer.z));
+		if (deer->anim.GetSkeleton() == nullptr || deer->anim.GetSkeleton()->FindClip("wait") < 0)
+		{
+			Vec3 toPlayer = player->Position() - pos;
+			deer->SetYaw(atan2f(toPlayer.x, toPlayer.z));
+		}
 		return;
 	}
 

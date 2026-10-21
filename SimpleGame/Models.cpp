@@ -16,6 +16,8 @@ namespace
 		"shadow", "ground",
 		"grandma", "shed", "garden_bed", "vegetable", "berry_red", "berry_pale", "deer",
 		"canned_food", "bus_stop", "ginkgo", "pole", "meat", "cooked_meat", "wisp", "mote",
+		"jangdok", "pyeongsang", "tiller", "gate", "greenhouse",
+		"relic_torch", "relic_peaches", "relic_watch", "relic_radio", "relic_ticket", "relic_photo", "relic_phone", "relic_badge",
 	};
 
 	const Vec3 kMoss(0.24f, 0.38f, 0.24f);
@@ -126,6 +128,8 @@ OccluderSize ModelOccluder(int id)
 	case MODEL_TRUCK:    return { 2.3f, 2.0f };
 	case MODEL_ROCK:     return { 0.9f, 1.0f };
 	case MODEL_RUIN:     return { 1.8f, 1.9f };
+	case MODEL_GATE:     return { 1.9f, 2.1f };
+	case MODEL_GREENHOUSE: return { 2.8f, 2.4f };
 	default:             return { 0.0f, 0.0f };
 	}
 }
@@ -707,6 +711,76 @@ ModelRecipe BuildRecipe(int id)
 	case MODEL_MOTE:
 		// White, so the tint alone gives an ember, a glint or a puff of dust its colour.
 		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 0.0f, 0.0f), Vec3(0.10f, 0.10f, 0.10f), Vec3(0.95f, 0.95f, 0.95f));
+		break;
+
+	// Stand-ins for the Blender models below, used only when their files are missing.
+	case MODEL_JANGDOK:
+	{
+		const Vec3 onggi(0.30f, 0.18f, 0.11f);
+		r.Add(SHAPE_BOX, Vec3(0.0f, 0.12f, 0.0f), Vec3(1.8f, 0.24f, 1.2f), stone * 0.9f);
+		const float jars[5][3] = { { -0.55f, 0.25f, 0.62f }, { 0.05f, -0.25f, 0.55f }, { 0.55f, 0.20f, 0.48f }, { -0.30f, -0.30f, 0.40f }, { 0.45f, -0.32f, 0.36f } };
+		for (int i = 0; i < 5; ++i)
+		{
+			float s = jars[i][2];
+			r.Add(SHAPE_ELLIPSOID, Vec3(jars[i][0], 0.24f + s * 0.5f, jars[i][1]), Vec3(s, s, s), onggi);
+			r.Add(SHAPE_CYLINDER, Vec3(jars[i][0], 0.24f + s * 0.98f, jars[i][1]), Vec3(s * 0.6f, 0.05f, s * 0.6f), onggi * 0.8f);
+		}
+		r.Add(SHAPE_ELLIPSOID, Vec3(-0.75f, 0.24f, -0.45f), Vec3(0.40f, 0.12f, 0.30f), moss, ANIM_PULSE);
+		break;
+	}
+
+	case MODEL_PYEONGSANG:
+	{
+		const Vec3 wood(0.33f, 0.27f, 0.21f);
+		r.Add(SHAPE_BOX, Vec3(0.0f, 0.42f, 0.0f), Vec3(1.8f, 0.07f, 1.4f), wood);
+		for (int i = 0; i < 4; ++i)
+		{
+			float x = (i % 2 == 0) ? -0.80f : 0.80f;
+			float z = (i < 2) ? -0.60f : 0.60f;
+			r.Add(SHAPE_BOX, Vec3(x, 0.20f, z), Vec3(0.09f, 0.40f, 0.09f), wood * 0.8f);
+		}
+		r.Add(SHAPE_BOX, Vec3(0.35f, 0.50f, 0.20f), Vec3(0.60f, 0.10f, 0.45f), Vec3(0.45f, 0.30f, 0.26f));
+		break;
+	}
+
+	case MODEL_TILLER:
+		r.Add(SHAPE_BOX, Vec3(0.0f, 0.62f, -0.50f), Vec3(0.55f, 0.45f, 0.70f), rust);
+		AddWheel(r, 0.42f, -0.55f, 0.75f, 0.18f);
+		AddWheel(r, -0.42f, -0.55f, 0.75f, 0.18f);
+		r.Add(SHAPE_CYLINDER, Vec3(0.18f, 0.90f, 0.45f), Vec3(0.05f, 1.60f, 0.05f), dark).Rotated(Vec3(1.2f, 0.0f, 0.0f));
+		r.Add(SHAPE_CYLINDER, Vec3(-0.18f, 0.90f, 0.45f), Vec3(0.05f, 1.60f, 0.05f), dark).Rotated(Vec3(1.2f, 0.0f, 0.0f));
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 0.86f, -0.50f), Vec3(0.50f, 0.12f, 0.60f), moss, ANIM_PULSE);
+		break;
+
+	case MODEL_GATE:
+		r.Add(SHAPE_BOX, Vec3(-1.45f, 0.95f, 0.0f), Vec3(0.70f, 1.90f, 0.30f), stone);
+		r.Add(SHAPE_BOX, Vec3(1.45f, 0.95f, 0.0f), Vec3(0.70f, 1.90f, 0.30f), stone);
+		r.Add(SHAPE_BOX, Vec3(-0.55f, 0.95f, 0.0f), Vec3(1.05f, 1.80f, 0.05f), Vec3(0.24f, 0.36f, 0.44f));
+		r.Add(SHAPE_BOX, Vec3(0.60f, 0.95f, 0.25f), Vec3(1.05f, 1.80f, 0.05f), Vec3(0.24f, 0.36f, 0.44f)).Rotated(Vec3(0.0f, -0.5f, 0.0f));
+		r.Add(SHAPE_ELLIPSOID, Vec3(-1.45f, 1.92f, 0.0f), Vec3(0.75f, 0.12f, 0.35f), moss, ANIM_PULSE);
+		break;
+
+	case MODEL_GREENHOUSE:
+		for (int i = 0; i < 5; ++i)
+		{
+			float z = -2.4f + 1.2f * (float)i;
+			r.Add(SHAPE_CYLINDER, Vec3(-1.15f, 0.85f, z), Vec3(0.05f, 1.8f, 0.05f), kMetal).Rotated(Vec3(0.0f, 0.0f, -0.35f));
+			r.Add(SHAPE_CYLINDER, Vec3(1.15f, 0.85f, z), Vec3(0.05f, 1.8f, 0.05f), kMetal).Rotated(Vec3(0.0f, 0.0f, 0.35f));
+			r.Add(SHAPE_CYLINDER, Vec3(0.0f, 2.05f, z), Vec3(0.05f, 1.6f, 0.05f), kMetal).Rotated(Vec3(0.0f, 0.0f, kPi * 0.5f));
+		}
+		r.Add(SHAPE_CYLINDER, Vec3(0.0f, 2.1f, 0.0f), Vec3(0.04f, 5.0f, 0.04f), kMetal).Rotated(Vec3(kPi * 0.5f, 0.0f, 0.0f));
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 0.3f, 0.0f), Vec3(1.8f, 0.6f, 4.0f), Vec3(0.20f, 0.31f, 0.20f), ANIM_SWAY);
+		break;
+
+	case MODEL_RELIC_TORCH:
+	case MODEL_RELIC_PEACHES:
+	case MODEL_RELIC_WATCH:
+	case MODEL_RELIC_RADIO:
+	case MODEL_RELIC_TICKET:
+	case MODEL_RELIC_PHOTO:
+	case MODEL_RELIC_PHONE:
+	case MODEL_RELIC_BADGE:
+		r = BuildRecipe(MODEL_RELIC);
 		break;
 
 	default:

@@ -50,6 +50,19 @@ enum ModelId
 	MODEL_COOKED_MEAT,
 	MODEL_WISP,
 	MODEL_MOTE,
+	MODEL_JANGDOK,        // earthenware jars on their stone stand
+	MODEL_PYEONGSANG,     // low wooden platform bench
+	MODEL_TILLER,         // two-wheeled power tiller
+	MODEL_GATE,           // blue iron gate between wall stubs
+	MODEL_GREENHOUSE,     // vinyl greenhouse hoops
+	MODEL_RELIC_TORCH,    // the eight relics, in RelicId order
+	MODEL_RELIC_PEACHES,
+	MODEL_RELIC_WATCH,
+	MODEL_RELIC_RADIO,
+	MODEL_RELIC_TICKET,
+	MODEL_RELIC_PHOTO,
+	MODEL_RELIC_PHONE,
+	MODEL_RELIC_BADGE,
 	MODEL_COUNT
 };
 

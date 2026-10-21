@@ -364,6 +364,16 @@ private:
 	void UpdateWisps(float dt);
 	void DrawLevelUpRings();
 
+	// GameAnim.cpp: rigged bodies follow what their owners are doing
+	void UpdateAnimations(float dt);
+	void AnimatePlayer(float dt);
+	void AnimateEnemy(EnemyActor& e, float dt);
+	void AnimateGrandmother(float dt);
+	void AnimateSleepers(float dt);
+	void AnimateDeer(float dt);
+	void PlayPlayerAction(const char* clip);   // eat, pickup: a one-shot over whatever the body was doing
+	void ShareSleeperPose(ChunkActor& chunk);  // the road's sleepers breathe with one shared pose
+
 	// GameStory.cpp: the story the road tells as you grow, find and travel
 	void UpdateStory(float dt);
 	void QueueStory(const char* speaker, const char* const* lines, int count);
@@ -516,6 +526,8 @@ private:
 	bool  printLeft = false;
 	Vec3  swingTip;               // where the weapon's end was last update, for the trail behind it
 	bool  swingTipValid = false;
+
+	Animator roadSleeperAnim;     // one breathing pose for every sleeper lying by the road
 
 	std::vector<StoryBeat> storyQueue;
 	float storyCalm = 0.0f;       // seconds the road has been quiet

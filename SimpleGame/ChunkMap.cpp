@@ -37,6 +37,10 @@ namespace
 		{ MODEL_RUIN, 2.0f, 1.00f, 0.80f, 1.10f, { 2.0f, 1.0f, 0.0f }, true },
 		{ MODEL_CAR,  2.2f, 1.30f, 1.00f, 1.00f, { 1.5f, 0.5f, 0.0f }, true },
 		{ MODEL_POLE, 0.8f, 0.25f, 0.90f, 1.10f, { 1.5f, 0.8f, 0.2f }, true },
+		{ MODEL_TILLER, 1.6f, 0.70f, 0.95f, 1.05f, { 0.8f, 0.3f, 0.0f }, true },
+		{ MODEL_JANGDOK, 1.3f, 0.75f, 0.85f, 1.10f, { 0.5f, 0.2f, 0.0f }, true },
+		{ MODEL_GATE, 2.2f, 0.40f, 0.95f, 1.00f, { 0.4f, 0.2f, 0.0f }, true },
+		{ MODEL_GREENHOUSE, 3.4f, 0.00f, 0.90f, 1.05f, { 0.4f, 0.15f, 0.0f }, true },
 	};
 	const int kPropKindCount = (int)(sizeof(kPropKinds) / sizeof(kPropKinds[0]));
 

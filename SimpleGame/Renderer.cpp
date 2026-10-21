@@ -1,11 +1,13 @@
 #include "stdafx.h"
 #include "Renderer.h"
 
+#include <cstddef>
 #include <cstring>
 #include <vector>
 
 #include "Models.h"
 #include "Random.h"
+#include "Texture.h"
 #include "Dependencies\wglew.h"
 
 // ASCII only: the original template's CP949 comments turned into mojibake in UTF-8 tools.
@@ -45,6 +47,7 @@ void Renderer::Initialize(int sizeX, int sizeY)
 	CreateVertexBufferObjects();
 	CacheUniformLocations();
 	LoadModels();
+	LoadGroundTextures();
 
 	fonts[0].Load("Fonts/NanumGothic-Regular.ttf", 16.0f);
 	fonts[1].Load("Fonts/NanumGothic-Bold.ttf", 22.0f);
@@ -423,6 +426,9 @@ void Renderer::CreateVertexBufferObjects()
 
 	glGenBuffers(1, &vboText);
 	glGenBuffers(1, &vboInstances);
+
+	glGenBuffers(1, &boneBuffer);
+	glGenTextures(1, &boneTex);
 }
 
 void Renderer::CacheUniformLocations()
@@ -454,10 +460,28 @@ void Renderer::CacheUniformLocations()
 	lit.glowCount = glGetUniformLocation(litShader, "u_GlowCount");
 	lit.glowPos = glGetUniformLocation(litShader, "u_GlowPos");
 	lit.cutaway = glGetUniformLocation(litShader, "u_Cutaway");
+	lit.material = glGetUniformLocation(litShader, "u_Material");
+	lit.groundTex = glGetUniformLocation(litShader, "u_GroundTex");
+
+	// Each sampler keeps its own unit for the whole run.
+	glUseProgram(litShader);
+	glUniform1i(glGetUniformLocation(litShader, "u_Albedo"), kUnitAlbedo);
+	glUniform1i(glGetUniformLocation(litShader, "u_NormalMap"), kUnitNormal);
+	glUniform1i(glGetUniformLocation(litShader, "u_Mask"), kUnitMask);
+	glUniform1i(glGetUniformLocation(litShader, "u_GroundAlbedo"), kUnitGroundAlbedo);
+	glUniform1i(glGetUniformLocation(litShader, "u_GroundNormal"), kUnitGroundNormal);
+	glUniform1i(glGetUniformLocation(litShader, "u_GroundHeight"), kUnitGroundHeight);
+	glUniform1i(glGetUniformLocation(litShader, "u_Bones"), kUnitBones);
+	glUniform4f(lit.material, 0.0f, 0.0f, 0.0f, 0.0f);
+	glUniform1f(lit.groundTex, 0.0f);
+	glUseProgram(0);
 
 	shadow.viewProj = glGetUniformLocation(shadowShader, "u_ViewProj");
 	shadow.model = glGetUniformLocation(shadowShader, "u_Model");
 	shadow.time = glGetUniformLocation(shadowShader, "u_Time");
+	glUseProgram(shadowShader);
+	glUniform1i(glGetUniformLocation(shadowShader, "u_Bones"), kUnitBones);
+	glUseProgram(0);
 
 	overlay.rect = glGetUniformLocation(overlayShader, "u_Rect");
 	overlay.mode = glGetUniformLocation(overlayShader, "u_Mode");
@@ -544,8 +568,17 @@ void Renderer::LoadModels()
 
 	meshes.resize(meshData.size());
 	modelQueue.resize(meshData.size());
+	skeletons.resize(meshData.size());
+	int assets = 0;
 	for (size_t i = 0; i < meshData.size(); ++i)
 	{
+		// A model made in Blender wins; the shape recipe stands in when its file is missing.
+		if (LoadAssetModel((int)i))
+		{
+			++assets;
+			continue;
+		}
+
 		const std::vector<MeshVertex>& vertices = meshData[i].vertices;
 		if (vertices.empty()) continue;
 
@@ -555,7 +588,91 @@ void Renderer::LoadModels()
 		meshes[i].count = (int)vertices.size();
 	}
 
-	std::cout << "Models: " << ((int)meshData.size() - built) << " loaded from Cache/Models, " << built << " built.\n";
+	std::cout << "Models: " << assets << " from Assets/Models, the rest from shape recipes ("
+		<< ((int)meshData.size() - built) << " cached, " << built << " built).\n";
+}
+
+bool Renderer::LoadAssetModel(int id)
+{
+	std::string path;
+	if (!FindDataFile(std::string("Assets/Models/") + ModelName(id) + ".gsm", path)) return false;
+
+	AssetMesh asset;
+	if (!LoadAssetMesh(path, asset)) return false;
+
+	GpuMesh& g = meshes[id];
+	glGenBuffers(1, &g.vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, g.vbo);
+	glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(asset.vertices.size() * sizeof(AssetVertex)), &asset.vertices[0], GL_STATIC_DRAW);
+
+	g.index32 = asset.vertices.size() > 65535;
+	glGenBuffers(1, &g.ebo);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g.ebo);
+	if (g.index32)
+	{
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)(asset.indices.size() * sizeof(uint32_t)), &asset.indices[0], GL_STATIC_DRAW);
+	}
+	else
+	{
+		std::vector<uint16_t> small(asset.indices.begin(), asset.indices.end());
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)(small.size() * sizeof(uint16_t)), &small[0], GL_STATIC_DRAW);
+	}
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+	g.count = (int)asset.indices.size();
+	g.asset = true;
+	g.specular = asset.specular;
+	g.emissive = asset.emissive;
+
+	// A missing map falls back to a plain one, so the model still draws: white, flat, unoccluded and rough.
+	const unsigned char fallback[3][4] = { { 255, 255, 255, 255 }, { 128, 128, 255, 255 }, { 255, 210, 0, 255 } };
+	for (int t = 0; t < 3; ++t)
+	{
+		if (!asset.textures[t].empty()) g.textures[t] = LoadTexture2D("Assets/Textures/" + asset.textures[t]);
+		if (g.textures[t] == 0) g.textures[t] = SolidTexture(fallback[t][0], fallback[t][1], fallback[t][2], fallback[t][3]);
+	}
+
+	if (asset.skeleton.BoneCount() > 0)
+	{
+		skeletons[id] = asset.skeleton;
+		std::string clips;
+		if (FindDataFile(std::string("Assets/Models/") + ModelName(id) + ".gsa", clips))
+			LoadAssetClips(clips, skeletons[id]);
+		g.skinned = true;
+	}
+	return true;
+}
+
+void Renderer::LoadGroundTextures()
+{
+	const char* layers[5] = { "grass", "moss", "dirt", "concrete", "forest" };
+	std::vector<std::string> albedo, normal, height;
+	for (int i = 0; i < 5; ++i)
+	{
+		std::string base = std::string("Assets/Textures/ground_") + layers[i];
+		albedo.push_back(base + "_albedo.jpg");
+		normal.push_back(base + "_normal.jpg");
+		height.push_back(base + "_height.jpg");
+	}
+
+	groundAlbedo = LoadTextureArray(albedo);
+	groundNormal = LoadTextureArray(normal);
+	groundHeight = LoadTextureArray(height);
+	if (groundAlbedo == 0 || groundNormal == 0 || groundHeight == 0)
+	{
+		// All or nothing: the ground falls back to its painted colours.
+		if (groundAlbedo) glDeleteTextures(1, &groundAlbedo);
+		if (groundNormal) glDeleteTextures(1, &groundNormal);
+		if (groundHeight) glDeleteTextures(1, &groundHeight);
+		groundAlbedo = groundNormal = groundHeight = 0;
+	}
+	std::cout << "Ground: " << (groundAlbedo ? "Blender layers loaded" : "painted colours") << "\n";
+}
+
+const Skeleton* Renderer::ModelSkeleton(int id) const
+{
+	if (id < 0 || id >= (int)meshes.size() || !meshes[id].skinned) return nullptr;
+	return &skeletons[id];
 }
 
 void Renderer::AddShader(GLuint program, const char* shaderText, GLenum shaderType)
@@ -1023,21 +1140,60 @@ void Renderer::BindLit(const Mat4& model, int mode)
 	glVertexAttrib4f(7, 0.0f, 0.0f, 0.0f, 1.0f);
 	glVertexAttrib4f(8, 1.0f, 1.0f, 1.0f, 0.0f);
 	glVertexAttrib4f(9, 0.0f, 0.0f, 0.0f, 0.0f);
+	glVertexAttrib4f(10, -1.0f, 0.0f, 0.0f, 0.0f);
 }
 
 void Renderer::BindMesh(int id)
 {
 	// Attribute locations are fixed by layout qualifiers in Lit.vs.
-	const GLsizei stride = (GLsizei)sizeof(MeshVertex);
-	glBindBuffer(GL_ARRAY_BUFFER, meshes[id].vbo);
-	glEnableVertexAttribArray(0);
-	glEnableVertexAttribArray(1);
-	glEnableVertexAttribArray(2);
-	glEnableVertexAttribArray(3);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(sizeof(float) * 3));
-	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, stride, (void*)(sizeof(float) * 6));
-	glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, stride, (void*)(sizeof(float) * 9));
+	const GpuMesh& mesh = meshes[id];
+	glBindBuffer(GL_ARRAY_BUFFER, mesh.vbo);
+	for (GLuint loc = 0; loc <= 3; ++loc)
+		glEnableVertexAttribArray(loc);
+
+	if (!mesh.asset)
+	{
+		const GLsizei stride = (GLsizei)sizeof(MeshVertex);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(sizeof(float) * 3));
+		glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, stride, (void*)(sizeof(float) * 6));
+		glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, stride, (void*)(sizeof(float) * 9));
+
+		// A recipe mesh has no maps and no bones: the shader reads these as constants.
+		for (GLuint loc = 11; loc <= 14; ++loc)
+			glDisableVertexAttribArray(loc);
+		glVertexAttrib4f(11, 0.0f, 0.0f, 0.0f, 0.0f);
+		glVertexAttrib4f(12, 1.0f, 0.0f, 0.0f, 1.0f);
+		glVertexAttrib4f(13, 0.0f, 0.0f, 0.0f, 0.0f);
+		glVertexAttrib4f(14, 0.0f, 0.0f, 0.0f, 0.0f);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+		if (!shadowPass) glUniform4f(lit.material, 0.0f, 0.0f, 0.0f, 0.0f);
+		return;
+	}
+
+	const GLsizei stride = (GLsizei)sizeof(AssetVertex);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(AssetVertex, px));
+	glVertexAttribPointer(1, 3, GL_SHORT, GL_TRUE, stride, (void*)offsetof(AssetVertex, normal));
+	glVertexAttribPointer(2, 4, GL_UNSIGNED_BYTE, GL_TRUE, stride, (void*)offsetof(AssetVertex, color));
+	glVertexAttribPointer(3, 1, GL_UNSIGNED_INT, GL_FALSE, stride, (void*)offsetof(AssetVertex, anim));
+	for (GLuint loc = 11; loc <= 14; ++loc)
+		glEnableVertexAttribArray(loc);
+	glVertexAttribPointer(11, 2, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(AssetVertex, u));
+	glVertexAttribPointer(12, 4, GL_SHORT, GL_TRUE, stride, (void*)offsetof(AssetVertex, tangent));
+	glVertexAttribPointer(13, 4, GL_UNSIGNED_BYTE, GL_FALSE, stride, (void*)offsetof(AssetVertex, joints));
+	glVertexAttribPointer(14, 4, GL_UNSIGNED_BYTE, GL_TRUE, stride, (void*)offsetof(AssetVertex, weights));
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.ebo);
+
+	if (!shadowPass)
+	{
+		for (int t = 0; t < 3; ++t)
+		{
+			glActiveTexture(GL_TEXTURE0 + kUnitAlbedo + t);
+			glBindTexture(GL_TEXTURE_2D, mesh.textures[t]);
+		}
+		glActiveTexture(GL_TEXTURE0);
+		glUniform4f(lit.material, 1.0f, mesh.specular, mesh.emissive, 0.0f);
+	}
 }
 
 void Renderer::DrawMesh(int id)
@@ -1045,13 +1201,16 @@ void Renderer::DrawMesh(int id)
 	if (id < 0 || id >= (int)meshes.size() || meshes[id].count == 0) return;
 
 	BindMesh(id);
-	glDrawArrays(GL_TRIANGLES, 0, meshes[id].count);
+	if (meshes[id].asset)
+		glDrawElements(GL_TRIANGLES, meshes[id].count, meshes[id].index32 ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT, (void*)0);
+	else
+		glDrawArrays(GL_TRIANGLES, 0, meshes[id].count);
 	++drawCalls;
 
-	glDisableVertexAttribArray(0);
-	glDisableVertexAttribArray(1);
-	glDisableVertexAttribArray(2);
-	glDisableVertexAttribArray(3);
+	for (GLuint loc = 0; loc <= 3; ++loc)
+		glDisableVertexAttribArray(loc);
+	for (GLuint loc = 11; loc <= 14; ++loc)
+		glDisableVertexAttribArray(loc);
 }
 
 void Renderer::DrawModel(int id, const Mat4& model, const DrawParams& params)
@@ -1068,6 +1227,26 @@ void Renderer::DrawModel(int id, const Mat4& model, const DrawParams& params)
 	instance.flash = params.flash;
 	instance.dissolve = params.dissolve;
 	instance.cutaway = ModelOccluder(id).radius > 0.0f ? 1.0f : 0.0f;
+	instance.boneBase = -1.0f;
+	instance.moss = params.moss;
+	instance.spare[0] = instance.spare[1] = 0.0f;
+
+	// A rigged model brings its pose: three rows of each bone's matrix go into this pass's bone buffer.
+	if (params.skin != nullptr && meshes[id].skinned && (int)params.skin->size() == skeletons[id].BoneCount())
+	{
+		instance.boneBase = (float)(boneData.size() / 12);
+		for (size_t b = 0; b < params.skin->size(); ++b)
+		{
+			const float* m = (*params.skin)[b].m;
+			for (int row = 0; row < 3; ++row)
+			{
+				boneData.push_back(m[row]);
+				boneData.push_back(m[4 + row]);
+				boneData.push_back(m[8 + row]);
+				boneData.push_back(m[12 + row]);
+			}
+		}
+	}
 	modelQueue[id].push_back(instance);
 }
 
@@ -1086,6 +1265,7 @@ void Renderer::DrawShadow(const Vec3& pos, float radius)
 	Instance instance = {};
 	for (int i = 0; i < 16; ++i) instance.model[i] = model.m[i];
 	instance.tint[0] = instance.tint[1] = instance.tint[2] = 1.0f;
+	instance.boneBase = -1.0f;
 	discQueue.push_back(instance);
 }
 
@@ -1103,6 +1283,7 @@ void Renderer::DrawDecal(const Vec3& pos, float yaw, float sizeX, float sizeZ, c
 	instance.tint[2] = color.z;
 	instance.emissive = strength;
 	instance.flash = ring;
+	instance.boneBase = -1.0f;
 	discQueue.push_back(instance);
 }
 
@@ -1123,7 +1304,27 @@ void Renderer::FlushModels()
 	instanceData.insert(instanceData.end(), discQueue.begin(), discQueue.end());
 	discQueue.clear();
 
-	if (instanceData.empty()) return;
+	if (instanceData.empty())
+	{
+		boneData.clear();
+		return;
+	}
+
+	// This pass's poses go up once; every rigged instance reads its own rows from them.
+	if (!boneData.empty())
+	{
+		glBindBuffer(GL_TEXTURE_BUFFER, boneBuffer);
+		GLsizeiptr boneBytes = (GLsizeiptr)(boneData.size() * sizeof(float));
+		if (boneBytes > boneCapacity) boneCapacity = boneBytes * 2;
+		glBufferData(GL_TEXTURE_BUFFER, boneCapacity, NULL, GL_STREAM_DRAW);
+		glBufferSubData(GL_TEXTURE_BUFFER, 0, boneBytes, &boneData[0]);
+		glBindBuffer(GL_TEXTURE_BUFFER, 0);
+		glActiveTexture(GL_TEXTURE0 + kUnitBones);
+		glBindTexture(GL_TEXTURE_BUFFER, boneTex);
+		glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, boneBuffer);
+		glActiveTexture(GL_TEXTURE0);
+		boneData.clear();
+	}
 
 	Mat4 identity;
 	if (shadowPass)
@@ -1144,7 +1345,7 @@ void Renderer::FlushModels()
 	glBufferData(GL_ARRAY_BUFFER, instanceCapacity, NULL, GL_STREAM_DRAW);
 	glBufferSubData(GL_ARRAY_BUFFER, 0, bytes, &instanceData[0]);
 
-	for (GLuint loc = 4; loc <= 9; ++loc)
+	for (GLuint loc = 4; loc <= 10; ++loc)
 	{
 		glEnableVertexAttribArray(loc);
 		glVertexAttribDivisor(loc, 1);
@@ -1162,15 +1363,16 @@ void Renderer::FlushModels()
 		glDepthMask(GL_TRUE);
 	}
 
-	for (GLuint loc = 4; loc <= 9; ++loc)
+	for (GLuint loc = 4; loc <= 10; ++loc)
 	{
 		glVertexAttribDivisor(loc, 0);
 		glDisableVertexAttribArray(loc);
 	}
-	glDisableVertexAttribArray(0);
-	glDisableVertexAttribArray(1);
-	glDisableVertexAttribArray(2);
-	glDisableVertexAttribArray(3);
+	for (GLuint loc = 0; loc <= 3; ++loc)
+		glDisableVertexAttribArray(loc);
+	for (GLuint loc = 11; loc <= 14; ++loc)
+		glDisableVertexAttribArray(loc);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
 void Renderer::DrawInstances(int mesh, int start, int count)
@@ -1186,8 +1388,13 @@ void Renderer::DrawInstances(int mesh, int start, int count)
 		glVertexAttribPointer(4 + c, 4, GL_FLOAT, GL_FALSE, stride, (void*)(base + sizeof(float) * 4 * c));
 	glVertexAttribPointer(8, 4, GL_FLOAT, GL_FALSE, stride, (void*)(base + sizeof(float) * 16));
 	glVertexAttribPointer(9, 4, GL_FLOAT, GL_FALSE, stride, (void*)(base + sizeof(float) * 20));
+	glVertexAttribPointer(10, 4, GL_FLOAT, GL_FALSE, stride, (void*)(base + sizeof(float) * 24));
 
-	glDrawArraysInstanced(GL_TRIANGLES, 0, meshes[mesh].count, count);
+	const GpuMesh& m = meshes[mesh];
+	if (m.asset)
+		glDrawElementsInstanced(GL_TRIANGLES, m.count, m.index32 ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT, (void*)0, count);
+	else
+		glDrawArraysInstanced(GL_TRIANGLES, 0, m.count, count);
 	++drawCalls;
 }
 
@@ -1205,7 +1412,20 @@ void Renderer::DrawGround(const Vec3& center, float extent, const GroundParams& 
 	glUniform3f(lit.damp, params.dampCenter.x, params.dampCenter.z, params.dampStrength);
 	glUniform1f(lit.road, params.road);
 
+	glUniform1f(lit.groundTex, groundAlbedo ? 1.0f : 0.0f);
+	if (groundAlbedo)
+	{
+		const GLuint arrays[3] = { groundAlbedo, groundNormal, groundHeight };
+		for (int i = 0; i < 3; ++i)
+		{
+			glActiveTexture(GL_TEXTURE0 + kUnitGroundAlbedo + i);
+			glBindTexture(GL_TEXTURE_2D_ARRAY, arrays[i]);
+		}
+		glActiveTexture(GL_TEXTURE0);
+	}
+
 	DrawMesh(MODEL_GROUND);
+	glUniform1f(lit.groundTex, 0.0f);
 }
 
 void Renderer::DrawWater(const Vec3& center, float sizeX, float sizeZ)

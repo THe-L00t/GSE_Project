@@ -25,7 +25,8 @@ enum AnimFlag
 	ANIM_PULSE = 4,
 	ANIM_HOVER = 8,
 	ANIM_SPIN = 16,
-	ANIM_BOB = 32     // walk bob driven by DrawParams::phase
+	ANIM_BOB = 32,    // walk bob driven by DrawParams::phase
+	ANIM_FOLIAGE = 64 // leaves: they turn in autumn and pale in winter (Blender-made models only)
 };
 
 struct MeshVertex

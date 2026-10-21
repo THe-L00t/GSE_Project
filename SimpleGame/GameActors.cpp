@@ -68,6 +68,18 @@ PlayerActor::PlayerActor()
 
 void PlayerActor::UpdatePose(float deathTimer)
 {
+	// A rigged body rolls and falls by itself, and the pipe rides in its hand.
+	if (anim.Bound())
+	{
+		SetPitch(0.0f, Vec3());
+		if (gripBone == -2) gripBone = anim.GetSkeleton()->FindBone("grip_R");
+		if (weapon && gripBone >= 0)
+			weapon->SetLocalMatrix(Mul(anim.BoneMatrix(gripBone), MatRotateX(-0.5f * kPi)));
+		else if (weapon)
+			weapon->SetSwing(swingTimer);
+		return;
+	}
+
 	// Roll pivots around the waist so the tumble reads from a quarter view.
 	if (rollTimer > 0.0f)
 		SetPitch(rollAngle, Vec3(0.0f, kRollPivot, 0.0f));
@@ -83,10 +95,11 @@ void PlayerActor::Draw(const DrawContext& dc) const
 {
 	// Lit.vs turns the walk phase into the bob; a roll holds it still.
 	DrawParams params;
-	params.phase = (rollTimer > 0.0f) ? 0.0f : walkPhase;
+	params.phase = (rollTimer > 0.0f || anim.Bound()) ? 0.0f : walkPhase;
 	params.flash = flash;
 	if (hurtTimer > 0.0f && fmodf(hurtTimer, 0.16f) < 0.08f)
 		params.flash = Maxf(params.flash, 0.35f);
+	if (anim.Bound()) params.skin = &anim.SkinMatrices();
 
 	dc.renderer->DrawShadow(Position(), 0.45f);
 	dc.renderer->DrawModel(MODEL_PLAYER, WorldMatrix(), params);
@@ -135,6 +148,8 @@ void PropActor::Draw(const DrawContext& dc) const
 	DrawParams params;
 	params.emissive = emissive;
 	params.phase = phase;
+	params.moss = moss;
+	params.skin = skin;
 
 	if (shadowRadius > 0.0f) dc.renderer->DrawShadow(WorldPosition(), shadowRadius);
 	dc.renderer->DrawModel(model, WorldMatrix(), params);
@@ -154,6 +169,7 @@ void SleeperActor::Draw(const DrawContext& dc) const
 {
 	DrawParams params;
 	params.phase = phase;
+	if (anim.Bound()) params.skin = &anim.SkinMatrices();
 	dc.renderer->DrawModel(isGrandma ? MODEL_SLEEPER_ELDER : MODEL_SLEEPER, WorldMatrix(), params);
 }
 
@@ -169,6 +185,7 @@ void NpcActor::Draw(const DrawContext& dc) const
 {
 	DrawParams params;
 	params.phase = phase;
+	if (anim.Bound()) params.skin = &anim.SkinMatrices();
 
 	dc.renderer->DrawShadow(WorldPosition(), 0.4f);
 	dc.renderer->DrawModel(model, WorldMatrix(), params);
@@ -191,6 +208,7 @@ void DeerActor::Draw(const DrawContext& dc) const
 	DrawParams params;
 	params.phase = stepPhase;
 	params.emissive = 0.15f;
+	if (anim.Bound()) params.skin = &anim.SkinMatrices();
 
 	dc.renderer->DrawShadow(WorldPosition(), 0.7f);
 	dc.renderer->DrawModel(MODEL_DEER, WorldMatrix(), params);
@@ -201,7 +219,12 @@ void DeerActor::Draw(const DrawContext& dc) const
 		glow.phase = stepPhase * 0.3f;
 		glow.tint = Vec3(1.0f, 0.72f, 0.40f);
 		glow.emissive = 0.9f;
-		dc.renderer->DrawModel(MODEL_DREAM_MOTE, Mul(WorldMatrix(), MatTranslate(Vec3(0.15f, 1.35f, 0.75f))), glow);
+		// Her light hangs from an antler tip when the deer has one to hang it on.
+		// The mote model sits about 1.05 up and 0.2 forward of its origin.
+		Mat4 at = Mul(WorldMatrix(), MatTranslate(Vec3(0.15f, 1.35f, 0.75f)));
+		if (antlerBone >= 0)
+			at = Mul(Mul(WorldMatrix(), anim.BoneMatrix(antlerBone)), MatTranslate(Vec3(0.0f, -1.05f, -0.2f)));
+		dc.renderer->DrawModel(MODEL_DREAM_MOTE, at, glow);
 	}
 }
 
@@ -226,6 +249,9 @@ ChunkActor::ChunkActor(const Chunk& chunk)
 	// Stays at the origin, so its props keep the map's world coordinates exactly.
 	layer = LAYER_GROUND;
 
+	// The deeper into the green, the more of what the old world left has gone under moss.
+	float overgrown = Saturatef((float)(stage - 1) * 0.3f + 0.12f + (1.0f - modernity) * 0.25f);
+
 	for (size_t i = 0; i < chunk.props.size(); ++i)
 	{
 		const ChunkProp& p = chunk.props[i];
@@ -234,6 +260,7 @@ ChunkActor::ChunkActor(const Chunk& chunk)
 		prop->SetYaw(p.yaw);
 		prop->SetScale(Vec3(p.scale, p.scale, p.scale));
 		prop->phase = p.pos.x * 0.37f + p.pos.z * 0.21f;
+		prop->moss = overgrown;
 
 		if (p.radius > 0.0f)
 		{
@@ -290,6 +317,8 @@ void EnemyActor::Draw(const DrawContext& dc) const
 		params.emissive = 0.25f * w;
 	}
 
+	if (anim.Bound()) params.skin = &anim.SkinMatrices();
+
 	Mat4 model = Mul(WorldMatrix(), MatScale(Vec3(size, size, size)));
 	if (alive) dc.renderer->DrawShadow(WorldPosition(), info.radius * 1.1f * size);
 	dc.renderer->DrawModel(info.model, model, params);
@@ -307,6 +336,13 @@ void ItemActor::Draw(const DrawContext& dc) const
 	params.phase = phase;
 	params.emissive = 0.35f + sparkle * 1.4f;
 
+	int model = type == ITEM_RELIC ? RelicModel(relicId) : GetItemInfo(type).model;
 	dc.renderer->DrawShadow(WorldPosition(), 0.3f);
-	dc.renderer->DrawModel(GetItemInfo(type).model, WorldMatrix(), params);
+	dc.renderer->DrawModel(model, WorldMatrix(), params);
+}
+
+int RelicModel(int relicId)
+{
+	if (relicId < 0 || relicId >= kRelicCount) return MODEL_RELIC;
+	return MODEL_RELIC_TORCH + relicId;
 }

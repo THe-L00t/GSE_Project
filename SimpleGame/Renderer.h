@@ -7,6 +7,7 @@
 #include <iostream>
 
 #include "Dependencies\glew.h"
+#include "Asset.h"
 #include "Font.h"
 #include "Math3D.h"
 
@@ -17,6 +18,8 @@ struct DrawParams
 	float phase = 0.0f;       // offsets shader animation so neighbours do not move in lockstep
 	float flash = 0.0f;
 	float dissolve = 0.0f;    // [0,1] how much of the model has come apart into light
+	float moss = 0.0f;        // [0,1] how far moss has grown over a Blender-made model
+	const std::vector<Mat4>* skin = nullptr;   // an Animator's skinning matrices, for rigged models
 };
 
 struct GroundParams
@@ -134,6 +137,9 @@ public:
 	// in Lit.fs. Strength 0 turns it off.
 	void SetCutaway(const Vec3& playerPos, float strength);
 
+	// The skeleton and clips of a rigged Blender model; null for anything else.
+	const Skeleton* ModelSkeleton(int id) const;
+
 	// Models and blob shadows are queued and drawn one call per mesh when the pass ends.
 	void DrawModel(int id, const Mat4& model, const DrawParams& params);
 	void DrawModel(int id, const Vec3& pos, float yaw, const Vec3& scale, const DrawParams& params);
@@ -165,13 +171,21 @@ public:
 	void DrawSolidRect(float x, float y, float z, float size, float r, float g, float b, float a);
 
 private:
+	// A recipe mesh is a flat list of MeshVertex; a Blender-made one is indexed AssetVertex with three textures.
 	struct GpuMesh
 	{
 		GLuint vbo = 0;
-		int    count = 0;
+		GLuint ebo = 0;
+		int    count = 0;        // vertices for a recipe mesh, indices for an asset
+		bool   asset = false;
+		bool   index32 = false;
+		bool   skinned = false;
+		GLuint textures[3] = { 0, 0, 0 };   // albedo, normal, mask
+		float  specular = 0.0f;
+		float  emissive = 1.0f;
 	};
 
-	// Per-instance attributes at locations 4-9 in Lit.vs.
+	// Per-instance attributes at locations 4-10 in Lit.vs.
 	struct Instance
 	{
 		float model[16];
@@ -181,6 +195,9 @@ private:
 		float flash;
 		float dissolve;
 		float cutaway;    // 1 for models that open up when they hide the player
+		float boneBase;   // first of this instance's matrices in the bone buffer, -1 when not skinned
+		float moss;
+		float spare[2];
 	};
 
 	struct LitLocations
@@ -212,6 +229,8 @@ private:
 		GLint glowCount = -1;
 		GLint glowPos = -1;
 		GLint cutaway = -1;
+		GLint material = -1;
+		GLint groundTex = -1;
 	};
 
 	struct ShadowLocations
@@ -219,6 +238,18 @@ private:
 		GLint viewProj = -1;
 		GLint model = -1;
 		GLint time = -1;
+	};
+
+	// Texture units the lit and shadow shaders read beyond the ones the passes already use.
+	enum
+	{
+		kUnitAlbedo = 5,
+		kUnitNormal = 6,
+		kUnitMask = 7,
+		kUnitGroundAlbedo = 8,
+		kUnitGroundNormal = 9,
+		kUnitGroundHeight = 10,
+		kUnitBones = 11
 	};
 
 	struct OverlayLocations
@@ -328,6 +359,8 @@ private:
 	void CreateVertexBufferObjects();
 	void CacheUniformLocations();
 	void LoadModels();
+	bool LoadAssetModel(int id);
+	void LoadGroundTextures();
 	void GetGLPosition(float x, float y, float* newX, float* newY);
 	bool ProjectUv(const Vec3& pos, float& u, float& v) const;   // texture coordinates, bottom-left origin
 
@@ -414,6 +447,18 @@ private:
 	PostLocations        post;
 	VolumeLocations      volume;
 	std::vector<GpuMesh> meshes;
+	std::vector<Skeleton> skeletons;   // per model; empty for unrigged ones
+
+	// Skinning matrices for this pass, three rows of four floats per bone, read by Lit.vs from a buffer texture.
+	std::vector<float> boneData;
+	GLuint boneBuffer = 0;
+	GLuint boneTex = 0;
+	GLsizeiptr boneCapacity = 0;
+
+	// Ground layers made in Blender: grass, moss, dirt, concrete, forest floor.
+	GLuint groundAlbedo = 0;
+	GLuint groundNormal = 0;
+	GLuint groundHeight = 0;
 
 	// DrawModel and DrawShadow only queue; FlushModels draws each mesh once for all its instances.
 	std::vector<std::vector<Instance>> modelQueue;
