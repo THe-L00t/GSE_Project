@@ -343,6 +343,7 @@ void ItemActor::Draw(const DrawContext& dc) const
 
 int RelicModel(int relicId)
 {
-	if (relicId < 0 || relicId >= kRelicCount) return MODEL_RELIC;
+	// Once every entry is filled, what is left lying about is old-world odds and ends: an old radio will do.
+	if (relicId < 0 || relicId >= kRelicCount) return MODEL_RELIC_RADIO;
 	return MODEL_RELIC_TORCH + relicId;
 }
