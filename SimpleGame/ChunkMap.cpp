@@ -60,7 +60,7 @@ namespace
 		KeepOut k;
 		if (cx == 0 && cz == kBusStopChunkZ)
 		{
-			k.center = Vec3(RoadCenter(kBusStopZ) + 5.0f, 0.0f, kBusStopZ);
+			k.center = Vec3(RoadCenter(kBusStopZ) - 5.0f, 0.0f, kBusStopZ);
 			k.radius = 5.0f;
 		}
 		else if (cx == kReservoirChunkX && cz == kReservoirChunkZ)
@@ -101,10 +101,11 @@ namespace
 
 		if (c.cx == 0 && c.cz == kBusStopChunkZ)
 		{
-			// The bus shelter faces the road; a car died beside it long ago.
-			AddFixedProp(c, footprints, MODEL_BUS_STOP, Vec3(RoadCenter(kBusStopZ) + 5.2f, 0.0f, kBusStopZ), -halfPi, 1.0f, 1.6f);
-			AddFixedProp(c, footprints, MODEL_CAR, Vec3(RoadCenter(kBusStopZ + 6.0f) + 4.6f, 0.0f, kBusStopZ + 6.0f), 0.25f, 1.0f, 1.3f);
-			AddFixedProp(c, footprints, MODEL_POLE, Vec3(RoadCenter(kBusStopZ - 5.0f) + 4.0f, 0.0f, kBusStopZ - 5.0f), 0.0f, 1.0f, 0.25f);
+			// The bus shelter faces the road; a car died beside it long ago. It stands on the west side so
+			// its open front, and whatever waits in it, faces the quarter-view camera.
+			AddFixedProp(c, footprints, MODEL_BUS_STOP, Vec3(RoadCenter(kBusStopZ) - 5.2f, 0.0f, kBusStopZ), halfPi, 1.0f, 1.6f);
+			AddFixedProp(c, footprints, MODEL_CAR, Vec3(RoadCenter(kBusStopZ + 6.0f) - 4.6f, 0.0f, kBusStopZ + 6.0f), -0.25f, 1.0f, 1.3f);
+			AddFixedProp(c, footprints, MODEL_POLE, Vec3(RoadCenter(kBusStopZ - 5.0f) - 4.0f, 0.0f, kBusStopZ - 5.0f), 0.0f, 1.0f, 0.25f);
 		}
 		else if (c.cx == kReservoirChunkX && c.cz == kReservoirChunkZ)
 		{
