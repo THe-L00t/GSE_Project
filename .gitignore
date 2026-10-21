@@ -15,3 +15,9 @@
 Cache/
 
 Options.txt
+
+# Blender sources are rebuilt from Art/assets scripts; only what the game reads is committed.
+Art/blend/
+Art/previews/
+__pycache__/
+*.blend1
