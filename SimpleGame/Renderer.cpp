@@ -15,6 +15,18 @@
 namespace
 {
 	const Vec3 kFireflyField(56.0f, 3.2f, 56.0f);   // the box the fireflies wander in, around the camera
+
+	void LogValidation(GLuint program, const char* name)
+	{
+		if (program == 0) return;
+		glValidateProgram(program);
+		GLint ok = 0;
+		glGetProgramiv(program, GL_VALIDATE_STATUS, &ok);
+		if (ok) return;
+		GLchar log[1024] = { 0 };
+		glGetProgramInfoLog(program, sizeof(log), NULL, log);
+		std::cout << name << " program does not validate: " << log << "\n";
+	}
 }
 
 Renderer::Renderer(int sizeX, int sizeY)
@@ -56,6 +68,10 @@ void Renderer::Initialize(int sizeX, int sizeY)
 	CreateShadowMap();
 
 	CreateNoiseTexture();
+
+	// Every sampler has its own unit by now.
+	LogValidation(litShader, "Lit");
+	LogValidation(shadowShader, "Shadow");
 
 	if (GLEW_VERSION_3_3 || GLEW_ARB_timer_query) glGenQueries(kQueryFrames * MARK_COUNT, &timeQueries[0][0]);
 	std::cout << "GPU: " << (const char*)glGetString(GL_RENDERER) << "\n";
@@ -614,8 +630,8 @@ bool Renderer::LoadAssetModel(int id)
 	}
 	else
 	{
-		std::vector<uint16_t> small(asset.indices.begin(), asset.indices.end());
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)(small.size() * sizeof(uint16_t)), &small[0], GL_STATIC_DRAW);
+		std::vector<uint16_t> shortIndices(asset.indices.begin(), asset.indices.end());
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)(shortIndices.size() * sizeof(uint16_t)), &shortIndices[0], GL_STATIC_DRAW);
 	}
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
@@ -785,15 +801,8 @@ GLuint Renderer::CompileShaders(const char* filenameVS, const char* filenameFS)
 		return 0;
 	}
 
-	glValidateProgram(program);
-	glGetProgramiv(program, GL_VALIDATE_STATUS, &success);
-	if (!success)
-	{
-		glGetProgramInfoLog(program, sizeof(errorLog), NULL, errorLog);
-		std::cout << filenameVS << ", " << filenameFS << " Error validating shader program\n" << errorLog;
-		return 0;
-	}
-
+	// Validation waits for LogValidation at the end of Initialize: right after linking every sampler still
+	// points at unit 0, and samplers of different kinds on one unit would fail it for no real reason.
 	std::cout << filenameVS << ", " << filenameFS << " shader compiled.\n";
 	return program;
 }
@@ -940,8 +949,9 @@ void Renderer::EndScene()
 	glUniform3f(post.ao, AoOn() ? 1.0f : 0.0f, depthRange, pixelsPerUnit / (float)targetHeight);
 	DrawPostPass(0, (int)windowSizeX, (int)windowSizeY, 2, sceneTex, (float)targetWidth, (float)targetHeight);
 
+	// Unit 4 goes back to the noise the lit shader reads there; the depth only borrowed it for the composite.
 	glActiveTexture(GL_TEXTURE4);
-	glBindTexture(GL_TEXTURE_2D, 0);
+	glBindTexture(GL_TEXTURE_2D, noiseTex);
 	glActiveTexture(GL_TEXTURE3);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glActiveTexture(GL_TEXTURE1);
