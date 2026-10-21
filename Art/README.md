@@ -13,7 +13,9 @@
   `SimpleGame/Assets/Textures/<이름>_albedo.jpg · _normal.jpg · _mask.jpg`
 - 미리보기: `Art/previews/<이름>.png` — 게임 카메라 각도(요 45°, 피치 30°, 직교)에서 앞·뒤를 찍는다.
 - 지면 재질: `blender -b --factory-startup --python Art/ground.py`
-- 전부: `blender -b --factory-startup --python Art/build_all.py`
+- 전부: `blender -b --factory-startup --python Art/build_all.py` (이름을 주면 그것만: `... -- tree pine`)
+- 리깅 검증: `blender -b Art/blend/<이름>.blend --python Art/verify_rig.py -- <이름> <클립> <프레임>`
+  — 내보낸 파일을 게임과 같은 수식으로 스키닝해 블렌더의 자세와 비교한다(`err_max` 가 수 mm 이하면 정상).
 
 ## 컨셉: 「이끼가 덮어 가는 기억의 디오라마」
 

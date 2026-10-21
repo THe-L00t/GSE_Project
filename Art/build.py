@@ -43,12 +43,17 @@ def run(name, want_preview=True, want_blend=True):
 				frames = picks
 				by_name = {c["name"]: c for c in clips}
 				def set_frame(pick):
+					arm.data.pose_position = 'POSE'
 					c = by_name[pick[0]]
 					ad = arm.animation_data
 					ad.action = c["action"]
 					if hasattr(ad, "action_slot") and len(c["action"].slots) > 0:
 						ad.action_slot = c["action"].slots[0]
 					bpy.context.scene.frame_set(c["start"] + pick[1])
+		# The sheet is framed on the rest pose, not on whatever pose the last exported clip ended in.
+		if arm is not None:
+			arm.data.pose_position = 'REST'
+			bpy.context.view_layer.update()
 		preview.render(name, objs, views=result.get("preview_views", (45.0, 225.0)), frames=frames,
 					   height=result.get("preview_height"), set_frame=set_frame)
 

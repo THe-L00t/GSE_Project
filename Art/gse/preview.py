@@ -110,6 +110,8 @@ def render(name, objs, views=(45.0, 225.0), frames=None, height=None, set_frame=
 	extent = height or max(size.x, size.y, size.z) * 1.35 + 0.3
 	scene, cam = _setup(extent, center)
 
+	# Each asset renders through its own scratch file, so builds running side by side never collide.
+	shot = os.path.join(core.PREVIEW_DIR, "_shot_" + name + ".png")
 	shots = []
 	frame_list = frames or [None]
 	for f in frame_list:
@@ -117,7 +119,7 @@ def render(name, objs, views=(45.0, 225.0), frames=None, height=None, set_frame=
 			set_frame(f)
 		for yaw in views:
 			_aim(cam, center, yaw)
-			path = os.path.join(core.PREVIEW_DIR, "_shot.png")
+			path = shot
 			scene.render.filepath = path
 			scene.render.image_settings.file_format = 'PNG'
 			bpy.ops.render.render(write_still=True)
@@ -139,7 +141,7 @@ def render(name, objs, views=(45.0, 225.0), frames=None, height=None, set_frame=
 	out.file_format = 'PNG'
 	out.save()
 	try:
-		os.remove(os.path.join(core.PREVIEW_DIR, "_shot.png"))
+		os.remove(shot)
 	except OSError:
 		pass
 	return path

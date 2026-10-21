@@ -149,7 +149,8 @@ def key(arm_obj, frame, pose, root=None, root_bone="root"):
 
 
 def clip(arm_obj, name, keys, loop=True):
-	# keys: list of (frame, pose, root_offset). A loop repeats its first pose at the end.
+	# keys: list of (frame, pose, root_offset). A loop must end on the same pose it starts with: write that key too.
+	# Only the root is moved by these keys; key other bones' locations directly when a part should lift.
 	act = new_clip(arm_obj, name)
 	for (frame, pose, root) in keys:
 		key(arm_obj, frame, pose, root)
