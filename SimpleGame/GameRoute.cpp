@@ -904,6 +904,7 @@ void Game::DrawRouteHud()
 	DrawTitleCard("32번 국도", "처음 나선 바깥");
 	DrawTitleCardAt("은행나무 읍내", "첫 길의 끝", townCardTimer);
 	DrawNarration();
+	DrawMemoMap();
 	DrawDialog();
 	DrawStatPanel();
 	DrawBagPanel();

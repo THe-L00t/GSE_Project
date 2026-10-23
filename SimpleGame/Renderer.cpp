@@ -1934,7 +1934,7 @@ void Renderer::DrawMap(float x, float y, float w, float h, const MapParams& para
 	{
 		places[i * 4 + 0] = params.places[i].x;
 		places[i * 4 + 1] = params.places[i].z;
-		places[i * 4 + 2] = 0.0f;
+		places[i * 4 + 2] = params.focus == i ? 1.0f : 0.0f;
 		places[i * 4 + 3] = params.placeRead[i] ? 1.0f : 0.0f;
 	}
 	glUniform4fv(mapLoc.places, 5, places);

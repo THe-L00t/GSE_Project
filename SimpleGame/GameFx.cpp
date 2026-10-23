@@ -58,6 +58,7 @@ void Game::UpdateScreenFx(float dt)
 	bool recallSaid = said == "하율" || said == "기억 속 할머니";
 	float recall = recallDialog ? 1.0f : (recallSaid ? 0.3f : 0.0f);
 	screenFx.memo = Approach(screenFx.memo, (memo || mapOpen) ? 1.0f : 0.0f, mapOpen ? 3.0f : 2.5f, dt);
+	if (mapOpen || (!memo && screenFx.memo <= 0.0f)) memoMap = -1;
 	screenFx.recall = Approach(screenFx.recall, recall, recall > screenFx.recall ? 1.6f : 2.4f, dt);
 
 	// The place a note speaks of is ringed while the note is open, or waiting to open, and lets go once it closes.

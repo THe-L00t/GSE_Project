@@ -991,6 +991,16 @@ void Game::DrawDialog()
 	float pw = 900.0f, ph = 96.0f;
 	float px = (float)w * 0.5f - pw * 0.5f;
 	float py = (float)h - 290.0f;
+
+	// Beside her map, a note keeps to the rest of the screen.
+	float mx, my, mw, mh;
+	if (dialogSpeaker == "할머니의 지도 메모" && MemoMapRect(mx, my, mw, mh))
+	{
+		float from = memoMapLeft ? mx + mw + 24.0f : 24.0f;
+		float to = memoMapLeft ? (float)w - 24.0f : mx - 24.0f;
+		pw = Minf(pw, to - from);
+		px = (from + to) * 0.5f - pw * 0.5f;
+	}
 	renderer->DrawRectPx(px, py, pw, ph, Vec3(0.08f, 0.09f, 0.08f), 0.88f);
 	renderer->DrawRectPx(px, py, 4.0f, ph, Vec3(0.85f, 0.70f, 0.45f), 0.9f);
 

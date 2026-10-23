@@ -181,16 +181,37 @@ void Game::UpdateStory(float dt)
 
 	StoryBeat beat = storyQueue.front();
 	storyQueue.erase(storyQueue.begin());
+	OpenBeat(beat);
+	storyCalm = 0.0f;
+}
+
+void Game::OpenBeat(const StoryBeat& beat)
+{
 	dialogSpeaker = beat.speaker;
 	dialogLines = beat.lines;
 	dialogIndex = 0;
 	dialogNext = -1;
-	storyCalm = 0.0f;
 	if (beat.relic >= 0)
 	{
 		showcaseRelic = beat.relic;
 		showcaseFade = 0.0f;
 	}
+	if (beat.memo < 0) return;
+
+	// A note is read off her map, so the map is held up beside it, on the side away from the place it names.
+	memoMap = beat.memo;
+	memoMapLeft = true;
+	Vec3 at;
+	switch (beat.memo)
+	{
+	case MEMO_BUS_STOP:  at = BusStopPos(); break;
+	case MEMO_RESERVOIR: at = kReservoirCenter; break;
+	case MEMO_TOWN:      at = TownGatePos(); break;
+	case MEMO_TREE:      at = OldTreePos(); break;
+	default:             return;
+	}
+	float sx, sy;
+	if (renderer->WorldToScreen(at, sx, sy)) memoMapLeft = sx > (float)renderer->GetWidth() * 0.5f;
 }
 
 void Game::Narrate(const char* speaker, const char* const* lines, int count)
@@ -267,6 +288,7 @@ void Game::MarkMemo(int memo)
 	StoryBeat beat;
 	beat.speaker = kMemoSpeaker;
 	beat.lines.assign(kMemos[memo].lines, kMemos[memo].lines + 3);
+	beat.memo = memo;
 	if (memo == MEMO_ROAD)
 	{
 		storyQueue.push_back(beat);
@@ -280,10 +302,7 @@ void Game::MarkMemo(int memo)
 	}
 	else
 	{
-		dialogSpeaker = beat.speaker;
-		dialogLines = beat.lines;
-		dialogIndex = 0;
-		dialogNext = -1;
+		OpenBeat(beat);
 	}
 
 	// Its place is ringed while the note is open. Starting just above zero keeps the ring from being let go
@@ -374,6 +393,13 @@ void Game::TellRelicOwner(int relic)
 	beat.speaker = RelicName(relic);
 	beat.lines.push_back(kOwnerLines[relic]);
 	beat.relic = relic;
+
+	// In the village nothing waits in line: the find is told the moment it is picked up.
+	if (level != LEVEL_ROUTE)
+	{
+		OpenBeat(beat);
+		return;
+	}
 	storyQueue.push_back(beat);
 
 	// Hayul's thoughts on how many have been found are a dialog of their own, opening as the owner's closes.
@@ -533,7 +559,33 @@ bool Game::MapOwned() const
 	return level == LEVEL_ROUTE || tutorial >= TUT_PACK;
 }
 
-void Game::DrawGrandmaMap(float x, float y, float w, float h, bool notes)
+bool Game::MemoMapRect(float& x, float& y, float& w, float& h) const
+{
+	if (memoMap < 0 || mapOpen || screenFx.memo <= 0.0f) return false;
+
+	// Wide enough for her words, beside the dialog box rather than under it.
+	float sh = (float)renderer->GetHeight();
+	h = Minf(sh * 0.74f, 640.0f);
+	w = h * 0.62f;
+	x = memoMapLeft ? 32.0f : (float)renderer->GetWidth() - 32.0f - w;
+	y = sh * 0.5f - h * 0.5f - 6.0f;
+	return true;
+}
+
+void Game::DrawMemoMap()
+{
+	float x, y, w, h;
+	if (!MemoMapRect(x, y, w, h)) return;
+
+	// Brought in from its side of the screen as the note opens, and put away the same way.
+	float shown = SmoothStep(0.0f, 1.0f, screenFx.memo);
+	float away = (1.0f - shown) * (w + 60.0f);
+	x += memoMapLeft ? -away : away;
+	renderer->DrawRectPx(x + 7.0f, y + 9.0f, w, h, Vec3(0.0f, 0.0f, 0.0f), 0.35f * shown);
+	DrawGrandmaMap(x, y, w, h, true, memoMap);
+}
+
+void Game::DrawGrandmaMap(float x, float y, float w, float h, bool notes, int focus)
 {
 	MapParams params;
 	params.x0 = kMapX0;
@@ -546,6 +598,7 @@ void Game::DrawGrandmaMap(float x, float y, float w, float h, bool notes)
 	params.places[3] = TownGatePos();
 	params.places[4] = OldTreePos();
 	for (int i = 0; i < MEMO_COUNT; ++i) params.placeRead[i] = memoSeen[i];
+	params.focus = focus;
 	params.roadStartZ = kMapRoadStart;
 	params.roadEndZ = kOldTreeZ;
 	params.reservoirX = kReservoirSizeX;

@@ -97,6 +97,7 @@ struct StoryBeat
 	std::string speaker;
 	std::vector<std::string> lines;
 	int  relic = -1;        // the find shown in the middle of the screen while it is told
+	int  memo = -1;         // the note on her map it reads; the map is held up beside it
 	bool follows = false;   // opens as soon as the dialog before it closes, without waiting for quiet
 };
 
@@ -395,9 +396,12 @@ private:
 	bool StoryCalm() const;   // nothing hostile close or closing in
 	bool MapOwned() const;    // found beside grandmother with her letter
 	void DrawMapPanel();      // M: her map spread out, notes beside the places they speak of
-	void DrawGrandmaMap(float x, float y, float w, float h, bool notes);
+	void DrawGrandmaMap(float x, float y, float w, float h, bool notes, int focus = -1);
 	int  DrawWrapped(int x, int y, const char* text, int maxWidth, const Vec3& color);   // lines used
+	void OpenBeat(const StoryBeat& beat);
 	void MarkMemo(int memo);
+	bool MemoMapRect(float& x, float& y, float& w, float& h) const;   // her map beside a note, at rest
+	void DrawMemoMap();
 	bool PlaceInSight(const Vec3& at, float height) const;   // well inside the screen, not at its edge
 	void OutlineMemoPlace(int memo, float strength);          // rings the place a note speaks of
 	void NoteFirstFind(int itemType);
@@ -563,6 +567,8 @@ private:
 	bool  memoSeen[MEMO_COUNT] = {};
 	int   outlineMemo = -1;       // the note whose place is ringed on screen while it is read
 	float outlineStrength = 0.0f;
+	int   memoMap = -1;           // the note whose map is held up beside it, until it is put away
+	bool  memoMapLeft = true;     // on the side of the screen away from the place
 	int   showcaseRelic = -1;     // the find held up mid-screen while its owner is told
 	float showcaseFade = 0.0f;    // [0,1] gathers out of light as the dialog opens, comes apart as it closes
 	int   nextRecall = 4;         // the level whose memory comes back next

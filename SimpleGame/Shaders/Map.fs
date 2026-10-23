@@ -189,6 +189,25 @@ void main()
 	}
 	c = Mark(c, kGraphite * 0.85, Lead(strokes, 1.3, p + 11.0) * (0.78 + 0.15 * u_Places[4].w));
 
+	// The note being read now: rings of its own pencil keep going out from its place. The road's own note has
+	// her whole line gone over again, a broad soft stroke widening and fading along it.
+	float wave = fract(u_Time * 0.55);
+	if (u_Places[0].z > 0.5)
+	{
+		float stroke = 1.0 - smoothstep(2.0 + wave * 7.0, 3.5 + wave * 7.0, abs(p.x - rx - wobbleA));
+		c = Mark(c, kGraphite, stroke * drawn * (1.0 - wave) * 0.45);
+	}
+	vec3 inks[5] = vec3[5](kGraphite, kRed, kBlue, kGold, kGraphite);
+	vec2 lifts[5] = vec2[5](vec2(0.0), vec2(0.0), vec2(0.0), vec2(0.0, -6.0), vec2(0.0, -8.0));
+	float starts[5] = float[5](0.0, 19.0, max(radius.x, radius.y) + 8.0, 22.0, 24.0);
+	for (int i = 1; i < 5; ++i)
+	{
+		if (u_Places[i].z < 0.5) continue;
+		float from = length(p - ToPaper(u_Places[i].xy) - lifts[i]);
+		float ring = 1.0 - smoothstep(0.8, 2.0, abs(from - (starts[i] + wave * 14.0)));
+		c = Mark(c, inks[i], ring * (1.0 - wave) * 0.9);
+	}
+
 	// Hayul: a dot where she stands, a ring running out from it; off the paper, an arrow on its edge.
 	if (u_Player.z > 0.5)
 	{

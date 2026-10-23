@@ -79,6 +79,7 @@ struct MapParams
 	float z1 = 1.0f;
 	Vec3  places[5];                   // village, bus stop, reservoir, town gate, the lone tree
 	bool  placeRead[5] = {};           // its note has been read
+	int   focus = -1;                  // the place whose note is being read now; 0 is the road itself
 	float roadStartZ = 0.0f;           // where her line leaves the village
 	float roadEndZ = 0.0f;             // and where it gives out
 	float reservoirX = 1.0f;           // the water's size

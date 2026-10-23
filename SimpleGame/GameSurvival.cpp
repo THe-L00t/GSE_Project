@@ -180,7 +180,7 @@ void Game::FindRelic(int id)
 		char buf[256];
 		sprintf_s(buf, sizeof(buf), "유물 도감에 새 기록: %s  (B로 읽기)", RelicName(id));
 		ShowMessage(buf, 4.5f);
-		if (level == LEVEL_ROUTE) TellRelicOwner(id);
+		TellRelicOwner(id);
 	}
 	else
 	{
