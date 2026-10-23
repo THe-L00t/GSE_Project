@@ -112,6 +112,7 @@ class PropActor : public Actor
 public:
 	PropActor(int actorKind, int propModel);
 
+	bool IsDrawn(const DrawContext& dc) const override;
 	void Draw(const DrawContext& dc) const override;
 
 	int   model = 0;

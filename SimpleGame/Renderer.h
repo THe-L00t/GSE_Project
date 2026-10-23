@@ -143,6 +143,9 @@ public:
 
 	// Models and blob shadows are queued and drawn one call per mesh when the pass ends.
 	void DrawModel(int id, const Mat4& model, const DrawParams& params);
+	// Whether something standing at pos, spreading reach around it and rising top above it, can reach what
+	// this pass draws into: the screen, or the sun's shadow map during the shadow pass.
+	bool MayShow(const Vec3& pos, float reach, float top) const;
 	void DrawModel(int id, const Vec3& pos, float yaw, const Vec3& scale, const DrawParams& params);
 	void DrawShadow(const Vec3& pos, float radius);
 	// Flat on the ground. A ring width above zero leaves only a band of that share of the radius at the rim.
@@ -442,6 +445,7 @@ private:
 	bool   shadowActive = false;   // this frame's shadow map is valid
 	GLuint noiseTex = 0;
 	Mat4   lightViewProj;
+	static constexpr float kShadowHalf = 30.0f;   // half the side of the sun's square view, in world units
 
 	LitLocations         lit;
 	ShadowLocations      shadow;

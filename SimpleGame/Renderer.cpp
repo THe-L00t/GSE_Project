@@ -332,7 +332,7 @@ void Renderer::BeginShadowPass(const Vec3& focus)
 	float rise = Maxf(sinf(ang), -0.15f) * 0.9f + 0.18f;
 	Vec3 sun = Normalize(Vec3(cosf(ang) * 0.75f, Maxf(rise, 0.30f), 0.42f));
 
-	const float half = 30.0f;
+	const float half = kShadowHalf;
 	const float depth = 60.0f;
 	Mat4 view = MatLookAt(sun * 100.0f, Vec3(0.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f));
 
@@ -1242,9 +1242,36 @@ void Renderer::DrawMesh(int id)
 		glDisableVertexAttribArray(loc);
 }
 
+bool Renderer::MayShow(const Vec3& pos, float reach, float top) const
+{
+	// Both views are orthographic, so two rows of the matrix give where the point lands in clip space.
+	if (shadowPass)
+	{
+		const float* m = lightViewProj.m;
+		float x = m[0] * pos.x + m[4] * pos.y + m[8] * pos.z + m[12];
+		float y = m[1] * pos.x + m[5] * pos.y + m[9] * pos.z + m[13];
+		float margin = 1.0f + (reach + top) / kShadowHalf;
+		return fabsf(x) <= margin && fabsf(y) <= margin;
+	}
+
+	const float* m = viewProj.m;
+	float x = m[0] * pos.x + m[4] * pos.y + m[8] * pos.z + m[12];
+	float y = m[1] * pos.x + m[5] * pos.y + m[9] * pos.z + m[13];
+
+	// Clip units per world unit across and up the screen. Whatever stands up shows from below the bottom edge.
+	float perX = 2.0f * pixelsPerUnit / Maxf((float)windowSizeX, 1.0f);
+	float perY = 2.0f * pixelsPerUnit / Maxf((float)windowSizeY, 1.0f);
+	return fabsf(x) <= 1.0f + reach * perX && y <= 1.0f + reach * perY && y >= -1.0f - (reach + top) * perY;
+}
+
 void Renderer::DrawModel(int id, const Mat4& model, const DrawParams& params)
 {
 	if (id < 0 || id >= (int)meshes.size() || meshes[id].count == 0) return;
+
+	// A creature coming apart stops casting a shadow once half of it is light. The whole instance shares one
+	// dissolve value, so it is left out here instead of discarded per fragment, which would cost the shadow
+	// pass its early depth test.
+	if (shadowPass && params.dissolve > 0.5f) return;
 
 	Instance instance;
 	for (int i = 0; i < 16; ++i) instance.model[i] = model.m[i];

@@ -143,6 +143,20 @@ PropActor::PropActor(int actorKind, int propModel)
 {
 }
 
+bool PropActor::IsDrawn(const DrawContext& dc) const
+{
+	if (!visible) return false;
+
+	// A chunk is drawn whole once any of it shows; its props each check the view, so the ones off screen,
+	// or outside the sun's shadow map, cost no vertices. Poles and lamps are thin but tall, and a signal's
+	// arm reaches 3.3 m to the side.
+	OccluderSize o = ModelOccluder(model);
+	const Vec3& s = Scale();
+	float reach = Maxf(o.radius * Maxf(s.x, s.z), 3.5f);
+	float top = Maxf(o.height * s.y, 8.5f);
+	return dc.renderer->MayShow(WorldPosition(), reach, top);
+}
+
 void PropActor::Draw(const DrawContext& dc) const
 {
 	DrawParams params;
