@@ -262,13 +262,13 @@ void Game::BuildVillage()
 	PropActor* sign = AddProp(MODEL_SIGN, Vec3(RoadCenter(signZ) + 3.2f, 0.0f, signZ), kUnitScale, 0.0f, 0.0f, 0.0f);
 	sign->emissive = 0.10f;
 
-	// The pond whose mist kept the village: clear of grandmother's house and the tree by it, turned so its
-	// long side faces the deer's path. The well ran dry first; the pond has only just begun to draw back.
+	// The pond whose mist kept the village, turned and sized to keep clear of grandmother's house, the tree by
+	// it and the deer's path. The well ran dry first; the pond has only just begun to draw back.
 	water = levelNode->AddChild(new WaterActor(19.6f, 16.8f, 1.2f, 1.0f));
 	water->SetPosition(Vec3(-17.0f, 0.03f, -15.0f));
 	water->SetYaw(1.5f);
 
-	// Reeds round all but the house side, where the deer slips away at night, and stones on the bared mud.
+	// Reeds round all but the house side (the deer slips away into them at night), and stones on the bared mud.
 	std::vector<ChunkProp> shore;
 	ShoreDressing(Vec3(-17.0f, 0.0f, -15.0f), 9.8f, 8.4f, 1.5f, 1.2f, 0.0f, 0x0A11A9E5ULL, shore);
 	for (size_t i = 0; i < shore.size(); ++i)
