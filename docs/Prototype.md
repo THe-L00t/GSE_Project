@@ -31,6 +31,7 @@
 | 10 | "손전등 마을에서 주우면 그때도 하게 해줘" | 헛간에서 손전등을 주우면 그 자리에서 유물 주인 대화와 가운데 손전등. 마을엔 대기열이 없어 바로 연다 | `GameSurvival.cpp` `FindRelic`, `GameStory.cpp` `TellRelicOwner` |
 | 11 | "호수 이런곳 다 직사각형인거 조치해줘" (10-22 제안 방향) | 두 저수지를 타원에 물결 셋을 얹은 못 모양 메시로. 둘레 땅은 물이 빠진 갈라진 진흙 띠, 물가엔 갈대 네 무리·돌, 수면 위 낮은 물안개 세 겹. 지도·충돌·물가 판정·메모 테두리도 같은 모양 | `Mesh.h` `PondShore`·`PondEdge`, `Mesh.cpp` `SHAPE_POND`, `GameActors.cpp` `WaterActor`, `ChunkMap.cpp` `ShoreDressing`, `Lit.fs` 모드 1·2·4, `Map.fs`, `Art/assets/reeds.py` |
 | 12 | 몬스터가 보이지 않는 무언가에 걸려 떨며 걷는 동작만 한다 | 쫓기 포기(집 22m)와 다시 알아보기 사이에 16m 여유를 두었다. 몬스터끼리 밀어낸 뒤 소품·석등 빛에서 다시 밀어낸다 | `GameCombat.cpp` `UpdateEnemy`·`UpdateEnemies`·`KeepOutOfLight` |
+| 13 | "장소 소개할때 테두리 생긴 오브젝트를 카메라 중앙으로 위치하게 했다가, 다시 플레이어 포커싱" (10-24) | 장소 메모가 열린 동안 시선이 0.7초에 걸쳐 그 물체의 높이 중간으로 옮겨 가 머물고, 닫히면 하율에게 돌아온다. 국도에서 대화로 멈춘 동안에도 카메라는 갱신. 틸트시프트 초점도 함께 | `Game.cpp` `UpdateCamera`·`Render`, `GameStory.cpp` `MemoPlace`·`MemoViewPoint` |
 
 - 남쪽 끝의 나무 메모를 위해 큰길 서쪽 z 240 에 큰 나무 하나를 고정 랜드마크로 두었다(청크 (0,10)).
 - 지도 셰이더는 같은 식을 파이썬으로 옮겨 그려 배치를 확인했다(실기 확인 전). 이 PC 엔 GLSL 컴파일러가 없어 셰이더 문법은 빌드 때 확인된다. `Map.fs`·`Outline.fs` 가 컴파일되지 않으면 지도 종이·테두리만 빠지고 나머지는 돈다.
