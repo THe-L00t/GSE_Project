@@ -49,11 +49,15 @@ void Game::UpdateScreenFx(float dt)
 	bool dreaming = DialogOpen() && dialogSpeaker.find("꿈 조각") == 0;
 	screenFx.dream = Approach(screenFx.dream, dreaming ? 1.0f : 0.0f, dreaming ? 1.4f : 2.2f, dt);
 
-	// Grandmother's map notes read as a sketch on her paper; Hayul's memories as an old photograph.
-	bool memo = DialogOpen() && dialogSpeaker == "할머니의 지도 메모";
-	bool recall = DialogOpen() && (dialogSpeaker == "하율" || dialogSpeaker == "기억 속 할머니");
-	screenFx.memo = Approach(screenFx.memo, memo ? 1.0f : 0.0f, 2.5f, dt);
-	screenFx.recall = Approach(screenFx.recall, recall ? 1.0f : 0.0f, recall ? 1.6f : 2.4f, dt);
+	// Grandmother's map notes read as a sketch on her paper; Hayul's memories as an old photograph. Said over play,
+	// they only tint the scene, so the road stays easy to read.
+	std::string said = NarrationSpeaker();
+	bool memo = said == "할머니의 지도 메모";
+	bool recallDialog = DialogOpen() && (dialogSpeaker == "하율" || dialogSpeaker == "기억 속 할머니");
+	bool recallSaid = said == "하율" || said == "기억 속 할머니";
+	float recall = recallDialog ? 1.0f : (recallSaid ? 0.3f : 0.0f);
+	screenFx.memo = Approach(screenFx.memo, memo ? 0.18f : 0.0f, 2.5f, dt);
+	screenFx.recall = Approach(screenFx.recall, recall, recall > screenFx.recall ? 1.6f : 2.4f, dt);
 
 	// A level-up sends one ring of bent air out from the player in its first moments.
 	float sinceLevelUp = kLevelUpTime - levelUpTimer;

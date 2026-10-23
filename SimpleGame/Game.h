@@ -91,11 +91,20 @@ enum StoryMemo
 	MEMO_COUNT
 };
 
-// A dialog waiting for a quiet moment on the road.
+// A dialog waiting for a quiet moment on the road: what a relic's owner left behind, held up to the light.
 struct StoryBeat
 {
 	std::string speaker;
 	std::vector<std::string> lines;
+	int relic = -1;                   // the find shown in the middle of the screen while it is told
+	std::vector<std::string> after;   // Hayul's own words once it closes, said over play
+};
+
+// A line said over play, without stopping it.
+struct NarrationLine
+{
+	std::string speaker;
+	std::string text;
 };
 
 enum Season
@@ -379,7 +388,10 @@ private:
 
 	// GameStory.cpp: the story the road tells as you grow, find and travel
 	void UpdateStory(float dt);
-	void QueueStory(const char* speaker, const char* const* lines, int count);
+	void Narrate(const char* speaker, const char* const* lines, int count);
+	void UpdateNarration(float dt);
+	void DrawNarration();
+	const char* NarrationSpeaker() const;   // who says the line on screen now; empty when none
 	bool StoryCalm() const;   // nothing hostile close or closing in
 	void MarkMemo(int memo);
 	void NoteFirstFind(int itemType);
@@ -536,6 +548,8 @@ private:
 
 	std::vector<StoryBeat> storyQueue;
 	float storyCalm = 0.0f;       // seconds the road has been quiet
+	std::vector<NarrationLine> narration;   // said over play, front first
+	float narrationTimer = 0.0f;  // seconds the front line has shown
 	bool  memoSeen[MEMO_COUNT] = {};
 	int   nextRecall = 4;         // the level whose memory comes back next
 	bool  firstFound[ITEM_TYPE_COUNT] = {};

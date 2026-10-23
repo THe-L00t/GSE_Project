@@ -5,10 +5,13 @@
 
 // The road's story comes from three sides of one family (ContentDesign.md 5): grandmother's notes on the map,
 // opened by reaching their place; Hayul's own memories, opened by growing; and the owners of what is found.
+// Notes and memories are said over play; only a relic's owner, and a dream chosen beside a sleeper, stop the road.
 
 namespace
 {
 	const float kStoryCalm = 1.5f;       // quiet seconds before a waiting beat opens
+	const float kLineFadeIn = 0.35f;
+	const float kLineFadeOut = 0.45f;
 	const float kRoadMemoDelay = 6.0f;   // the first note waits for the title card to clear
 	const int   kLastRecall = 7;
 	const float kSleeperReach = 1.8f;
@@ -100,6 +103,24 @@ namespace
 	const char* kHerbWords[] = { "\"쓴 풀이 몸엔 낫다. 아플 땐 아끼지 말고 씹어라.\"" };
 	const char* kMeatWords[] = { "\"짐승한테 받은 건 불에 익혀 먹어라. 그게 예의다.\"" };
 	const char* kBerryWords[] = { "\"빨간 건 먹고, 허연 건 두어라. 숲이 알려 주는 대로.\"" };
+
+	// Long enough to read at an easy pace, counted in characters rather than bytes.
+	float LineTime(const std::string& text)
+	{
+		int glyphs = 0;
+		for (size_t i = 0; i < text.size(); ++i)
+		{
+			if (((unsigned char)text[i] & 0xC0) != 0x80) ++glyphs;
+		}
+		return Clampf(2.0f + 0.09f * (float)glyphs, 3.5f, 8.0f);
+	}
+
+	Vec3 SpeakerColor(const std::string& speaker)
+	{
+		if (speaker == "할머니의 지도 메모") return Vec3(0.93f, 0.88f, 0.74f);
+		if (speaker == "기억 속 할머니") return Vec3(0.95f, 0.82f, 0.62f);
+		return Vec3(0.78f, 0.86f, 0.95f);
+	}
 }
 
 void Game::UpdateStory(float dt)
@@ -109,9 +130,11 @@ void Game::UpdateStory(float dt)
 
 	while (nextRecall <= kLastRecall && stats.level >= nextRecall)
 	{
-		QueueStory("하율", kRecalls[nextRecall - 4], 2);
+		Narrate("하율", kRecalls[nextRecall - 4], 2);
 		++nextRecall;
 	}
+
+	UpdateNarration(dt);
 
 	// A beat never opens in the middle of a fight; it waits until the road has been quiet a moment.
 	storyCalm = (deathTimer < 0.0f && StoryCalm()) ? storyCalm + dt : 0.0f;
@@ -124,14 +147,65 @@ void Game::UpdateStory(float dt)
 	dialogIndex = 0;
 	dialogNext = -1;
 	storyCalm = 0.0f;
+
+	// Said over play once the dialog closes: the narration waits while any dialog is open.
+	for (size_t i = 0; i < beat.after.size(); ++i)
+	{
+		NarrationLine line;
+		line.speaker = "하율";
+		line.text = beat.after[i];
+		narration.push_back(line);
+	}
 }
 
-void Game::QueueStory(const char* speaker, const char* const* lines, int count)
+void Game::Narrate(const char* speaker, const char* const* lines, int count)
 {
-	StoryBeat beat;
-	beat.speaker = speaker;
-	beat.lines.assign(lines, lines + count);
-	storyQueue.push_back(beat);
+	for (int i = 0; i < count; ++i)
+	{
+		NarrationLine line;
+		line.speaker = speaker;
+		line.text = lines[i];
+		narration.push_back(line);
+	}
+}
+
+void Game::UpdateNarration(float dt)
+{
+	// A dialog takes the place on screen, and the line waits under it.
+	if (narration.empty() || DialogOpen()) return;
+
+	narrationTimer += dt;
+	if (narrationTimer < LineTime(narration.front().text)) return;
+
+	narration.erase(narration.begin());
+	narrationTimer = 0.0f;
+}
+
+const char* Game::NarrationSpeaker() const
+{
+	if (narration.empty() || DialogOpen()) return "";
+	return narration.front().speaker.c_str();
+}
+
+void Game::DrawNarration()
+{
+	if (narration.empty() || DialogOpen()) return;
+
+	const int w = renderer->GetWidth();
+	const int h = renderer->GetHeight();
+	const NarrationLine& line = narration.front();
+
+	float shown = LineTime(line.text);
+	float alpha = Saturatef(narrationTimer / kLineFadeIn) * Saturatef((shown - narrationTimer) / kLineFadeOut);
+	if (alpha <= 0.0f) return;
+
+	// A subtitle over the road: no box to read through, only a band of shade under the words.
+	int tw = renderer->TextWidth(line.text.c_str(), false);
+	int sw = renderer->TextWidth(line.speaker.c_str(), false);
+	int y = h - 236;
+	renderer->DrawRectPx((float)(w / 2 - tw / 2 - 26), (float)(y - 46), (float)(tw + 52), 60.0f, Vec3(0.02f, 0.03f, 0.03f), 0.42f * alpha);
+	renderer->DrawTexts(w / 2 - sw / 2, y - 24, line.speaker.c_str(), SpeakerColor(line.speaker) * (0.85f * alpha), false);
+	renderer->DrawTexts(w / 2 - tw / 2, y, line.text.c_str(), kHudInk * alpha, false);
 }
 
 bool Game::StoryCalm() const
@@ -151,7 +225,7 @@ void Game::MarkMemo(int memo)
 {
 	if (memoSeen[memo]) return;
 	memoSeen[memo] = true;
-	QueueStory("할머니의 지도 메모", kMemos[memo].lines, 3);
+	Narrate("할머니의 지도 메모", kMemos[memo].lines, 3);
 }
 
 void Game::NoteFirstFind(int itemType)
@@ -165,25 +239,30 @@ void Game::NoteFirstFind(int itemType)
 	if (!words) return;
 
 	firstFound[itemType] = true;
-	QueueStory("기억 속 할머니", words, 1);
+	Narrate("기억 속 할머니", words, 1);
 }
 
 void Game::TellRelicOwner(int relic)
 {
-	QueueStory(RelicName(relic), &kOwnerLines[relic], 1);
+	StoryBeat beat;
+	beat.speaker = RelicName(relic);
+	beat.lines.push_back(kOwnerLines[relic]);
+	beat.relic = relic;
 
+	// Hayul's thoughts on how many have been found follow the owner's line, over play.
 	int found = 0;
 	for (int i = 0; i < kRelicCount; ++i) found += relicFound[i] ? 1 : 0;
 	if (found >= 3 && relicsTold < 3)
 	{
 		relicsTold = 3;
-		QueueStory("하율", kThreeRelics, 2);
+		beat.after.assign(kThreeRelics, kThreeRelics + 2);
 	}
 	if (found >= 6 && relicsTold < 6)
 	{
 		relicsTold = 6;
-		QueueStory("하율", kSixRelics, 2);
+		beat.after.assign(kSixRelics, kSixRelics + 2);
 	}
+	storyQueue.push_back(beat);
 }
 
 bool Game::FindRouteSleeper()
