@@ -309,7 +309,15 @@ void Game::Render()
 	camera->Apply(renderer);
 	camera->SetPosition(view);
 
-	if (level == LEVEL_ROUTE) PrepareChunkView();
+	if (level == LEVEL_ROUTE)
+	{
+		PrepareChunkView();
+		if (outlineMemo >= 0)
+		{
+			OutlineMemoPlace(outlineMemo, outlineStrength);
+			if (outlineStrength <= 0.0f) outlineMemo = -1;
+		}
+	}
 	GatherLights(view);
 	renderer->PlaceFireflyLights(Vec3(view.x, 0.0f, view.z));
 

@@ -46,6 +46,11 @@ const float kReservoirSizeZ = 9.0f;
 const int   kTownChunkZ = 6;
 const float kTownGateZ = 140.0f;
 
+// The shelter stands west of the road, so its open front faces the quarter-view camera.
+inline Vec3 BusStopPos() { return Vec3(RoadCenter(kBusStopZ) - 5.2f, 0.0f, kBusStopZ); }
+// The road at the town gate, between its two ginkgo trees.
+inline Vec3 TownGatePos() { return Vec3(RoadCenter(kTownGateZ), 0.0f, kTownGateZ); }
+
 // The lone tree at the south end of grandmother's map, where her road gives out. West of the road, so it
 // stands behind the road from the quarter-view camera instead of in front of it.
 const int   kOldTreeChunkZ = 10;

@@ -227,6 +227,7 @@
     <None Include="Shaders\Post.vs" />
     <None Include="Shaders\Volume.fs" />
     <None Include="Shaders\Shadow.fs" />
+    <None Include="Shaders\Outline.fs" />
     <None Include="Shaders\SolidRect.fs" />
     <None Include="Shaders\SolidRect.vs" />
     <None Include="Shaders\Text.fs" />

@@ -105,6 +105,8 @@ public:
 	float sizeX = 0.0f;
 	float sizeZ = 0.0f;
 	float clearRange = 4.5f;      // spore exposure falls this close to the shore
+	float outline = 0.0f;         // [0,1] ringed on screen in outlineColor while a note speaks of it
+	Vec3  outlineColor;
 };
 
 class PropActor : public Actor
@@ -121,6 +123,8 @@ public:
 	float shadowRadius = 0.0f;    // zero casts no shadow
 	float moss = 0.0f;            // how far the road's moss has grown over it
 	const std::vector<Mat4>* skin = nullptr;   // a shared pose, for rigged models placed as props
+	float outline = 0.0f;         // [0,1] ringed on screen in outlineColor while a note speaks of it
+	Vec3  outlineColor;
 };
 
 class SleeperActor : public Actor

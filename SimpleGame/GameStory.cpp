@@ -3,6 +3,8 @@
 
 #include <cstdio>
 
+#include "Models.h"
+
 // The road's story comes from three sides of one family (ContentDesign.md 5): grandmother's notes on the map,
 // opened by reaching their place; Hayul's own memories, opened by growing; and the owners of what is found.
 // Notes and memories are said over play; only a relic's owner, and a dream chosen beside a sleeper, stop the road.
@@ -16,6 +18,20 @@ namespace
 	const int   kLastRecall = 7;
 	const float kSleeperReach = 1.8f;
 	const float kGuardReach = 6.0f;      // a live creature this close to a sleeper keeps you off
+
+	const char* kMemoSpeaker = "할머니의 지도 메모";
+
+	// The colour of the pencil each place is marked in on her map, and of its ring on screen while the note is
+	// read: red around the bus stop, blue for the water, gold for the ginkgo trees. The lone tree is graphite on
+	// the paper; on screen its ring is pale, or it would vanish against the leaves.
+	const Vec3 kMemoMark[MEMO_COUNT] =
+	{
+		Vec3(0.35f, 0.33f, 0.30f),
+		Vec3(0.95f, 0.32f, 0.24f),
+		Vec3(0.32f, 0.62f, 1.00f),
+		Vec3(1.00f, 0.80f, 0.26f),
+		Vec3(0.96f, 0.93f, 0.80f),
+	};
 
 	struct MemoText
 	{
@@ -126,7 +142,6 @@ namespace
 void Game::UpdateStory(float dt)
 {
 	if (levelTimer > kRoadMemoDelay) MarkMemo(MEMO_ROAD);
-	if (townReached && EnsureChunk(playerChunkX, playerChunkZ)->stage >= 3) MarkMemo(MEMO_TREE);
 
 	while (nextRecall <= kLastRecall && stats.level >= nextRecall)
 	{
@@ -135,6 +150,14 @@ void Game::UpdateStory(float dt)
 	}
 
 	UpdateNarration(dt);
+
+	// The place a note speaks of stays ringed while any of the note is still to be read, then lets go.
+	if (outlineMemo >= 0)
+	{
+		bool reading = false;
+		for (size_t i = 0; i < narration.size() && !reading; ++i) reading = narration[i].speaker == kMemoSpeaker;
+		outlineStrength = Approach(outlineStrength, reading ? 1.0f : 0.0f, reading ? 1.6f : 0.7f, dt);
+	}
 
 	// A beat never opens in the middle of a fight; it waits until the road has been quiet a moment.
 	storyCalm = (deathTimer < 0.0f && StoryCalm()) ? storyCalm + dt : 0.0f;
@@ -225,7 +248,80 @@ void Game::MarkMemo(int memo)
 {
 	if (memoSeen[memo]) return;
 	memoSeen[memo] = true;
-	Narrate("할머니의 지도 메모", kMemos[memo].lines, 3);
+
+	// A note is read while its place is in sight, so it goes ahead of whatever else is waiting to be said.
+	size_t at = narration.empty() ? 0 : 1;
+	for (int i = 0; i < 3; ++i)
+	{
+		NarrationLine line;
+		line.speaker = kMemoSpeaker;
+		line.text = kMemos[memo].lines[i];
+		narration.insert(narration.begin() + at + i, line);
+	}
+
+	// Its place is ringed from now until the note has been read. Starting just above zero keeps the ring
+	// from being let go before it has faded in.
+	if (outlineMemo >= 0 && outlineMemo != memo) OutlineMemoPlace(outlineMemo, 0.0f);
+	outlineMemo = memo;
+	outlineStrength = 0.01f;
+}
+
+bool Game::PlaceInSight(const Vec3& at, float height) const
+{
+	float sx, sy;
+	if (!renderer->WorldToScreen(at + Vec3(0.0f, height * 0.5f, 0.0f), sx, sy)) return false;
+	float w = (float)renderer->GetWidth();
+	float h = (float)renderer->GetHeight();
+	return sx > w * 0.12f && sx < w * 0.88f && sy > h * 0.12f && sy < h * 0.78f;
+}
+
+void Game::OutlineMemoPlace(int memo, float strength)
+{
+	// The landmark props live in their chunk; a chunk built again later picks the ring up on the next frame.
+	int cx = 0, cz = -1, model = -1;
+	Vec3 around;
+	float within = 1.0f;
+	switch (memo)
+	{
+	case MEMO_BUS_STOP:
+		cz = kBusStopChunkZ;
+		model = MODEL_BUS_STOP;
+		around = BusStopPos();
+		break;
+	case MEMO_TOWN:
+		cz = kTownChunkZ;
+		model = MODEL_GINKGO;
+		around = TownGatePos();
+		within = 9.0f;
+		break;
+	case MEMO_TREE:
+		cz = kOldTreeChunkZ;
+		model = MODEL_TREE;
+		around = OldTreePos();
+		break;
+	case MEMO_RESERVOIR:
+		if (reservoir)
+		{
+			reservoir->outline = strength;
+			reservoir->outlineColor = kMemoMark[memo];
+		}
+		return;
+	default:
+		return;
+	}
+
+	std::unordered_map<uint64_t, ChunkActor*>::iterator found = chunkActors.find(ChunkMap::Key(cx, cz));
+	if (found == chunkActors.end()) return;
+	ChunkActor* chunk = found->second;
+	for (size_t i = 0; i < chunk->ChildCount(); ++i)
+	{
+		Actor* child = chunk->Child(i);
+		if (child->Kind() != ACTOR_PROP) continue;
+		PropActor* prop = static_cast<PropActor*>(child);
+		if (prop->model != model || DistXZ(prop->Position(), around) > within) continue;
+		prop->outline = strength;
+		prop->outlineColor = kMemoMark[memo];
+	}
 }
 
 void Game::NoteFirstFind(int itemType)

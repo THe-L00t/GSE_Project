@@ -258,7 +258,7 @@ namespace
 		{
 			// The bus shelter faces the road; a car died beside it long ago. It stands on the west side so
 			// its open front, and whatever waits in it, faces the quarter-view camera.
-			AddFixedProp(c, footprints, MODEL_BUS_STOP, Vec3(RoadCenter(kBusStopZ) - 5.2f, 0.0f, kBusStopZ), halfPi, 1.0f, 1.6f);
+			AddFixedProp(c, footprints, MODEL_BUS_STOP, BusStopPos(), halfPi, 1.0f, 1.6f);
 			AddFixedProp(c, footprints, MODEL_CAR, Vec3(RoadCenter(kBusStopZ + 6.0f) - 4.6f, 0.0f, kBusStopZ + 6.0f), -0.25f, 1.0f, 1.3f);
 			AddFixedProp(c, footprints, MODEL_POLE, Vec3(RoadCenter(kBusStopZ - 5.0f) - 4.0f, 0.0f, kBusStopZ - 5.0f), 0.0f, 1.0f, 0.25f);
 		}
@@ -342,14 +342,14 @@ namespace
 	}
 
 	// An open spot within spread of a point, on either axis.
-	bool FindSpotNear(Rng& rng, const Chunk& c, const std::vector<Footprint>& footprints, const Vec3& near, float spread,
+	bool FindSpotNear(Rng& rng, const Chunk& c, const std::vector<Footprint>& footprints, const Vec3& around, float spread,
 					  float footprint, Vec3& out)
 	{
 		for (int attempt = 0; attempt < 8; ++attempt)
 		{
 			float offsetX = rng.Range(-spread, spread);
 			float offsetZ = rng.Range(-spread, spread);
-			Vec3 pos(near.x + offsetX, 0.0f, near.z + offsetZ);
+			Vec3 pos(around.x + offsetX, 0.0f, around.z + offsetZ);
 			if (!Fits(c, footprints, Circle(pos, footprint), 0.6f)) continue;
 
 			out = pos;

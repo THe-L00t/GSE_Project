@@ -20,6 +20,8 @@ struct DrawParams
 	float dissolve = 0.0f;    // [0,1] how much of the model has come apart into light
 	float moss = 0.0f;        // [0,1] how far moss has grown over a Blender-made model
 	const std::vector<Mat4>* skin = nullptr;   // an Animator's skinning matrices, for rigged models
+	Vec3  outlineColor{ 1.0f, 1.0f, 1.0f };
+	float outline = 0.0f;     // [0,1] how strongly Post.fs rings the model's silhouette in outlineColor; 0 none
 };
 
 struct GroundParams
@@ -64,6 +66,7 @@ struct ScreenFx
 	Vec3  rippleAt;
 	Vec3  heat[2];            // lantern flames the air shimmers over
 	float heatStrength[2] = { 0.0f, 0.0f };
+	float spotlight = 0.0f;   // [0,1] all but the outlined models sinks into shade, as when a find is held up
 };
 
 // Graphics options; ApplySettings rebuilds only what a change touches.
@@ -152,6 +155,8 @@ public:
 	void DrawDecal(const Vec3& pos, float yaw, float sizeX, float sizeZ, const Vec3& color, float strength, float ring = 0.0f);
 	void DrawGround(const Vec3& center, float extent, const GroundParams& params);
 	void DrawWater(const Vec3& center, float sizeX, float sizeZ);
+	// Rings a flat rectangle on the ground like an outlined model, for a place that is not a model, such as water.
+	void OutlineGround(const Vec3& center, float sizeX, float sizeZ, const Vec3& color, float strength);
 	void DrawSpores(const Vec3& center, const Vec3& field, const Vec3& color, float densityScale, float size);
 	void DrawAmbientMotes(const Vec3& center);   // fireflies by night, pollen by day
 
@@ -254,7 +259,8 @@ private:
 		kUnitGroundAlbedo = 8,
 		kUnitGroundNormal = 9,
 		kUnitGroundHeight = 10,
-		kUnitBones = 11
+		kUnitBones = 11,
+		kUnitOutline = 12     // the composite's outline target; no lit draw reads this unit
 	};
 
 	struct OverlayLocations
@@ -319,7 +325,23 @@ private:
 		GLint heat = -1;
 		GLint depth = -1;
 		GLint ao = -1;
+		GLint outlineOn = -1;
+		GLint spotlight = -1;
 		GLint positionAttrib = -1;
+	};
+
+	struct OutlineLocations
+	{
+		GLint viewProj = -1;
+		GLint model = -1;
+		GLint time = -1;
+	};
+
+	// An outlined model's silhouette, drawn flat into the outline target after the scene.
+	struct OutlineDraw
+	{
+		int      mesh = 0;
+		Instance instance;
 	};
 
 	struct VolumeLocations
@@ -487,6 +509,16 @@ private:
 	};
 	std::vector<Surface> surfaceQueue;
 	void DrawSurface(const Surface& s);
+
+	// Outlined silhouettes at scene resolution, colour in rgb and strength in alpha; the composite rings them.
+	GLuint outlineShader = 0;
+	GLuint outlineFbo = 0;
+	GLuint outlineTex = 0;
+	bool   outlineOn = false;   // this frame's outline target holds something
+	bool   maskPass = false;    // drawing silhouettes: meshes bind no textures or material
+	OutlineLocations outlineLoc;
+	std::vector<OutlineDraw> outlineQueue;
+	void DrawOutlines();
 
 	Mat4  viewProj;
 	float depthRange = 1.0f;   // world units across the depth buffer; the view is orthographic, so depth is linear

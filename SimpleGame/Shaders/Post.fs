@@ -29,6 +29,9 @@ uniform vec3      u_Ripple;         // xy centre on screen, z how far the level-
 uniform vec4      u_Heat[2];        // lantern flames: xy on screen, z one world unit in screen heights, w strength
 uniform sampler2D u_Depth;          // scene depth, linear: the view is orthographic
 uniform vec3      u_Ao;             // x on, y world units across the depth range, z one world unit in screen heights
+uniform sampler2D u_Outline;        // outlined silhouettes: rgb the ring's colour, a its strength
+uniform float     u_OutlineOn;
+uniform float     u_Spotlight;      // all but the outlined models sinks into shade
 
 layout(location = 0) out vec4 FragColor;
 
@@ -102,6 +105,40 @@ float AmbientOcclusion(vec2 uv)
 	return 1.0 - occ / 6.0;
 }
 
+// A pencil ring around what a note speaks of: the silhouettes grown by a few pixels, less the silhouettes
+// themselves. The stroke wavers in width and shows the grain of the lead; a faint glow lies just outside it.
+vec3 Outline(vec2 uv, vec3 c)
+{
+	vec4 here = texture(u_Outline, uv);
+	float inside = step(0.002, here.a);
+	float width = 2.2 + 1.6 * valueNoise(gl_FragCoord.xy * 0.035 + vec2(u_Time * 0.4, 0.0));
+	float ring = 0.0;
+	float glow = 0.0;
+	vec3 color = here.rgb * here.a;
+	float weight = here.a;
+	for (int i = 0; i < 12; ++i)
+	{
+		float a = float(i) * 0.5235988;
+		vec2 dir = vec2(cos(a), sin(a)) * u_Texel;
+		vec4 inner = texture(u_Outline, uv + dir * width);
+		vec4 outer = texture(u_Outline, uv + dir * 7.0);
+		ring = max(ring, inner.a);
+		glow = max(glow, outer.a);
+		color += inner.rgb * inner.a + outer.rgb * outer.a * 0.5;
+		weight += inner.a + outer.a * 0.5;
+	}
+	if (weight <= 0.0001) return c;
+	color /= weight;
+
+	ring *= 1.0 - inside;
+	glow *= 1.0 - inside;
+	float grain = 0.78 + 0.22 * hash12(floor(gl_FragCoord.xy * 0.5));
+	float pulse = 0.88 + 0.12 * sin(u_Time * 3.0);
+	c = mix(c, color, here.a * 0.10);
+	c += color * glow * 0.22 * (1.0 - ring) * pulse;
+	return mix(c, color, clamp(ring * grain * pulse, 0.0, 1.0));
+}
+
 // Linear below the shoulder, so the graded palette is kept; highlights roll off instead of clipping.
 vec3 ToneMap(vec3 c)
 {
@@ -173,6 +210,13 @@ vec3 Composite(vec2 uv)
 
 	float radial = length(fromCenter * vec2(1.15, 1.0));
 
+	// A find held up to the light: the rest of the scene sinks into shade, deepest at the edges.
+	if (u_OutlineOn > 0.5 && u_Spotlight > 0.002)
+	{
+		float held = texture(u_Outline, uv).a;
+		c *= 1.0 - u_Spotlight * (1.0 - held) * (0.5 + 0.25 * smoothstep(0.15, 0.75, radial));
+	}
+
 	// A map note reads as the scene sketched on old paper: graphite along the edges, hatching in the shadows.
 	if (u_Memo > 0.002)
 	{
@@ -237,6 +281,8 @@ vec3 Composite(vec2 uv)
 	c += texture(u_Bloom, uv).rgb * u_BloomStrength * (1.0 - u_Memo * 0.7);
 	c += texture(u_Volume, uv).rgb * u_VolumeOn;
 	c = ToneMap(c);
+
+	if (u_OutlineOn > 0.5) c = Outline(uv, c);
 
 	// A trace of grain breaks up banding in the fog gradients.
 	c += (hash12(gl_FragCoord.xy + fract(u_Time) * 97.0) - 0.5) * (1.5 / 255.0);

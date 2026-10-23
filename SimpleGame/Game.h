@@ -394,6 +394,8 @@ private:
 	const char* NarrationSpeaker() const;   // who says the line on screen now; empty when none
 	bool StoryCalm() const;   // nothing hostile close or closing in
 	void MarkMemo(int memo);
+	bool PlaceInSight(const Vec3& at, float height) const;   // well inside the screen, not at its edge
+	void OutlineMemoPlace(int memo, float strength);          // rings the place a note speaks of
 	void NoteFirstFind(int itemType);
 	void TellRelicOwner(int relic);
 	bool FindRouteSleeper();  // a sleeper close by, unvisited and unguarded; sets the rest target
@@ -551,6 +553,8 @@ private:
 	std::vector<NarrationLine> narration;   // said over play, front first
 	float narrationTimer = 0.0f;  // seconds the front line has shown
 	bool  memoSeen[MEMO_COUNT] = {};
+	int   outlineMemo = -1;       // the note whose place is ringed on screen while it is read
+	float outlineStrength = 0.0f;
 	int   nextRecall = 4;         // the level whose memory comes back next
 	bool  firstFound[ITEM_TYPE_COUNT] = {};
 	int   relicsTold = 0;         // relic count milestones already spoken

@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "Renderer.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstring>
 #include <vector>
@@ -71,6 +72,7 @@ void Renderer::Initialize(int sizeX, int sizeY)
 	postShader      = CompileShaders("Shaders/Post.vs",      "Shaders/Post.fs");
 	volumeShader    = CompileShaders("Shaders/Post.vs",      "Shaders/Volume.fs");
 	shadowShader    = CompileShaders("Shaders/Lit.vs",       "Shaders/Shadow.fs");
+	outlineShader   = CompileShaders("Shaders/Lit.vs",       "Shaders/Outline.fs");
 	textShader      = CompileShaders("Shaders/Text.vs",      "Shaders/Text.fs");
 
 	CreateVertexBufferObjects();
@@ -171,6 +173,25 @@ void Renderer::CreateTargets(int windowX, int windowY)
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sceneTex, 0);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, sceneDepth, 0);
 	bool ok = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+
+	// Outlined silhouettes, filtered so the ring the composite draws around them comes out smooth.
+	glGenTextures(1, &outlineTex);
+	glBindTexture(GL_TEXTURE_2D, outlineTex);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, sizeX, sizeY, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	glGenFramebuffers(1, &outlineFbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, outlineFbo);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, outlineTex, 0);
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+	{
+		glDeleteFramebuffers(1, &outlineFbo);
+		glDeleteTextures(1, &outlineTex);
+		outlineFbo = outlineTex = 0;
+	}
 
 	// MSAA smooths the long diagonal edges the quarter view is full of.
 	GLint maxSamples = 0;
@@ -394,6 +415,9 @@ void Renderer::DeleteTargets()
 	if (sceneFbo) glDeleteFramebuffers(1, &sceneFbo);
 	if (sceneTex) glDeleteTextures(1, &sceneTex);
 	if (sceneDepth) glDeleteTextures(1, &sceneDepth);
+	if (outlineFbo) glDeleteFramebuffers(1, &outlineFbo);
+	if (outlineTex) glDeleteTextures(1, &outlineTex);
+	outlineFbo = outlineTex = 0;
 	for (int i = 0; i < 2; ++i)
 	{
 		if (volumeFbo[i]) glDeleteFramebuffers(1, &volumeFbo[i]);
@@ -517,6 +541,13 @@ void Renderer::CacheUniformLocations()
 	glUniform1i(glGetUniformLocation(shadowShader, "u_Bones"), kUnitBones);
 	glUseProgram(0);
 
+	outlineLoc.viewProj = glGetUniformLocation(outlineShader, "u_ViewProj");
+	outlineLoc.model = glGetUniformLocation(outlineShader, "u_Model");
+	outlineLoc.time = glGetUniformLocation(outlineShader, "u_Time");
+	glUseProgram(outlineShader);
+	glUniform1i(glGetUniformLocation(outlineShader, "u_Bones"), kUnitBones);
+	glUseProgram(0);
+
 	overlay.rect = glGetUniformLocation(overlayShader, "u_Rect");
 	overlay.mode = glGetUniformLocation(overlayShader, "u_Mode");
 	overlay.color = glGetUniformLocation(overlayShader, "u_Color");
@@ -572,6 +603,11 @@ void Renderer::CacheUniformLocations()
 	post.heat = glGetUniformLocation(postShader, "u_Heat");
 	post.depth = glGetUniformLocation(postShader, "u_Depth");
 	post.ao = glGetUniformLocation(postShader, "u_Ao");
+	post.outlineOn = glGetUniformLocation(postShader, "u_OutlineOn");
+	post.spotlight = glGetUniformLocation(postShader, "u_Spotlight");
+	glUseProgram(postShader);
+	glUniform1i(glGetUniformLocation(postShader, "u_Outline"), kUnitOutline);
+	glUseProgram(0);
 
 	volume.invViewProj = glGetUniformLocation(volumeShader, "u_InvViewProj");
 	volume.lightViewProj = glGetUniformLocation(volumeShader, "u_LightViewProj");
@@ -874,6 +910,7 @@ void Renderer::BeginFrame()
 void Renderer::EndScene()
 {
 	FlushModels();
+	DrawOutlines();
 	MarkGpu(MARK_SCENE);
 	if (!postReady)
 	{
@@ -966,7 +1003,15 @@ void Renderer::EndScene()
 	glUniform1f(post.volumeOn, VolumeOn() ? 1.0f : 0.0f);
 	glUniform1i(post.depth, 4);
 	glUniform3f(post.ao, AoOn() ? 1.0f : 0.0f, depthRange, pixelsPerUnit / (float)targetHeight);
+	glActiveTexture(GL_TEXTURE0 + kUnitOutline);
+	glBindTexture(GL_TEXTURE_2D, outlineOn ? outlineTex : 0);
+	glUniform1f(post.outlineOn, outlineOn ? 1.0f : 0.0f);
+	glUniform1f(post.spotlight, outlineOn ? screenFx.spotlight : 0.0f);
+	glActiveTexture(GL_TEXTURE0);
 	DrawPostPass(0, (int)windowSizeX, (int)windowSizeY, 2, sceneTex, (float)targetWidth, (float)targetHeight);
+
+	glActiveTexture(GL_TEXTURE0 + kUnitOutline);
+	glBindTexture(GL_TEXTURE_2D, 0);
 
 	// Unit 4 goes back to the noise the lit shader reads there; the depth only borrowed it for the composite.
 	glActiveTexture(GL_TEXTURE4);
@@ -983,6 +1028,67 @@ void Renderer::EndScene()
 	glDepthMask(GL_TRUE);
 	glEnable(GL_DEPTH_TEST);
 	MarkGpu(MARK_POST);
+}
+
+void Renderer::DrawOutlines()
+{
+	outlineOn = false;
+	if (outlineQueue.empty()) return;
+	if (!postReady || outlineFbo == 0 || outlineShader == 0)
+	{
+		outlineQueue.clear();
+		return;
+	}
+
+	// Silhouettes only: no depth test, so what stands in front of an outlined model does not cut its ring.
+	std::stable_sort(outlineQueue.begin(), outlineQueue.end(),
+		[](const OutlineDraw& a, const OutlineDraw& b) { return a.mesh < b.mesh; });
+	instanceData.clear();
+	for (size_t i = 0; i < outlineQueue.size(); ++i)
+		instanceData.push_back(outlineQueue[i].instance);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, outlineFbo);
+	glViewport(0, 0, targetWidth, targetHeight);
+	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_BLEND);
+
+	Mat4 identity;
+	glUseProgram(outlineShader);
+	glUniformMatrix4fv(outlineLoc.viewProj, 1, GL_FALSE, viewProj.m);
+	glUniformMatrix4fv(outlineLoc.model, 1, GL_FALSE, identity.m);
+	glUniform1f(outlineLoc.time, time);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vboInstances);
+	GLsizeiptr bytes = (GLsizeiptr)(instanceData.size() * sizeof(Instance));
+	if (bytes > instanceCapacity) instanceCapacity = bytes * 2;
+	glBufferData(GL_ARRAY_BUFFER, instanceCapacity, NULL, GL_STREAM_DRAW);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, bytes, &instanceData[0]);
+
+	maskPass = true;
+	SetInstanceArrays(true);
+	size_t start = 0;
+	while (start < outlineQueue.size())
+	{
+		size_t end = start + 1;
+		while (end < outlineQueue.size() && outlineQueue[end].mesh == outlineQueue[start].mesh) ++end;
+		DrawInstances(outlineQueue[start].mesh, (int)start, (int)(end - start));
+		start = end;
+	}
+	SetInstanceArrays(false);
+	maskPass = false;
+
+	for (GLuint loc = 0; loc <= 3; ++loc)
+		glDisableVertexAttribArray(loc);
+	for (GLuint loc = 11; loc <= 14; ++loc)
+		glDisableVertexAttribArray(loc);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+
+	outlineQueue.clear();
+	outlineOn = true;
 }
 
 void Renderer::DrawPostPass(GLuint target, int width, int height, int mode, GLuint source, float sourceWidth, float sourceHeight)
@@ -1196,7 +1302,7 @@ void Renderer::BindMesh(int id)
 		glVertexAttrib4f(13, 0.0f, 0.0f, 0.0f, 0.0f);
 		glVertexAttrib4f(14, 0.0f, 0.0f, 0.0f, 0.0f);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-		if (!shadowPass) glUniform4f(lit.material, 0.0f, 0.0f, 0.0f, 0.0f);
+		if (!shadowPass && !maskPass) glUniform4f(lit.material, 0.0f, 0.0f, 0.0f, 0.0f);
 		return;
 	}
 
@@ -1213,7 +1319,7 @@ void Renderer::BindMesh(int id)
 	glVertexAttribPointer(14, 4, GL_UNSIGNED_BYTE, GL_TRUE, stride, (void*)offsetof(AssetVertex, weights));
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.ebo);
 
-	if (!shadowPass)
+	if (!shadowPass && !maskPass)
 	{
 		for (int t = 0; t < 3; ++t)
 		{
@@ -1304,6 +1410,20 @@ void Renderer::DrawModel(int id, const Mat4& model, const DrawParams& params)
 		}
 	}
 	modelQueue[id].push_back(instance);
+
+	// An outlined model is drawn a second time, flat, into the outline target: its colour and strength ride
+	// in the tint and emissive. It keeps its phase and pose, so the silhouette sways and moves with it.
+	if (!shadowPass && params.outline > 0.0f)
+	{
+		OutlineDraw draw;
+		draw.mesh = id;
+		draw.instance = instance;
+		draw.instance.tint[0] = params.outlineColor.x;
+		draw.instance.tint[1] = params.outlineColor.y;
+		draw.instance.tint[2] = params.outlineColor.z;
+		draw.instance.emissive = Saturatef(params.outline);
+		outlineQueue.push_back(draw);
+	}
 }
 
 void Renderer::DrawModel(int id, const Vec3& pos, float yaw, const Vec3& scale, const DrawParams& params)
@@ -1496,6 +1616,24 @@ void Renderer::DrawWater(const Vec3& center, float sizeX, float sizeZ)
 	s.sizeX = sizeX;
 	s.sizeZ = sizeZ;
 	surfaceQueue.push_back(s);
+}
+
+void Renderer::OutlineGround(const Vec3& center, float sizeX, float sizeZ, const Vec3& color, float strength)
+{
+	if (shadowPass || strength <= 0.0f || MODEL_GROUND >= (int)meshes.size()) return;
+
+	Mat4 model = Mul(MatTranslate(center), MatScale(Vec3(sizeX, 1.0f, sizeZ)));
+	OutlineDraw draw;
+	draw.mesh = MODEL_GROUND;
+	Instance& instance = draw.instance;
+	instance = Instance();
+	for (int i = 0; i < 16; ++i) instance.model[i] = model.m[i];
+	instance.tint[0] = color.x;
+	instance.tint[1] = color.y;
+	instance.tint[2] = color.z;
+	instance.emissive = Saturatef(strength);
+	instance.boneBase = -1.0f;
+	outlineQueue.push_back(draw);
 }
 
 void Renderer::DrawSurface(const Surface& s)

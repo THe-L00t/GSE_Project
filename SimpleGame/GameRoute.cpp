@@ -48,6 +48,8 @@ void Game::StartRoute()
 	dialogNext = -1;
 	narration.clear();
 	narrationTimer = 0.0f;
+	outlineMemo = -1;
+	outlineStrength = 0.0f;
 	prompt.clear();
 
 	levelNode->Destroy();
@@ -590,7 +592,8 @@ void Game::UpdateLandmarks(float dt)
 {
 	const Vec3& pos = player->Position();
 
-	if (!busQueueSeen && DistXZ(pos, Vec3(RoadCenter(kBusStopZ) - 4.6f, 0.0f, kBusStopZ - 4.0f)) < 14.0f)
+	// Each note waits until its place is well inside the screen, so the words and the place arrive together.
+	if (!busQueueSeen && DistXZ(pos, BusStopPos()) < 13.0f && PlaceInSight(BusStopPos(), 2.6f))
 	{
 		busQueueSeen = true;
 		ShowMessage("정류장 앞에 허물들이 줄을 서 있다. 오지 않는 버스를 아직 기다리는 것처럼.", 5.0f);
@@ -609,7 +612,6 @@ void Game::UpdateLandmarks(float dt)
 		townReached = true;
 		townCardTimer = 0.0f;
 		ShowMessage("은행나무 읍내에 닿았다. 원한다면, 길은 계속된다.", 6.0f);
-		MarkMemo(MEMO_TOWN);
 	}
 
 	if (townCardTimer >= 0.0f)
@@ -617,6 +619,14 @@ void Game::UpdateLandmarks(float dt)
 		townCardTimer += dt;
 		if (townCardTimer > 8.0f) townCardTimer = -1.0f;
 	}
+
+	// The town's note waits for the haze that swells at the gate to lift off the two ginkgo trees.
+	bool hazeLifting = townCardTimer < 0.0f || townCardTimer > 4.5f;
+	if (townReached && !memoSeen[MEMO_TOWN] && hazeLifting && DistXZ(pos, TownGatePos()) < 22.0f && PlaceInSight(TownGatePos(), 8.0f))
+		MarkMemo(MEMO_TOWN);
+
+	if (!memoSeen[MEMO_TREE] && DistXZ(pos, OldTreePos()) < 14.0f && PlaceInSight(OldTreePos(), 7.0f))
+		MarkMemo(MEMO_TREE);
 
 	prompt.clear();
 	restIndex = -1;

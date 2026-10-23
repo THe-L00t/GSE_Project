@@ -128,6 +128,7 @@ WaterActor::WaterActor(float width, float depth)
 void WaterActor::Draw(const DrawContext& dc) const
 {
 	dc.renderer->DrawWater(WorldPosition(), sizeX, sizeZ);
+	if (outline > 0.0f) dc.renderer->OutlineGround(WorldPosition(), sizeX, sizeZ, outlineColor, outline);
 }
 
 float WaterActor::ShoreDistance(const Vec3& pos) const
@@ -164,6 +165,8 @@ void PropActor::Draw(const DrawContext& dc) const
 	params.phase = phase;
 	params.moss = moss;
 	params.skin = skin;
+	params.outline = outline;
+	params.outlineColor = outlineColor;
 
 	if (shadowRadius > 0.0f) dc.renderer->DrawShadow(WorldPosition(), shadowRadius);
 	dc.renderer->DrawModel(model, WorldMatrix(), params);
