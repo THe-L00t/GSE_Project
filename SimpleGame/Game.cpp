@@ -331,9 +331,10 @@ void Game::Render()
 	if (level == LEVEL_ROUTE)
 	{
 		PrepareChunkView();
+		// While a find is held up, only it keeps its ring and its light; the place waits until the dialog closes.
 		if (outlineMemo >= 0)
 		{
-			OutlineMemoPlace(outlineMemo, outlineStrength);
+			OutlineMemoPlace(outlineMemo, showcaseRelic >= 0 ? 0.0f : outlineStrength);
 			if (outlineStrength <= 0.0f) outlineMemo = -1;
 		}
 	}
