@@ -371,6 +371,7 @@ private:
 	void DrawMesh(int id);
 	void FlushModels();
 	void DrawInstances(int mesh, int start, int count);
+	void SetInstanceArrays(bool on);
 	void DrawMotes(int style, int first, int count, const Vec3& center, const Vec3& field, const Vec3& color, float densityScale, float size);
 	void UploadWeather(GLint seasonLoc, GLint weatherLoc) const;
 	void DrawPixelQuad(float x, float y, float w, float h, const OverlayParams& params);
@@ -469,6 +470,19 @@ private:
 	std::vector<int>      instanceFirst;
 	GLsizeiptr            instanceCapacity = 0;
 	GLuint vboInstances = 0;
+
+	// Ground and water wait for the models too: drawn after them, the costly ground shading is skipped
+	// wherever a building or a tree already stands in front.
+	struct Surface
+	{
+		int          mode = 1;   // 1 ground, 2 water
+		Vec3         center;
+		float        sizeX = 0.0f;
+		float        sizeZ = 0.0f;
+		GroundParams ground;
+	};
+	std::vector<Surface> surfaceQueue;
+	void DrawSurface(const Surface& s);
 
 	Mat4  viewProj;
 	float depthRange = 1.0f;   // world units across the depth buffer; the view is orthographic, so depth is linear

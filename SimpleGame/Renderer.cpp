@@ -1333,7 +1333,7 @@ void Renderer::FlushModels()
 	instanceData.insert(instanceData.end(), discQueue.begin(), discQueue.end());
 	discQueue.clear();
 
-	if (instanceData.empty())
+	if (instanceData.empty() && surfaceQueue.empty())
 	{
 		boneData.clear();
 		return;
@@ -1356,52 +1356,71 @@ void Renderer::FlushModels()
 	}
 
 	Mat4 identity;
-	if (shadowPass)
+	if (!instanceData.empty())
 	{
-		glUseProgram(shadowShader);
-		glUniformMatrix4fv(shadow.model, 1, GL_FALSE, identity.m);
-	}
-	else
-	{
-		BindLit(identity, 0);
+		if (shadowPass)
+		{
+			glUseProgram(shadowShader);
+			glUniformMatrix4fv(shadow.model, 1, GL_FALSE, identity.m);
+		}
+		else
+		{
+			BindLit(identity, 0);
+		}
+
+		glBindBuffer(GL_ARRAY_BUFFER, vboInstances);
+		// Grow the buffer rarely and orphan it every flush: a fresh allocation per flush made the driver
+		// reallocate, and writing into storage the GPU still reads would make it wait.
+		GLsizeiptr bytes = (GLsizeiptr)(instanceData.size() * sizeof(Instance));
+		if (bytes > instanceCapacity) instanceCapacity = bytes * 2;
+		glBufferData(GL_ARRAY_BUFFER, instanceCapacity, NULL, GL_STREAM_DRAW);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, bytes, &instanceData[0]);
+
+		SetInstanceArrays(true);
+		for (size_t id = 0; id < meshes.size(); ++id)
+			DrawInstances((int)id, first[id], first[id + 1] - first[id]);
+		SetInstanceArrays(false);
 	}
 
-	glBindBuffer(GL_ARRAY_BUFFER, vboInstances);
-	// Grow the buffer rarely and orphan it every flush: a fresh allocation per flush made the driver
-	// reallocate, and writing into storage the GPU still reads would make it wait.
-	GLsizeiptr bytes = (GLsizeiptr)(instanceData.size() * sizeof(Instance));
-	if (bytes > instanceCapacity) instanceCapacity = bytes * 2;
-	glBufferData(GL_ARRAY_BUFFER, instanceCapacity, NULL, GL_STREAM_DRAW);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, bytes, &instanceData[0]);
-
-	for (GLuint loc = 4; loc <= 10; ++loc)
-	{
-		glEnableVertexAttribArray(loc);
-		glVertexAttribDivisor(loc, 1);
-	}
-
-	for (size_t id = 0; id < meshes.size(); ++id)
-		DrawInstances((int)id, first[id], first[id + 1] - first[id]);
+	// The models are in the depth buffer now, so the ground shader only runs where the ground still shows.
+	for (size_t i = 0; i < surfaceQueue.size(); ++i)
+		DrawSurface(surfaceQueue[i]);
+	surfaceQueue.clear();
 
 	// Blob shadows go last: blended over the ground and the models, writing no depth.
 	if (discFirst < (int)instanceData.size())
 	{
-		glUniform1i(lit.mode, 3);
+		BindLit(identity, 3);
+		SetInstanceArrays(true);
 		glDepthMask(GL_FALSE);
 		DrawInstances(MODEL_SHADOW, discFirst, (int)instanceData.size() - discFirst);
 		glDepthMask(GL_TRUE);
+		SetInstanceArrays(false);
 	}
 
-	for (GLuint loc = 4; loc <= 10; ++loc)
-	{
-		glVertexAttribDivisor(loc, 0);
-		glDisableVertexAttribArray(loc);
-	}
 	for (GLuint loc = 0; loc <= 3; ++loc)
 		glDisableVertexAttribArray(loc);
 	for (GLuint loc = 11; loc <= 14; ++loc)
 		glDisableVertexAttribArray(loc);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+}
+
+void Renderer::SetInstanceArrays(bool on)
+{
+	// Off, the instance locations read the constants BindLit sets; on, they step once per instance.
+	for (GLuint loc = 4; loc <= 10; ++loc)
+	{
+		if (on)
+		{
+			glEnableVertexAttribArray(loc);
+			glVertexAttribDivisor(loc, 1);
+		}
+		else
+		{
+			glVertexAttribDivisor(loc, 0);
+			glDisableVertexAttribArray(loc);
+		}
+	}
 }
 
 void Renderer::DrawInstances(int mesh, int start, int count)
@@ -1431,7 +1450,40 @@ void Renderer::DrawGround(const Vec3& center, float extent, const GroundParams& 
 {
 	if (shadowPass) return;
 
-	Mat4 model = Mul(MatTranslate(Vec3(center.x, 0.0f, center.z)), MatScale(Vec3(extent, 1.0f, extent)));
+	Surface s;
+	s.mode = 1;
+	s.center = center;
+	s.sizeX = extent;
+	s.sizeZ = extent;
+	s.ground = params;
+	surfaceQueue.push_back(s);
+}
+
+void Renderer::DrawWater(const Vec3& center, float sizeX, float sizeZ)
+{
+	if (shadowPass) return;
+
+	Surface s;
+	s.mode = 2;
+	s.center = center;
+	s.sizeX = sizeX;
+	s.sizeZ = sizeZ;
+	surfaceQueue.push_back(s);
+}
+
+void Renderer::DrawSurface(const Surface& s)
+{
+	if (s.mode == 2)
+	{
+		Mat4 model = Mul(MatTranslate(s.center), MatScale(Vec3(s.sizeX, 1.0f, s.sizeZ)));
+		BindLit(model, 2);
+		DrawMesh(MODEL_GROUND);
+		return;
+	}
+
+	const Vec3& center = s.center;
+	const GroundParams& params = s.ground;
+	Mat4 model = Mul(MatTranslate(Vec3(center.x, 0.0f, center.z)), MatScale(Vec3(s.sizeX, 1.0f, s.sizeZ)));
 	BindLit(model, 1);
 
 	glUniform1f(lit.stage, params.stage);
@@ -1456,15 +1508,6 @@ void Renderer::DrawGround(const Vec3& center, float extent, const GroundParams& 
 
 	DrawMesh(MODEL_GROUND);
 	glUniform1f(lit.groundTex, 0.0f);
-}
-
-void Renderer::DrawWater(const Vec3& center, float sizeX, float sizeZ)
-{
-	if (shadowPass) return;
-
-	Mat4 model = Mul(MatTranslate(center), MatScale(Vec3(sizeX, 1.0f, sizeZ)));
-	BindLit(model, 2);
-	DrawMesh(MODEL_GROUND);
 }
 
 void Renderer::DrawSpores(const Vec3& center, const Vec3& field, const Vec3& color, float densityScale, float size)
