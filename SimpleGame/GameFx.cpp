@@ -59,6 +59,16 @@ void Game::UpdateScreenFx(float dt)
 	screenFx.memo = Approach(screenFx.memo, memo ? 0.18f : 0.0f, 2.5f, dt);
 	screenFx.recall = Approach(screenFx.recall, recall, recall > screenFx.recall ? 1.6f : 2.4f, dt);
 
+	// A relic's owner is told with the find held up mid-screen and the rest of the road in shade; when the dialog
+	// closes the find comes apart into light and the shade lifts.
+	bool telling = showcaseRelic >= 0 && DialogOpen();
+	if (showcaseRelic >= 0)
+	{
+		showcaseFade = Approach(showcaseFade, telling ? 1.0f : 0.0f, telling ? 2.2f : 1.8f, dt);
+		if (!telling && showcaseFade <= 0.0f) showcaseRelic = -1;
+	}
+	screenFx.spotlight = Approach(screenFx.spotlight, telling ? 1.0f : 0.0f, telling ? 2.0f : 2.5f, dt);
+
 	// A level-up sends one ring of bent air out from the player in its first moments.
 	float sinceLevelUp = kLevelUpTime - levelUpTimer;
 	screenFx.ripple = (levelUpTimer > 0.0f && sinceLevelUp < kRippleTime) ? Maxf(sinceLevelUp / kRippleTime, 0.001f) : 0.0f;

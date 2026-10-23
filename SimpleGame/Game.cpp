@@ -335,6 +335,7 @@ void Game::Render()
 	DrawWisps();
 	DrawFootprints();
 	DrawLevelUpRings();
+	DrawRelicShowcase();
 
 	// Spores last: additive, and they should sit over everything. Rain beats them down.
 	renderer->DrawSpores(Vec3(view.x, 0.0f, view.z), Vec3(70.0f, 16.0f, 70.0f),
@@ -385,6 +386,13 @@ void Game::GatherLights(const Vec3& view)
 		Vec3 ground = LerpV(Vec3(0.42f, 0.48f, 0.36f), Vec3(0.90f, 0.92f, 0.95f), snowCover);
 		Vec3 bounce(1.00f * ground.x, 0.88f * ground.y, 0.68f * ground.z);
 		lights.push_back({ hit + Vec3(0.0f, 0.5f, 0.0f), bounce * 1.1f, 7.0f, -1.0f });
+	}
+
+	// A find held up mid-screen hangs far above the ground lights; one warm light of its own goes first.
+	if (showcaseRelic >= 0)
+	{
+		Vec3 toEye(sinf(camera->Yaw()), 0.6f, cosf(camera->Yaw()));
+		lights.push_back({ ShowcasePosition() + toEye * 2.5f, Vec3(1.00f, 0.86f, 0.62f) * 1.6f * showcaseFade, 9.0f, -100.0f });
 	}
 
 	std::vector<LanternActor*> lanterns;

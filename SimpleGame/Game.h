@@ -398,6 +398,8 @@ private:
 	void OutlineMemoPlace(int memo, float strength);          // rings the place a note speaks of
 	void NoteFirstFind(int itemType);
 	void TellRelicOwner(int relic);
+	Vec3 ShowcasePosition() const;   // where a find is held up: in front of everything, mid-screen
+	void DrawRelicShowcase();
 	bool FindRouteSleeper();  // a sleeper close by, unvisited and unguarded; sets the rest target
 	void RestBySleeper();
 	void DrawMemoPage(int x, int y);
@@ -555,6 +557,8 @@ private:
 	bool  memoSeen[MEMO_COUNT] = {};
 	int   outlineMemo = -1;       // the note whose place is ringed on screen while it is read
 	float outlineStrength = 0.0f;
+	int   showcaseRelic = -1;     // the find held up mid-screen while its owner is told
+	float showcaseFade = 0.0f;    // [0,1] gathers out of light as the dialog opens, comes apart as it closes
 	int   nextRecall = 4;         // the level whose memory comes back next
 	bool  firstFound[ITEM_TYPE_COUNT] = {};
 	int   relicsTold = 0;         // relic count milestones already spoken

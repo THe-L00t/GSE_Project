@@ -170,6 +170,11 @@ void Game::UpdateStory(float dt)
 	dialogIndex = 0;
 	dialogNext = -1;
 	storyCalm = 0.0f;
+	if (beat.relic >= 0)
+	{
+		showcaseRelic = beat.relic;
+		showcaseFade = 0.0f;
+	}
 
 	// Said over play once the dialog closes: the narration waits while any dialog is open.
 	for (size_t i = 0; i < beat.after.size(); ++i)
@@ -359,6 +364,36 @@ void Game::TellRelicOwner(int relic)
 		beat.after.assign(kSixRelics, kSixRelics + 2);
 	}
 	storyQueue.push_back(beat);
+}
+
+Vec3 Game::ShowcasePosition() const
+{
+	// The view is orthographic, so any point on the line from the view's centre toward the eye lands mid-screen.
+	// Far enough along it, the find stands in front of every roof; a little up the screen, the dialog box
+	// below leaves it clear.
+	float yaw = camera->Yaw();
+	float el = camera->elevation;
+	Vec3 toEye(cosf(el) * sinf(yaw), sinf(el), cosf(el) * cosf(yaw));
+	Vec3 up = Normalize(Vec3(0.0f, 1.0f, 0.0f) - toEye * toEye.y);
+	return camera->Position() + toEye * 34.0f + up * (camera->orthoHeight * 0.06f);
+}
+
+void Game::DrawRelicShowcase()
+{
+	if (showcaseRelic < 0 || showcaseFade <= 0.0f) return;
+
+	// About half a metre tall, it is held up to a fifth of the screen, tipped back a little so it turns to face
+	// the eye; the mesh spins and hovers by itself. It gathers out of light and comes apart into it again.
+	float size = camera->orthoHeight * 0.2f / 0.5f * (0.85f + 0.15f * showcaseFade);
+	Mat4 place = Mul(Mul(MatTranslate(ShowcasePosition()), MatRotateY(camera->Yaw())), MatRotateX(-0.35f));
+	Mat4 model = Mul(Mul(place, MatScale(Vec3(size, size, size))), MatTranslate(Vec3(0.0f, -0.3f, 0.0f)));
+
+	DrawParams params;
+	params.emissive = 0.3f;
+	params.dissolve = 1.0f - showcaseFade;
+	params.outline = showcaseFade;
+	params.outlineColor = Vec3(1.00f, 0.86f, 0.52f);
+	renderer->DrawModel(RelicModel(showcaseRelic), model, params);
 }
 
 bool Game::FindRouteSleeper()
