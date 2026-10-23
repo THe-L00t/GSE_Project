@@ -55,12 +55,14 @@ void Game::Update(float dt, const bool* keys)
 		return;
 	}
 
-	// On the road a story beat holds the world still like a panel; the dream on screen still eases in.
+	// On the road a story beat holds the world still like a panel; the dream on screen still eases in, and the
+	// view still turns to the place a note names.
 	if (level == LEVEL_ROUTE && DialogOpen())
 	{
 		time += dt;
 		prompt = "[E]  계속";
 		UpdateScreenFx(dt);
+		UpdateCamera(dt);
 		return;
 	}
 
@@ -160,7 +162,16 @@ void Game::UpdatePlayer(float dt, const bool* keys)
 
 void Game::UpdateCamera(float dt)
 {
-	camera->SetPosition(LerpV(camera->Position(), player->Position(), 1.0f - expf(-6.0f * dt)));
+	// A note naming a place turns the view to it, centred, while the note is read, then back to Hayul once it
+	// closes; both ways eased, over about seven tenths of a second.
+	bool reading = ReadingMemo() && memoMap > MEMO_ROAD;
+	if (reading) panMemo = memoMap;
+	placePan = Saturatef(placePan + (reading ? dt : -dt) * 1.4f);
+	if (placePan <= 0.0f) panMemo = -1;
+
+	Vec3 target = player->Position();
+	if (panMemo >= 0) target = LerpV(target, MemoViewPoint(panMemo), SmoothStep(0.0f, 1.0f, placePan));
+	camera->SetPosition(LerpV(camera->Position(), target, 1.0f - expf(-6.0f * dt)));
 	camera->orthoHeight += (viewHeight - camera->orthoHeight) * (1.0f - expf(-10.0f * dt));
 }
 
@@ -319,7 +330,12 @@ void Game::Render()
 	wp.driftZ = windDriftZ;
 	renderer->SetWeather(wp);
 	screenFx.tiltShift = SmoothStep(kFarView - 2.0f, kNearView, camera->orthoHeight);
+	// The lens keeps Hayul sharp, or the place a note has turned the view to.
 	screenFx.focus = player->Position() + Vec3(0.0f, 0.9f, 0.0f);
+	Vec3 placeAt;
+	float placeHeight;
+	if (panMemo >= 0 && MemoPlace(panMemo, placeAt, placeHeight))
+		screenFx.focus = LerpV(screenFx.focus, placeAt + Vec3(0.0f, placeHeight * 0.5f, 0.0f), SmoothStep(0.0f, 1.0f, placePan));
 	renderer->SetScreenFx(screenFx);
 	renderer->SetCutaway(player->Position(), cutaway);
 

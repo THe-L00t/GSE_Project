@@ -403,6 +403,9 @@ private:
 	void MarkMemo(int memo);
 	bool MemoMapRect(float& x, float& y, float& w, float& h) const;   // her map beside a note, at rest
 	void DrawMemoMap();
+	bool ReadingMemo() const;    // one of her map notes is open
+	bool MemoPlace(int memo, Vec3& at, float& height) const;   // the thing a note names, where it stands and how tall
+	Vec3 MemoViewPoint(int memo) const;   // where the view looks to centre that thing on screen
 	bool PlaceInSight(const Vec3& at, float height) const;   // well inside the screen, not at its edge
 	void OutlineMemoPlace(int memo, float strength);          // rings the place a note speaks of
 	void NoteFirstFind(int itemType);
@@ -570,6 +573,8 @@ private:
 	float outlineStrength = 0.0f;
 	int   memoMap = -1;           // the note whose map is held up beside it, until it is put away
 	bool  memoMapLeft = true;     // on the side of the screen away from the place
+	int   panMemo = -1;           // the note whose place the view has turned to, until it is back on Hayul
+	float placePan = 0.0f;        // [0,1] how far the view has gone from Hayul to that place
 	int   showcaseRelic = -1;     // the find held up mid-screen while its owner is told
 	float showcaseFade = 0.0f;    // [0,1] gathers out of light as the dialog opens, comes apart as it closes
 	int   nextRecall = 4;         // the level whose memory comes back next

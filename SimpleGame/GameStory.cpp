@@ -203,16 +203,40 @@ void Game::OpenBeat(const StoryBeat& beat)
 	memoMap = beat.memo;
 	memoMapLeft = true;
 	Vec3 at;
-	switch (beat.memo)
-	{
-	case MEMO_BUS_STOP:  at = BusStopPos(); break;
-	case MEMO_RESERVOIR: at = kReservoirCenter; break;
-	case MEMO_TOWN:      at = TownGatePos(); break;
-	case MEMO_TREE:      at = OldTreePos(); break;
-	default:             return;
-	}
+	float height;
+	if (!MemoPlace(beat.memo, at, height)) return;
 	float sx, sy;
 	if (renderer->WorldToScreen(at, sx, sy)) memoMapLeft = sx > (float)renderer->GetWidth() * 0.5f;
+}
+
+bool Game::ReadingMemo() const
+{
+	return DialogOpen() && dialogSpeaker == kMemoSpeaker;
+}
+
+bool Game::MemoPlace(int memo, Vec3& at, float& height) const
+{
+	// The road's own note names no one thing.
+	switch (memo)
+	{
+	case MEMO_BUS_STOP:  at = BusStopPos(); height = 2.6f; return true;
+	case MEMO_RESERVOIR: at = kReservoirCenter; height = 0.0f; return true;
+	case MEMO_TOWN:      at = TownGatePos(); height = 8.0f; return true;
+	case MEMO_TREE:      at = OldTreePos(); height = 7.0f; return true;
+	default:             return false;
+	}
+}
+
+Vec3 Game::MemoViewPoint(int memo) const
+{
+	// The view looks at a point on the ground; a thing's middle, half its height up, shows where a ground
+	// point that much further up the screen would.
+	Vec3 at;
+	float height;
+	if (!MemoPlace(memo, at, height)) return player->Position();
+	float yaw = camera->Yaw();
+	Vec3 upScreen(-sinf(yaw), 0.0f, -cosf(yaw));
+	return at + upScreen * (height * 0.5f / tanf(camera->elevation));
 }
 
 void Game::Narrate(const char* speaker, const char* const* lines, int count)
