@@ -191,17 +191,10 @@ vec3 PointLights(vec3 pos, vec3 n)
 
 const float kCutRadius = 1.1;   // the player and a little of the ground around them
 
-float CapsuleSdf(vec3 p, vec3 a, vec3 b, float radius)
-{
-	vec3 pa = p - a;
-	vec3 ba = b - a;
-	float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
-	return length(pa - ba * h) - radius;
-}
-
-// Sphere-traces a capsule around the player from this fragment, away from the eye. Reaching it means the
-// fragment stands between the eye and the player; the closest pass of the ray gives a soft edge.
-// The view is orthographic, so every ray runs the same way and the hole is a cylinder.
+// How close the ray from this fragment, away from the eye, passes the capsule around the player. Passing
+// through it means the fragment stands between the eye and the player; the closest pass gives a soft edge.
+// The view is orthographic, so every ray runs the same way and the hole is a cylinder. The distance from a
+// ray to the capsule's axis is convex along the ray, so its closest pass has a closed form.
 float CutawayMask(vec3 pos)
 {
 	vec3 toEye = normalize(u_CamPos - u_FogOrigin);
@@ -211,16 +204,17 @@ float CutawayMask(vec3 pos)
 	// Only what is nearer the eye than the player can hide them.
 	if (dot(pos - (a + b) * 0.5, toEye) < 0.2) return 0.0;
 
-	float t = 0.0;
-	float closest = 1e3;
-	for (int i = 0; i < 32; ++i)
-	{
-		float d = CapsuleSdf(pos - toEye * t, a, b, kCutRadius);
-		closest = min(closest, d);
-		if (d < 0.01) break;
-		t += max(d * 0.8, 0.05);
-		if (t > 40.0) break;
-	}
+	// The nearest point of the axis to the whole line, then the ray's point nearest that, never behind the
+	// fragment, then the axis point nearest that again.
+	vec3 dir = -toEye;
+	vec3 ab = b - a;
+	vec3 w = pos - a;
+	float abab = dot(ab, ab);
+	float abDir = dot(ab, dir);
+	float u = clamp((dot(w, ab) - abDir * dot(w, dir)) / max(abab - abDir * abDir, 1e-5), 0.0, 1.0);
+	float t = max(dot(ab * u - w, dir), 0.0);
+	u = clamp(dot(w + dir * t, ab) / abab, 0.0, 1.0);
+	float closest = length(w + dir * t - ab * u) - kCutRadius;
 	return 1.0 - smoothstep(0.0, 0.35, closest);
 }
 
