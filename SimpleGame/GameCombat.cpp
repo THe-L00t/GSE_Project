@@ -19,6 +19,8 @@ namespace
 	const float kHerbHeal = 0.4f;        // fraction of max health
 	const float kLoreRange = 9.0f;
 	const float kGuardRange = 3.5f;      // how close to a sleeper wakes the boar beside them
+	const float kLeashRange = 22.0f;     // a chase gives up this far from home
+	const float kLeashReturn = 16.0f;    // and a creature walking home takes notice again only this close to it
 
 	// Seconds the world freezes on a landed blow. Time-based: one frame at a high frame rate is too short to see.
 	const float kHitStop = 0.05f;
@@ -266,16 +268,22 @@ void Game::UpdateEnemies(float dt)
 		ShowMessage(GetEnemyInfo(e.type).lore, 5.5f);
 	}
 
-	// Keep creatures from stacking into one another.
+	// Keep creatures from stacking into one another, then out of whatever that shoved them into: otherwise two
+	// against a wall push each other in and are pushed back out every frame, shaking on the spot.
 	for (size_t i = 0; i < enemies.size(); ++i)
 	{
+		if (!enemies[i]->alive) continue;
+		Vec3 pos = enemies[i]->Position();
+		Vec3 before = pos;
 		for (size_t j = i + 1; j < enemies.size(); ++j)
 		{
-			if (!enemies[i]->alive || !enemies[j]->alive) continue;
-			Vec3 pos = enemies[i]->Position();
+			if (!enemies[j]->alive) continue;
 			PushOutOfCircle(pos, enemies[i]->collider.radius, enemies[j]->Position(), enemies[j]->collider.radius);
-			enemies[i]->SetPosition(pos);
 		}
+		if (DistXZ(pos, before) < 1e-5f) continue;
+		ResolveRouteCollisions(pos, enemies[i]->collider.radius);
+		KeepOutOfLight(pos, enemies[i]->collider.radius);
+		enemies[i]->SetPosition(pos);
 	}
 
 	for (size_t i = 0; i < enemies.size(); ++i)
@@ -324,9 +332,14 @@ void Game::UpdateEnemy(EnemyActor& e, float dt)
 				e.moveTarget = e.home + Vec3(combatRng.Range(-4.0f, 4.0f), 0.0f, combatRng.Range(-4.0f, 4.0f));
 				e.stateTimer = combatRng.Range(2.0f, 4.5f);
 			}
-			MoveToward(pos, yaw, e.moveTarget, speed * 0.35f, dt);
+			// Far from home it walks back with purpose rather than strolling.
+			float pace = DistXZ(pos, e.home) > kLeashReturn ? 0.7f : 0.35f;
+			MoveToward(pos, yaw, e.moveTarget, speed * pace, dt);
 		}
-		if (playerAwake && !sheltered && (dist < info.aggroRange || (e.guarding && DistXZ(player->Position(), e.guardPos) < kGuardRange)))
+		// One that gave up a chase at the edge of its ground does not turn round at once: started again at the
+		// same edge, it would flip between chasing and going home every frame and shake on the spot.
+		if (playerAwake && !sheltered && DistXZ(pos, e.home) < kLeashReturn &&
+			(dist < info.aggroRange || (e.guarding && DistXZ(player->Position(), e.guardPos) < kGuardRange)))
 		{
 			e.state = ENEMY_CHASE;
 			e.provoked = true;
@@ -337,7 +350,7 @@ void Game::UpdateEnemy(EnemyActor& e, float dt)
 	case ENEMY_CHASE:
 		// A provoked creature chases well past its notice range; the boar is only ever provoked.
 		// None follows into a lantern's light.
-		if (!playerAwake || sheltered || dist > Maxf(info.aggroRange * 1.8f, e.provoked ? 16.0f : 0.0f) || DistXZ(pos, e.home) > 22.0f)
+		if (!playerAwake || sheltered || dist > Maxf(info.aggroRange * 1.8f, e.provoked ? 16.0f : 0.0f) || DistXZ(pos, e.home) > kLeashRange)
 		{
 			e.provoked = false;
 			e.state = ENEMY_IDLE;
@@ -405,13 +418,18 @@ void Game::UpdateEnemy(EnemyActor& e, float dt)
 	if (e.state != ENEMY_STRIKE && playerAwake)
 		PushOutOfCircle(pos, e.collider.radius, player->Position(), player->collider.radius);
 
-	// The light itself keeps them out.
-	Vec3 lanternAt;
-	if (lantern && NearLantern(pos, lantern->zoneRadius + e.collider.radius, &lanternAt))
-		PushOutOfCircle(pos, e.collider.radius, lanternAt, lantern->zoneRadius);
+	KeepOutOfLight(pos, e.collider.radius);
 
 	e.SetPosition(pos);
 	e.SetYaw(yaw);
+}
+
+void Game::KeepOutOfLight(Vec3& pos, float radius) const
+{
+	// The lantern's light itself keeps creatures out.
+	Vec3 lanternAt;
+	if (lantern && NearLantern(pos, lantern->zoneRadius + radius, &lanternAt))
+		PushOutOfCircle(pos, radius, lanternAt, lantern->zoneRadius);
 }
 
 void Game::UpdateItems()

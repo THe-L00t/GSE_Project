@@ -318,6 +318,7 @@ private:
 	void WakeAtSafePoint();
 	void UpdateEnemies(float dt);
 	void UpdateEnemy(EnemyActor& e, float dt);
+	void KeepOutOfLight(Vec3& pos, float radius) const;   // a creature pushed back out of a lantern's light
 	void UpdateItems();
 	void UpdateCombatTimers(float dt);
 	EnemyActor* SpawnEnemy(int type, int enemyLevel, const Vec3& pos, int chunkX, int chunkZ, int spawnIndex);
