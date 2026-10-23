@@ -56,7 +56,7 @@ namespace
 		{ MODEL_EMPTY_HOUSE, 4.6f, 0.00f, 3.5f, 2.75f, 0.95f, 1.05f, { 0.7f, 0.4f, 0.1f }, ERA_OUTSKIRTS },
 		{ MODEL_BLOCK_WALL, 2.2f, 0.00f, 2.0f, 0.15f, 0.95f, 1.05f, { 1.0f, 0.7f, 0.3f }, ERA_OUTSKIRTS },
 		{ MODEL_STREETLAMP, 0.9f, 0.20f, 0.0f, 0.0f, 0.95f, 1.05f, { 0.8f, 0.5f, 0.2f }, ERA_OUTSKIRTS },
-		{ MODEL_ROAD_SIGN, 1.6f, 0.00f, 1.4f, 0.15f, 0.95f, 1.05f, { 0.2f, 0.15f, 0.05f }, ERA_OUTSKIRTS },
+		{ MODEL_ROAD_SIGN, 1.6f, 0.00f, 1.1f, 0.2f, 0.95f, 1.05f, { 0.2f, 0.15f, 0.05f }, ERA_OUTSKIRTS },
 	};
 	const int kPropKindCount = (int)(sizeof(kPropKinds) / sizeof(kPropKinds[0]));
 
@@ -537,8 +537,8 @@ namespace
 		{
 			float z = 30.0f;
 			Vec3 at(RoadCenter(z) - kMainRoadHalf - 1.4f, 0.0f, z);
-			if (Fits(c, footprints, Box(at, halfPi, 1.4f, 0.15f), 0.1f))
-				AddBoxProp(c, footprints, MODEL_ROAD_SIGN, at, halfPi, 1.0f, 1.4f, 0.15f);
+			if (Fits(c, footprints, Box(at, halfPi, 1.3f, 0.2f), 0.1f))
+				AddBoxProp(c, footprints, MODEL_ROAD_SIGN, at, halfPi, 1.0f, 1.1f, 0.2f);
 		}
 
 		// Signals on the far corners of a wide crossing, their arms out over the lanes.
@@ -547,14 +547,14 @@ namespace
 			float z = zHigh - kStreetHalf - 4.2f;
 			Vec3 at(RoadCenter(z) + 5.0f, 0.0f, z);
 			if (Fits(c, footprints, Circle(at, 0.3f), 0.1f))
-				AddFixedProp(c, footprints, MODEL_TRAFFIC_LIGHT, at, kPi, 1.0f, 0.25f);
+				AddFixedProp(c, footprints, MODEL_TRAFFIC_LIGHT, at, kPi, 1.0f, 0.28f);
 		}
 		if (WideStreetAfter(c.cz - 1) && UrbanAt(0.0f, zLow) > 0.3f && rng.Chance(0.85f))
 		{
 			float z = zLow + kStreetHalf + 4.2f;
 			Vec3 at(RoadCenter(z) - 5.0f, 0.0f, z);
 			if (Fits(c, footprints, Circle(at, 0.3f), 0.1f))
-				AddFixedProp(c, footprints, MODEL_TRAFFIC_LIGHT, at, 0.0f, 1.0f, 0.25f);
+				AddFixedProp(c, footprints, MODEL_TRAFFIC_LIGHT, at, 0.0f, 1.0f, 0.28f);
 		}
 
 		// Lamps on alternate sides, their heads out over the kerb; where one is missing, a street tree.
