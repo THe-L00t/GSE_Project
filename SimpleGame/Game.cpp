@@ -351,7 +351,11 @@ void Game::Render()
 		if (outlineMemo >= 0)
 		{
 			OutlineMemoPlace(outlineMemo, showcaseRelic >= 0 ? 0.0f : outlineStrength);
-			if (outlineStrength <= 0.0f) outlineMemo = -1;
+			if (outlineStrength < 0.01f)
+			{
+				OutlineMemoPlace(outlineMemo, 0.0f);
+				outlineMemo = -1;
+			}
 		}
 	}
 	GatherLights(view);

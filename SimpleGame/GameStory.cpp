@@ -330,11 +330,11 @@ void Game::MarkMemo(int memo)
 		OpenBeat(beat);
 	}
 
-	// Its place is ringed while the note is open. Starting just above zero keeps the ring from being let go
-	// before it has faded in.
+	// Its place is ringed while the note is open. Starting just above the point where a ring is let go keeps it
+	// from being let go before it has faded in.
 	if (outlineMemo >= 0 && outlineMemo != memo) OutlineMemoPlace(outlineMemo, 0.0f);
 	outlineMemo = memo;
-	outlineStrength = 0.01f;
+	outlineStrength = 0.02f;
 
 	// The words now stand beside the place on her map too.
 	mapUnread = true;
