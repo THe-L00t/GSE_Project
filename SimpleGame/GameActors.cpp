@@ -262,7 +262,13 @@ ChunkActor::ChunkActor(const Chunk& chunk)
 		prop->phase = p.pos.x * 0.37f + p.pos.z * 0.21f;
 		prop->moss = overgrown;
 
-		if (p.radius > 0.0f)
+		if (p.halfX > 0.0f)
+		{
+			prop->collider.shape = COLLIDER_BOX;
+			prop->collider.halfX = p.halfX;
+			prop->collider.halfZ = p.halfZ;
+		}
+		else if (p.radius > 0.0f)
 		{
 			prop->collider.shape = COLLIDER_CIRCLE;
 			prop->collider.radius = p.radius;
@@ -288,6 +294,7 @@ void ChunkActor::Draw(const DrawContext& dc) const
 		ground.neighborStage[i] = neighborStage[i];
 	ground.chunkSize = kChunkSize;
 	ground.road = modernity;
+	ground.city = 1.0f;
 
 	// A hair of overlap hides cracks between neighbouring ground quads.
 	dc.renderer->DrawGround(ChunkMap::ChunkCenter(cx, cz), kChunkSize + 0.02f, ground);

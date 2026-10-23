@@ -18,6 +18,8 @@ namespace
 		"canned_food", "bus_stop", "ginkgo", "pole", "meat", "cooked_meat", "wisp", "mote",
 		"jangdok", "pyeongsang", "tiller", "gate", "greenhouse",
 		"relic_torch", "relic_peaches", "relic_watch", "relic_radio", "relic_ticket", "relic_photo", "relic_phone", "relic_badge",
+		"office_4f", "villa_3f", "shop_2f", "store_1f", "collapsed_building",
+		"empty_house", "house_site", "block_wall", "guardrail", "streetlamp", "traffic_light", "road_sign",
 	};
 
 	const Vec3 kMoss(0.24f, 0.38f, 0.24f);
@@ -130,6 +132,14 @@ OccluderSize ModelOccluder(int id)
 	case MODEL_RUIN:     return { 1.8f, 1.9f };
 	case MODEL_GATE:     return { 1.9f, 2.1f };
 	case MODEL_GREENHOUSE: return { 2.8f, 2.4f };
+	case MODEL_OFFICE_4F: return { 6.4f, 14.0f };
+	case MODEL_VILLA_3F: return { 6.0f, 10.5f };
+	case MODEL_SHOP_2F:  return { 5.3f, 7.5f };
+	case MODEL_STORE_1F: return { 5.0f, 4.0f };
+	case MODEL_COLLAPSED_BUILDING: return { 6.0f, 7.0f };
+	case MODEL_EMPTY_HOUSE: return { 4.5f, 3.6f };
+	case MODEL_BLOCK_WALL: return { 2.0f, 1.6f };
+	case MODEL_ROAD_SIGN: return { 1.4f, 3.4f };
 	default:             return { 0.0f, 0.0f };
 	}
 }
@@ -781,6 +791,88 @@ ModelRecipe BuildRecipe(int id)
 	case MODEL_RELIC_PHONE:
 	case MODEL_RELIC_BADGE:
 		r = BuildRecipe(MODEL_RELIC);
+		break;
+
+	case MODEL_OFFICE_4F:
+		r.Add(SHAPE_BOX, Vec3(0.0f, 6.25f, 0.0f), Vec3(10.0f, 12.5f, 8.0f), Vec3(0.52f, 0.49f, 0.43f));
+		for (int i = 0; i < 4; ++i)
+			r.Add(SHAPE_BOX, Vec3(0.0f, 1.6f + 3.0f * (float)i, 4.02f), Vec3(9.0f, 1.4f, 0.05f), kGlass);
+		r.Add(SHAPE_BOX, Vec3(0.0f, 13.1f, -1.5f), Vec3(1.8f, 1.2f, 1.8f), Vec3(0.30f, 0.42f, 0.46f));
+		r.Add(SHAPE_ELLIPSOID, Vec3(-3.5f, 12.5f, 2.5f), Vec3(2.6f, 0.4f, 2.0f), moss, ANIM_PULSE);
+		break;
+
+	case MODEL_VILLA_3F:
+		r.Add(SHAPE_BOX, Vec3(0.0f, 6.05f, 0.0f), Vec3(9.0f, 6.9f, 8.0f), Vec3(0.46f, 0.26f, 0.21f));
+		for (int i = 0; i < 4; ++i)
+			r.Add(SHAPE_BOX, Vec3(i % 2 == 0 ? -4.2f : 4.2f, 1.3f, i < 2 ? -3.7f : 3.7f), Vec3(0.5f, 2.6f, 0.5f), stone);
+		r.Add(SHAPE_BOX, Vec3(0.0f, 1.3f, 0.0f), Vec3(8.0f, 2.6f, 7.0f), dark);
+		r.Add(SHAPE_BOX, Vec3(0.0f, 5.0f, 4.02f), Vec3(7.0f, 1.2f, 0.05f), kGlass);
+		r.Add(SHAPE_BOX, Vec3(0.0f, 7.8f, 4.02f), Vec3(7.0f, 1.2f, 0.05f), kGlass);
+		break;
+
+	case MODEL_SHOP_2F:
+		r.Add(SHAPE_BOX, Vec3(0.0f, 3.3f, 0.0f), Vec3(8.0f, 6.6f, 7.0f), Vec3(0.55f, 0.53f, 0.48f));
+		r.Add(SHAPE_BOX, Vec3(0.0f, 1.3f, 3.52f), Vec3(7.0f, 2.4f, 0.05f), dark);
+		r.Add(SHAPE_BOX, Vec3(0.0f, 3.0f, 3.6f), Vec3(7.6f, 0.8f, 0.2f), Vec3(0.30f, 0.40f, 0.52f));
+		r.Add(SHAPE_BOX, Vec3(0.0f, 4.8f, 3.52f), Vec3(5.0f, 1.1f, 0.05f), kGlass);
+		r.Add(SHAPE_CYLINDER, Vec3(2.0f, 7.1f, -1.5f), Vec3(1.4f, 1.0f, 1.4f), Vec3(0.30f, 0.42f, 0.46f));
+		break;
+
+	case MODEL_STORE_1F:
+		r.Add(SHAPE_BOX, Vec3(0.0f, 1.9f, 0.0f), Vec3(8.0f, 3.8f, 6.0f), Vec3(0.60f, 0.60f, 0.56f));
+		r.Add(SHAPE_BOX, Vec3(0.0f, 1.3f, 3.02f), Vec3(7.2f, 2.4f, 0.05f), kGlass);
+		r.Add(SHAPE_BOX, Vec3(0.0f, 3.2f, 3.1f), Vec3(8.0f, 0.7f, 0.2f), Vec3(0.30f, 0.46f, 0.36f));
+		break;
+
+	case MODEL_COLLAPSED_BUILDING:
+		r.Add(SHAPE_BOX, Vec3(-2.3f, 3.3f, -2.0f), Vec3(4.4f, 6.6f, 4.0f), Vec3(0.46f, 0.45f, 0.42f));
+		r.Add(SHAPE_BOX, Vec3(2.0f, 1.2f, 0.5f), Vec3(5.0f, 0.3f, 6.0f), Vec3(0.46f, 0.45f, 0.42f)).Rotated(Vec3(0.3f, 0.0f, -0.25f));
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.5f, 0.4f, 2.0f), Vec3(7.0f, 1.6f, 4.0f), Vec3(0.38f, 0.36f, 0.33f));
+		r.Add(SHAPE_ELLIPSOID, Vec3(1.5f, 1.0f, 1.0f), Vec3(2.2f, 0.5f, 2.0f), moss, ANIM_PULSE);
+		break;
+
+	case MODEL_EMPTY_HOUSE:
+		r.Add(SHAPE_BOX, Vec3(0.0f, 1.3f, 0.0f), Vec3(7.0f, 2.6f, 5.5f), Vec3(0.50f, 0.50f, 0.47f));
+		r.Add(SHAPE_PRISM, Vec3(0.0f, 3.1f, 0.0f), Vec3(7.4f, 1.0f, 5.9f), Vec3(0.40f, 0.41f, 0.40f));
+		r.Add(SHAPE_BOX, Vec3(1.0f, 0.95f, 2.77f), Vec3(1.2f, 1.9f, 0.05f), dark);
+		r.Add(SHAPE_ELLIPSOID, Vec3(-2.0f, 3.2f, 1.0f), Vec3(2.4f, 0.4f, 1.8f), moss, ANIM_PULSE);
+		break;
+
+	case MODEL_HOUSE_SITE:
+		r.Add(SHAPE_BOX, Vec3(0.0f, 0.08f, 0.0f), Vec3(7.0f, 0.16f, 5.5f), Vec3(0.44f, 0.44f, 0.41f));
+		r.Add(SHAPE_BOX, Vec3(-3.35f, 0.5f, 0.0f), Vec3(0.3f, 0.8f, 5.5f), stone);
+		r.Add(SHAPE_BOX, Vec3(0.0f, 0.35f, -2.6f), Vec3(7.0f, 0.5f, 0.3f), stone);
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.8f, 0.2f, 0.5f), Vec3(4.0f, 0.4f, 3.0f), Vec3(0.22f, 0.33f, 0.21f), ANIM_SWAY);
+		break;
+
+	case MODEL_BLOCK_WALL:
+		r.Add(SHAPE_BOX, Vec3(0.0f, 0.8f, 0.0f), Vec3(4.0f, 1.6f, 0.2f), Vec3(0.52f, 0.52f, 0.49f));
+		r.Add(SHAPE_ELLIPSOID, Vec3(-1.0f, 1.6f, 0.0f), Vec3(1.4f, 0.15f, 0.3f), moss, ANIM_PULSE);
+		break;
+
+	case MODEL_GUARDRAIL:
+		r.Add(SHAPE_BOX, Vec3(0.0f, 0.62f, 0.05f), Vec3(4.0f, 0.32f, 0.08f), Vec3(0.55f, 0.56f, 0.55f));
+		for (int i = 0; i < 3; ++i)
+			r.Add(SHAPE_BOX, Vec3(-1.9f + 1.9f * (float)i, 0.4f, 0.2f), Vec3(0.12f, 0.8f, 0.12f), kMetal);
+		break;
+
+	case MODEL_STREETLAMP:
+		r.Add(SHAPE_CYLINDER, Vec3(0.0f, 3.25f, 0.0f), Vec3(0.16f, 6.5f, 0.16f), Vec3(0.50f, 0.51f, 0.50f));
+		r.Add(SHAPE_BOX, Vec3(0.0f, 6.45f, 0.85f), Vec3(0.12f, 0.12f, 1.7f), Vec3(0.50f, 0.51f, 0.50f));
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 6.35f, 1.6f), Vec3(0.35f, 0.18f, 0.6f), kMetal);
+		break;
+
+	case MODEL_TRAFFIC_LIGHT:
+		r.Add(SHAPE_CYLINDER, Vec3(0.0f, 2.75f, 0.0f), Vec3(0.2f, 5.5f, 0.2f), Vec3(0.48f, 0.49f, 0.48f));
+		r.Add(SHAPE_BOX, Vec3(1.6f, 5.3f, 0.0f), Vec3(3.2f, 0.14f, 0.14f), Vec3(0.48f, 0.49f, 0.48f));
+		r.Add(SHAPE_BOX, Vec3(2.6f, 5.0f, 0.1f), Vec3(1.3f, 0.4f, 0.3f), dark);
+		r.Add(SHAPE_BOX, Vec3(0.0f, 2.6f, 0.15f), Vec3(0.35f, 0.7f, 0.25f), dark);
+		break;
+
+	case MODEL_ROAD_SIGN:
+		r.Add(SHAPE_BOX, Vec3(-1.1f, 1.7f, 0.0f), Vec3(0.1f, 3.4f, 0.1f), kMetal);
+		r.Add(SHAPE_BOX, Vec3(1.1f, 1.7f, 0.0f), Vec3(0.1f, 3.4f, 0.1f), kMetal);
+		r.Add(SHAPE_BOX, Vec3(0.0f, 2.7f, 0.08f), Vec3(2.6f, 1.4f, 0.05f), Vec3(0.16f, 0.36f, 0.26f));
 		break;
 
 	default:

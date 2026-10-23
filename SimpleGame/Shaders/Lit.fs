@@ -43,6 +43,7 @@ uniform vec2  u_ChunkCenter;
 uniform float u_ChunkSize;      // zero turns neighbour blending off
 uniform vec3  u_Damp;           // x, z, strength
 uniform float u_Road;           // 1 near the village; the road wears away to 0 far out
+uniform float u_City;           // 1 on Route 32, where the old town may still stand
 
 const int kMaxLights = 8;
 uniform int   u_LightCount;
@@ -118,6 +119,13 @@ float fbm(vec2 p)
 float roadCenter(float z)
 {
 	return sin(z * 0.05) * 3.0;
+}
+
+// How much of the old town still stands: whole around the start of Route 32, gone four chunks out.
+// Echoed by UrbanAt() in ChunkMap.h, as are the street widths below.
+float urbanAt(vec2 p)
+{
+	return 1.0 - smoothstep(30.0, 90.0, max(abs(p.x), abs(p.y)));
 }
 
 // Both sides of a chunk border meet at the average of the two stages, so there is no seam.
@@ -350,6 +358,55 @@ void main()
 		float mossOver = road * smoothstep(0.55 - overgrowth * 0.4, 0.85, patchMask) * 0.55;
 		float toForest = smoothstep(0.55, 1.0, overgrowth) * 0.5 * patchMask;
 
+		// The old town: asphalt streets, pavements and paved lots, with nature breaking through as it thins out.
+		// Cross streets run along the chunk borders; every other one is wide, with pavements and a crossing.
+		float urban = u_City * urbanAt(p);
+		float pave = 0.0;
+		float asphalt = 0.0;
+		float kerb = 0.0;
+		float slabs = 0.0;
+		float yellowPaint = 0.0;
+		float whitePaint = 0.0;
+		float stain = 0.0;
+		if (urban > 0.001)
+		{
+			float dx = abs(p.x - roadCenter(p.y));
+			float k = floor((p.y - 12.0) / 24.0 + 0.5);
+			float dz = abs(p.y - (k * 24.0 + 12.0));
+			bool wide = mod(k, 2.0) < 0.5;
+			float sideHalf = wide ? 2.6 : 1.6;
+
+			float breakAt = 0.42 + 0.30 * urban - 0.15 * overgrowth;
+			float breach = smoothstep(breakAt, breakAt + 0.10, fbm(p * 0.21 + 3.0));
+			pave = smoothstep(0.05, 0.35, urban) * (1.0 - breach);
+			stain = smoothstep(0.62 - overgrowth * 0.3, 0.9, patchMask) * 0.5;
+
+			float mainAsphalt = 1.0 - smoothstep(3.5, 3.7, dx);
+			float sideAsphalt = 1.0 - smoothstep(sideHalf - 0.1, sideHalf + 0.1, dz);
+			asphalt = max(mainAsphalt, sideAsphalt);
+			float mainWalk = 1.0 - smoothstep(5.9, 6.1, dx);
+			float sideWalk = wide ? 1.0 - smoothstep(3.7, 3.9, dz) : 0.0;
+			float walk = max(mainWalk, sideWalk) * (1.0 - asphalt);
+			kerb = walk * max(1.0 - smoothstep(0.05, 0.2, dx - 3.6), wide ? 1.0 - smoothstep(0.05, 0.2, dz - sideHalf) : 0.0);
+			vec2 cell = abs(fract(p * 2.0) - 0.5);
+			slabs = walk * smoothstep(0.42, 0.48, max(cell.x, cell.y));
+
+			// Worn paint: the centre line and edge lines of the road, a zebra crossing at each wide street,
+			// and a dashed line down the wide streets.
+			float wear = smoothstep(0.25, 0.65, valueNoise(p * 1.3 + 9.0)) * (1.0 - stain);
+			float open = 1.0 - sideAsphalt;
+			yellowPaint = (1.0 - smoothstep(0.04, 0.07, abs(dx - 0.12))) * open * mainAsphalt;
+			whitePaint = (1.0 - smoothstep(0.04, 0.07, abs(dx - 3.25))) * open;
+			if (wide)
+			{
+				float band = step(sideHalf + 0.8, dz) * step(dz, sideHalf + 3.8) * step(dx, 3.3);
+				whitePaint = max(whitePaint, band * step(0.5, fract((p.x - roadCenter(p.y)) / 0.9)));
+				whitePaint = max(whitePaint, (1.0 - smoothstep(0.04, 0.07, dz)) * step(0.5, fract(p.x / 3.0)) * step(4.0, dx));
+			}
+			yellowPaint *= wear;
+			whitePaint *= wear;
+		}
+
 		if (u_GroundTex > 0.5)
 		{
 			// The same mix as the painted ground below, as weights over the Blender layers, sharpened by
@@ -361,6 +418,12 @@ void main()
 			w[2] = onRoad * (1.0 - toConcrete) * keep;
 			w[3] = onRoad * toConcrete * keep;
 			w[4] = toForest;
+
+			// The town paves over all of it, its paving stained with moss.
+			for (int i = 0; i < 5; ++i)
+				w[i] *= 1.0 - pave;
+			w[3] += pave * (1.0 - stain);
+			w[1] += pave * stain;
 
 			vec2 uv = vec2(p.x, -p.y) * 0.22;
 			float top = 0.0;
@@ -399,8 +462,17 @@ void main()
 			base = mix(soil, track, onRoad);
 			base = mix(base, moss, mossOver);
 			base = mix(base, forest, toForest);
+			base = mix(base, mix(concrete, moss, stain), pave);
 			base *= 0.85 + 0.30 * grain;
 		}
+
+		// Asphalt is the paving darkened; pavements get their slabs and kerbs; the markings are worn paint.
+		base = mix(base, base * vec3(0.42, 0.44, 0.48), asphalt * pave * (1.0 - stain));
+		base *= 1.0 - slabs * pave * 0.22;
+		base = mix(base, base * 1.30 + vec3(0.03), kerb * pave);
+		base = mix(base, vec3(0.66, 0.55, 0.24), yellowPaint * pave);
+		base = mix(base, vec3(0.70, 0.70, 0.66), whitePaint * pave);
+		road = max(road, pave);
 
 		// Fine detail: grass tufts off the road, pebbles and cracks on it.
 		float tuft = valueNoise(p * vec2(4.1, 1.3)) * valueNoise(p * vec2(1.2, 3.7));

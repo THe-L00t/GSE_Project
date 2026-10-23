@@ -30,6 +30,7 @@ struct GroundParams
 	Vec3  dampCenter;
 	float dampStrength = 0.0f;
 	float road = 1.0f;                                       // how much of the painted road survives
+	float city = 0.0f;                                       // 1 where the old town's streets may show (Route 32)
 };
 
 // Season weights and live weather, read by Env.glsl as u_Season and u_Weather.
@@ -216,6 +217,7 @@ private:
 		GLint chunkSize = -1;
 		GLint damp = -1;
 		GLint road = -1;
+		GLint city = -1;
 		GLint lightCount = -1;
 		GLint lightPos = -1;
 		GLint lightColor = -1;

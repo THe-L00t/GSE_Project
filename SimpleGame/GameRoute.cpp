@@ -538,8 +538,11 @@ void Game::ResolveRouteCollisions(Vec3& pos, float radius)
 			for (size_t i = 0; i < c->ChildCount(); ++i)
 			{
 				const Actor* prop = c->Child(i);
-				if (!prop->IsDestroyed() && prop->collider.shape == COLLIDER_CIRCLE)
+				if (prop->IsDestroyed()) continue;
+				if (prop->collider.shape == COLLIDER_CIRCLE)
 					PushOutOfCircle(pos, radius, prop->WorldPosition(), prop->collider.radius);
+				else if (prop->collider.shape == COLLIDER_BOX)
+					PushOutOfTurnedBox(pos, radius, prop->WorldPosition(), prop->Yaw(), prop->collider.halfX, prop->collider.halfZ);
 			}
 		}
 	}

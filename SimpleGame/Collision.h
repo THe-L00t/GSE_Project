@@ -19,6 +19,19 @@ inline void PushOutOfBox(Vec3& pos, float radius, const Vec3& center, float half
 		pos.z += (dz < 0.0f ? -penZ : penZ);
 }
 
+// The same for a box turned by yaw about its centre, its halves measured along its own axes.
+inline void PushOutOfTurnedBox(Vec3& pos, float radius, const Vec3& center, float yaw, float halfX, float halfZ)
+{
+	float c = cosf(yaw);
+	float s = sinf(yaw);
+	float dx = pos.x - center.x;
+	float dz = pos.z - center.z;
+	Vec3 local(dx * c - dz * s, 0.0f, dx * s + dz * c);
+	PushOutOfBox(local, radius, Vec3(), halfX, halfZ);
+	pos.x = center.x + local.x * c + local.z * s;
+	pos.z = center.z - local.x * s + local.z * c;
+}
+
 // Pushes a circle out of another circle on the XZ plane.
 inline void PushOutOfCircle(Vec3& pos, float radius, const Vec3& center, float otherRadius)
 {
