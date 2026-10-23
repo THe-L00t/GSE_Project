@@ -27,6 +27,8 @@
 | 6 | 석등으로 쉼터 표시 | 쉼터 일부에 석등. 회복·포자 정화·체온·고기 굽기, 짐승은 그 빛에 못 들어온다 | `ChunkMap.cpp` `AddRestLantern`, `GameRoute.cpp` `NearLantern`, `GameCombat.cpp` |
 | 7 | 진드기 떼는 청크당 하나 | 가운데에 가장 가까운 차 한 대만 진드기 떼를 부른다 | `ChunkMap.cpp` `AddNest` |
 | 8 | 지도 언급에 비해 지도가 없다 → A안 | M 으로 할머니가 연필로 그린 지도를 펼친다. 종이와 그림은 셰이더 하나, 글씨는 그 위에. 도감 Tab 에도 작은 지도 | `Map.fs`, `Renderer::DrawMap`, `GameStory.cpp` `DrawGrandmaMap`·`DrawMapPanel` |
+| 9 | "지도 메모 지도도 안띄우고 얘기하면 뭐 어떻게 알아" | 지도 메모가 열린 동안 할머니 지도가 장소 반대쪽 화면 옆에서 밀려 들어온다. 읽는 장소는 지도 위에서 제 색 동그라미가 퍼지고, 32번 국도 메모는 길 선 전체가 다시 그어진다. 대화 상자는 지도 옆으로 비켜 선다 | `GameStory.cpp` `OpenBeat`·`MemoMapRect`·`DrawMemoMap`, `Map.fs` (u_Places[i].z = 지금 읽는 곳), `GameVillage.cpp` `DrawDialog` |
+| 10 | "손전등 마을에서 주우면 그때도 하게 해줘" | 헛간에서 손전등을 주우면 그 자리에서 유물 주인 대화와 가운데 손전등. 마을엔 대기열이 없어 바로 연다 | `GameSurvival.cpp` `FindRelic`, `GameStory.cpp` `TellRelicOwner` |
 
 - 남쪽 끝의 나무 메모를 위해 큰길 서쪽 z 240 에 큰 나무 하나를 고정 랜드마크로 두었다(청크 (0,10)).
 - 지도 셰이더는 같은 식을 파이썬으로 옮겨 그려 배치를 확인했다(실기 확인 전). 이 PC 엔 GLSL 컴파일러가 없어 셰이더 문법은 빌드 때 확인된다. `Map.fs`·`Outline.fs` 가 컴파일되지 않으면 지도 종이·테두리만 빠지고 나머지는 돈다.
