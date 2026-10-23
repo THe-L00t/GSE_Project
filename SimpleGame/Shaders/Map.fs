@@ -12,7 +12,7 @@ uniform vec2  u_Size;        // the paper in pixels
 uniform vec4  u_World;       // x0, z0, width, depth of the ground the paper covers
 uniform vec4  u_Places[5];   // village, bus stop, reservoir, town gate, lone tree: world x, z, -, note read
 uniform vec2  u_Road;        // world z where her line leaves the village, and where it gives out
-uniform vec2  u_Reservoir;   // the water's size in world units
+uniform vec4  u_Reservoir;   // the water's half sizes x, z in world units, its turn, and the band it used to fill
 uniform vec4  u_Player;      // world x, z, shown
 uniform float u_Time;
 
@@ -46,6 +46,12 @@ float valueNoise(vec2 p)
 vec2 ToPaper(vec2 world)
 {
 	return (world - u_World.xy) / u_World.zw * u_Size;
+}
+
+// Must match PondRadius in Mesh.h.
+float PondRadius(float a)
+{
+	return 1.0 + 0.10 * sin(2.0 * a + 0.8) + 0.07 * sin(3.0 * a + 2.1) + 0.04 * sin(5.0 * a + 4.0);
 }
 
 // Must match RoadCenter() in ChunkMap.h.
@@ -157,11 +163,20 @@ void main()
 	float circle = max(Lead(abs(length(q) - r1), 1.6, p + 31.0), Lead(abs(length(q) - r2), 1.2, p + 47.0) * 0.55);
 	c = Mark(c, kRed, circle * (0.75 + 0.15 * u_Places[1].w));
 
-	// The reservoir: a blob coloured in with blue pencil, its shore gone over harder. Drawn to the paper's
-	// across-scale both ways, so the stretched width does not flatten it.
+	// The reservoir, coloured in with blue pencil and its shore gone over harder. She drew it before the
+	// drought, so it reaches as far as the water used to. Drawn to the paper's across-scale both ways, so the
+	// stretched width does not flatten it.
 	q = p - ToPaper(u_Places[2].xy);
-	vec2 radius = u_Reservoir * 0.58 * (u_Size.x / u_World.z);
-	float shore = (length(q / radius) - 1.0) * min(radius.x, radius.y) + (valueNoise(q * 0.12 + 9.0) - 0.5) * 3.0;
+	float across = u_Size.x / u_World.z;
+	vec2 metres = q / across;
+	float turnC = cos(u_Reservoir.z);
+	float turnS = sin(u_Reservoir.z);
+	vec2 turned = vec2(turnC * metres.x - turnS * metres.y, turnS * metres.x + turnC * metres.y);
+	vec2 qn = turned / u_Reservoir.xy;
+	float rho = max(length(qn), 1e-4);
+	float edgeMetres = length(turned) / rho * (rho - PondRadius(atan(qn.y, qn.x + 1e-5))) - u_Reservoir.w;
+	float shore = edgeMetres * across + (valueNoise(q * 0.12 + 9.0) - 0.5) * 3.0;
+	float waterReach = (max(u_Reservoir.x, u_Reservoir.y) * 1.2 + u_Reservoir.w) * across;
 	float fill = (1.0 - smoothstep(-1.0, 0.5, shore)) * (0.30 + 0.45 * Hatch(p, 4.0, -1.0));
 	c = Mark(c, kBlue, fill * (0.75 + 0.25 * hash12(floor(p))));
 	c = Mark(c, kBlue * 0.8, Lead(abs(shore), 1.4, p + 5.0) * 0.8);
@@ -199,7 +214,7 @@ void main()
 	}
 	vec3 inks[5] = vec3[5](kGraphite, kRed, kBlue, kGold, kGraphite);
 	vec2 lifts[5] = vec2[5](vec2(0.0), vec2(0.0), vec2(0.0), vec2(0.0, -6.0), vec2(0.0, -8.0));
-	float starts[5] = float[5](0.0, 19.0, max(radius.x, radius.y) + 8.0, 22.0, 24.0);
+	float starts[5] = float[5](0.0, 19.0, waterReach + 6.0, 22.0, 24.0);
 	for (int i = 1; i < 5; ++i)
 	{
 		if (u_Places[i].z < 0.5) continue;

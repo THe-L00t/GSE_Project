@@ -14,6 +14,8 @@ namespace
 	const int kCircleSegments = 24;
 	const int kSphereStacks = 12;
 	const int kSphereSlices = 24;
+	const int kPondSegments = 144;
+	const int kPondVersion = 1;      // bump when PondRadius changes, so cached water meshes are rebuilt
 
 	struct MeshCacheHeader
 	{
@@ -219,6 +221,21 @@ namespace
 		}
 	}
 
+	void AddPond(PartWriter& w)
+	{
+		const Vec3 up(0.0f, 1.0f, 0.0f);
+		const Vec3 center(0.0f, 0.0f, 0.0f);
+
+		for (int i = 0; i < kPondSegments; ++i)
+		{
+			float a0 = (float)i / (float)kPondSegments * 2.0f * kPi;
+			float a1 = (float)(i + 1) / (float)kPondSegments * 2.0f * kPi;
+			Vec3 e0 = CirclePoint(i, kPondSegments) * (0.5f * PondRadius(a0));
+			Vec3 e1 = CirclePoint(i + 1, kPondSegments) * (0.5f * PondRadius(a1));
+			w.Triangle(center, e1, e0, up, up, up);
+		}
+	}
+
 	void AddPlane(PartWriter& w)
 	{
 		const Vec3 up(0.0f, 1.0f, 0.0f);
@@ -283,6 +300,8 @@ uint64_t ModelRecipe::Hash() const
 	h = HashInt(h, kCircleSegments);
 	h = HashInt(h, kSphereStacks);
 	h = HashInt(h, kSphereSlices);
+	h = HashInt(h, kPondSegments);
+	h = HashInt(h, kPondVersion);
 
 	for (size_t i = 0; i < parts.size(); ++i)
 	{
@@ -314,6 +333,7 @@ MeshData BuildMesh(const ModelRecipe& recipe)
 		case SHAPE_DISC:      AddDisc(writer); break;
 		case SHAPE_PLANE:     AddPlane(writer); break;
 		case SHAPE_PRISM:     AddPrism(writer); break;
+		case SHAPE_POND:      AddPond(writer); break;
 		default:              AddBox(writer); break;
 		}
 	}

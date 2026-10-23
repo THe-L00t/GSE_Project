@@ -82,10 +82,24 @@ struct MapParams
 	int   focus = -1;                  // the place whose note is being read now; 0 is the road itself
 	float roadStartZ = 0.0f;           // where her line leaves the village
 	float roadEndZ = 0.0f;             // and where it gives out
-	float reservoirX = 1.0f;           // the water's size
-	float reservoirZ = 1.0f;
+	float reservoirHalfX = 1.0f;       // the water's shape, as ShoreParams
+	float reservoirHalfZ = 1.0f;
+	float reservoirYaw = 0.0f;
+	float reservoirDry = 0.0f;         // she drew it before the drought, out to where it used to reach
 	Vec3  player;
 	bool  playerShown = false;
+};
+
+// The level's one pond: its middle, its half sizes and turn (PondShore in Mesh.h), the band of mud the water
+// has drawn back from, and how thick the mist on it lies.
+struct ShoreParams
+{
+	Vec3  center;
+	float halfX = 0.0f;
+	float halfZ = 0.0f;
+	float yaw = 0.0f;
+	float dry = 0.0f;
+	float mist = 0.0f;
 };
 
 // Graphics options; ApplySettings rebuilds only what a change touches.
@@ -173,9 +187,13 @@ public:
 	// Flat on the ground. A ring width above zero leaves only a band of that share of the radius at the rim.
 	void DrawDecal(const Vec3& pos, float yaw, float sizeX, float sizeZ, const Vec3& color, float strength, float ring = 0.0f);
 	void DrawGround(const Vec3& center, float extent, const GroundParams& params);
-	void DrawWater(const Vec3& center, float sizeX, float sizeZ);
-	// Rings a flat rectangle on the ground like an outlined model, for a place that is not a model, such as water.
-	void OutlineGround(const Vec3& center, float sizeX, float sizeZ, const Vec3& color, float strength);
+	// The level's pond, read by the ground (its band of dried mud) and the water. Reset every frame.
+	void SetShore(const ShoreParams& params) { shore = params; }
+	// The pond's surface, MODEL_WATER turned by yaw and scaled to its size; then its mist, in thin layers.
+	void DrawWater(const Vec3& center, float yaw, float sizeX, float sizeZ);
+	void DrawWaterMist(const Vec3& center, float yaw, float sizeX, float sizeZ);
+	// Rings a mesh like an outlined model, for a place that is not drawn as one, such as water.
+	void OutlineMesh(int mesh, const Mat4& model, const Vec3& color, float strength);
 	void DrawSpores(const Vec3& center, const Vec3& field, const Vec3& color, float densityScale, float size);
 	void DrawAmbientMotes(const Vec3& center);   // fireflies by night, pollen by day
 
@@ -262,6 +280,8 @@ private:
 		GLint cutaway = -1;
 		GLint material = -1;
 		GLint groundTex = -1;
+		GLint shore = -1;
+		GLint shoreShape = -1;
 	};
 
 	struct ShadowLocations
@@ -537,13 +557,15 @@ private:
 	// wherever a building or a tree already stands in front.
 	struct Surface
 	{
-		int          mode = 1;   // 1 ground, 2 water
+		int          mode = 1;   // 1 ground, 2 water, 4 mist lying on the water
 		Vec3         center;
+		float        yaw = 0.0f;
 		float        sizeX = 0.0f;
 		float        sizeZ = 0.0f;
 		GroundParams ground;
 	};
 	std::vector<Surface> surfaceQueue;
+	std::vector<Surface> mistQueue;     // drawn after everything else in the pass, blended
 	void DrawSurface(const Surface& s);
 
 	// Outlined silhouettes at scene resolution, colour in rgb and strength in alpha; the composite rings them.
@@ -571,6 +593,7 @@ private:
 	Vec3  torchDir{ 0.0f, 0.0f, 1.0f };
 	Vec3  cutawayPos;
 	float cutawayStrength = 0.0f;
+	ShoreParams shore;          // set by the level's pond each frame; halfX zero while there is none
 
 	// Quarter-resolution light shafts, beside the bloom buffers; [1] is the blur scratch.
 	GLuint volumeFbo[2] = { 0, 0 };

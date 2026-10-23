@@ -521,6 +521,8 @@ void Renderer::CacheUniformLocations()
 	lit.cutaway = glGetUniformLocation(litShader, "u_Cutaway");
 	lit.material = glGetUniformLocation(litShader, "u_Material");
 	lit.groundTex = glGetUniformLocation(litShader, "u_GroundTex");
+	lit.shore = glGetUniformLocation(litShader, "u_Shore");
+	lit.shoreShape = glGetUniformLocation(litShader, "u_ShoreShape");
 
 	// Each sampler keeps its own unit for the whole run.
 	glUseProgram(litShader);
@@ -916,6 +918,9 @@ void Renderer::BeginFrame()
 	glDepthMask(GL_TRUE);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	// The level's pond sets this again as it is drawn.
+	shore = ShoreParams();
 }
 
 void Renderer::EndScene()
@@ -1263,6 +1268,8 @@ void Renderer::BindLit(const Mat4& model, int mode)
 	glUniform4f(lit.torchPos, torchPos.x, torchPos.y, torchPos.z, torchOn ? 1.0f : 0.0f);
 	glUniform3f(lit.torchDir, torchDir.x, torchDir.y, torchDir.z);
 	glUniform4f(lit.cutaway, cutawayPos.x, cutawayPos.y, cutawayPos.z, cutawayStrength);
+	glUniform4f(lit.shore, shore.center.x, shore.center.z, shore.halfX, shore.halfZ);
+	glUniform4f(lit.shoreShape, shore.yaw, shore.dry, shore.mist, 0.0f);
 
 	// Uniforms stay with the program, so the light list goes up once per change.
 	if (lightsDirty)
@@ -1491,7 +1498,7 @@ void Renderer::FlushModels()
 	instanceData.insert(instanceData.end(), discQueue.begin(), discQueue.end());
 	discQueue.clear();
 
-	if (instanceData.empty() && surfaceQueue.empty())
+	if (instanceData.empty() && surfaceQueue.empty() && mistQueue.empty())
 	{
 		boneData.clear();
 		return;
@@ -1556,6 +1563,16 @@ void Renderer::FlushModels()
 		SetInstanceArrays(false);
 	}
 
+	// Mist on the water last of all: blended over everything under it, writing no depth.
+	if (!mistQueue.empty())
+	{
+		glDepthMask(GL_FALSE);
+		for (size_t i = 0; i < mistQueue.size(); ++i)
+			DrawSurface(mistQueue[i]);
+		glDepthMask(GL_TRUE);
+		mistQueue.clear();
+	}
+
 	for (GLuint loc = 0; loc <= 3; ++loc)
 		glDisableVertexAttribArray(loc);
 	for (GLuint loc = 11; loc <= 14; ++loc)
@@ -1617,25 +1634,45 @@ void Renderer::DrawGround(const Vec3& center, float extent, const GroundParams& 
 	surfaceQueue.push_back(s);
 }
 
-void Renderer::DrawWater(const Vec3& center, float sizeX, float sizeZ)
+void Renderer::DrawWater(const Vec3& center, float yaw, float sizeX, float sizeZ)
 {
 	if (shadowPass) return;
 
 	Surface s;
 	s.mode = 2;
 	s.center = center;
+	s.yaw = yaw;
 	s.sizeX = sizeX;
 	s.sizeZ = sizeZ;
 	surfaceQueue.push_back(s);
 }
 
-void Renderer::OutlineGround(const Vec3& center, float sizeX, float sizeZ, const Vec3& color, float strength)
+void Renderer::DrawWaterMist(const Vec3& center, float yaw, float sizeX, float sizeZ)
 {
-	if (shadowPass || strength <= 0.0f || MODEL_GROUND >= (int)meshes.size()) return;
+	if (shadowPass) return;
 
-	Mat4 model = Mul(MatTranslate(center), MatScale(Vec3(sizeX, 1.0f, sizeZ)));
+	// Three thin sheets at knee, waist and chest height read as a layer with depth from the slanted view, and
+	// sit at the right depth against the reeds and whoever wades past. Wider than the water, so the mist can
+	// spill over its edge; Lit.fs fades it out before the sheet ends.
+	const float heights[3] = { 0.15f, 0.42f, 0.78f };
+	for (int i = 0; i < 3; ++i)
+	{
+		Surface s;
+		s.mode = 4;
+		s.center = Vec3(center.x, heights[i], center.z);
+		s.yaw = yaw;
+		s.sizeX = sizeX * 1.5f;
+		s.sizeZ = sizeZ * 1.5f;
+		mistQueue.push_back(s);
+	}
+}
+
+void Renderer::OutlineMesh(int mesh, const Mat4& model, const Vec3& color, float strength)
+{
+	if (shadowPass || strength <= 0.0f || mesh >= (int)meshes.size()) return;
+
 	OutlineDraw draw;
-	draw.mesh = MODEL_GROUND;
+	draw.mesh = mesh;
 	Instance& instance = draw.instance;
 	instance = Instance();
 	for (int i = 0; i < 16; ++i) instance.model[i] = model.m[i];
@@ -1649,11 +1686,11 @@ void Renderer::OutlineGround(const Vec3& center, float sizeX, float sizeZ, const
 
 void Renderer::DrawSurface(const Surface& s)
 {
-	if (s.mode == 2)
+	if (s.mode == 2 || s.mode == 4)
 	{
-		Mat4 model = Mul(MatTranslate(s.center), MatScale(Vec3(s.sizeX, 1.0f, s.sizeZ)));
-		BindLit(model, 2);
-		DrawMesh(MODEL_GROUND);
+		Mat4 model = Mul(Mul(MatTranslate(s.center), MatRotateY(s.yaw)), MatScale(Vec3(s.sizeX, 1.0f, s.sizeZ)));
+		BindLit(model, s.mode);
+		DrawMesh(MODEL_WATER);
 		return;
 	}
 
@@ -1939,7 +1976,7 @@ void Renderer::DrawMap(float x, float y, float w, float h, const MapParams& para
 	}
 	glUniform4fv(mapLoc.places, 5, places);
 	glUniform2f(mapLoc.road, params.roadStartZ, params.roadEndZ);
-	glUniform2f(mapLoc.reservoir, params.reservoirX, params.reservoirZ);
+	glUniform4f(mapLoc.reservoir, params.reservoirHalfX, params.reservoirHalfZ, params.reservoirYaw, params.reservoirDry);
 	glUniform4f(mapLoc.player, params.player.x, params.player.z, params.playerShown ? 1.0f : 0.0f, 0.0f);
 	glUniform1f(mapLoc.time, time);
 

@@ -3,6 +3,7 @@
 
 #include <cstdlib>
 
+#include "Mesh.h"
 #include "Models.h"
 #include "Random.h"
 #include "Rpg.h"
@@ -175,8 +176,9 @@ namespace
 		}
 		else if (cx == kReservoirChunkX && cz == kReservoirChunkZ)
 		{
+			// Past the old waterline, so nothing stands on the dried mud.
 			k.center = kReservoirCenter;
-			k.radius = 8.5f;
+			k.radius = 10.6f;
 		}
 		else if (cx == 0 && cz == kTownChunkZ)
 		{
@@ -264,10 +266,12 @@ namespace
 		}
 		else if (c.cx == kReservoirChunkX && c.cz == kReservoirChunkZ)
 		{
-			// Reeds and stones around the hidden water; the water itself is placed by the level.
-			AddFixedProp(c, footprints, MODEL_BUSH, kReservoirCenter + Vec3(-7.2f, 0.0f, 3.5f), 0.4f, 1.2f, 0.0f);
+			// Reeds and stones around the hidden water, open on the side the road comes from; an old pine and a
+			// bush stand where the water used to reach. The water itself is placed by the level.
+			std::vector<ChunkProp> shore;
+			ShoreDressing(kReservoirCenter, kReservoirSizeX * 0.5f, kReservoirSizeZ * 0.5f, kReservoirYaw, kReservoirDry, kPi, 0x5EEDBA11ULL, shore);
+			c.props.insert(c.props.end(), shore.begin(), shore.end());
 			AddFixedProp(c, footprints, MODEL_BUSH, kReservoirCenter + Vec3(6.8f, 0.0f, -4.0f), 1.3f, 1.0f, 0.0f);
-			AddFixedProp(c, footprints, MODEL_ROCK, kReservoirCenter + Vec3(-6.5f, 0.0f, -4.4f), 2.0f, 1.1f, 0.6f);
 			AddFixedProp(c, footprints, MODEL_PINE, kReservoirCenter + Vec3(7.5f, 0.0f, 5.5f), 0.0f, 1.3f, 0.25f);
 		}
 		else if (c.cx == 0 && c.cz == kTownChunkZ)
@@ -903,6 +907,60 @@ namespace
 			h = HashInt(h, Quantise(c.lanterns[i].z));
 		}
 		return h;
+	}
+}
+
+void ShoreDressing(const Vec3& center, float halfX, float halfZ, float yaw, float dry, float openAngle, uint64_t seed,
+				   std::vector<ChunkProp>& out)
+{
+	Rng rng(seed);
+	float reach = (halfX + halfZ) * 0.5f;
+
+	// Four stands of reeds round the far side, each a few clumps along the edge, some up to their knees in it.
+	const int kStands = 4;
+	for (int s = 0; s < kStands; ++s)
+	{
+		float a = openAngle + 1.15f + (float)s * (2.0f * kPi - 2.3f) / (float)(kStands - 1) + rng.Range(-0.2f, 0.2f);
+		int clumps = rng.RangeInt(3, 5);
+		float step = 1.1f / reach;
+		for (int k = 0; k < clumps; ++k)
+		{
+			ChunkProp p;
+			p.model = MODEL_REEDS;
+			float along = a + ((float)k - (float)(clumps - 1) * 0.5f) * step + rng.Range(-0.15f, 0.15f) * step;
+			p.pos = PondEdge(center, halfX, halfZ, yaw, along, rng.Range(-0.5f, 0.5f));
+			p.pos.y = 0.0f;
+			p.yaw = rng.Range(0.0f, 2.0f * kPi);
+			p.scale = rng.Range(0.8f, 1.15f);
+			out.push_back(p);
+		}
+	}
+
+	// A few lone clumps still mark where the water used to reach.
+	for (int i = 0; i < 3; ++i)
+	{
+		ChunkProp p;
+		p.model = MODEL_REEDS;
+		float a = openAngle + rng.Range(1.0f, 2.0f * kPi - 1.0f);
+		p.pos = PondEdge(center, halfX, halfZ, yaw, a, dry + rng.Range(-0.4f, 0.3f));
+		p.pos.y = 0.0f;
+		p.yaw = rng.Range(0.0f, 2.0f * kPi);
+		p.scale = rng.Range(0.65f, 0.85f);
+		out.push_back(p);
+	}
+
+	// Stones left on the mud, and a couple at the water's edge.
+	for (int i = 0; i < 9; ++i)
+	{
+		ChunkProp p;
+		p.model = MODEL_ROCK;
+		float a = rng.Range(0.0f, 2.0f * kPi);
+		float off = i < 2 ? rng.Range(-0.2f, 0.1f) : rng.Range(0.3f, dry * 0.9f + 0.3f);
+		p.pos = PondEdge(center, halfX, halfZ, yaw, a, off);
+		p.pos.y = 0.0f;
+		p.yaw = rng.Range(0.0f, 2.0f * kPi);
+		p.scale = rng.Range(0.22f, 0.45f);
+		out.push_back(p);
 	}
 }
 

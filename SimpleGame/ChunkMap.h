@@ -40,9 +40,13 @@ const int   kBusStopChunkZ = 2;
 const float kBusStopZ = 48.0f;
 const int   kReservoirChunkX = 1;
 const int   kReservoirChunkZ = 4;
-const Vec3  kReservoirCenter(20.0f, 0.0f, 96.0f);
-const float kReservoirSizeX = 12.0f;
-const float kReservoirSizeZ = 9.0f;
+// The reservoir is a pond shape (PondShore in Mesh.h) turned to run north-south. The drought has drawn it back
+// from where it used to reach, leaving a band of cracked mud as wide as the distance it is noticed from.
+const Vec3  kReservoirCenter(21.5f, 0.0f, 96.0f);
+const float kReservoirSizeX = 12.8f;
+const float kReservoirSizeZ = 10.0f;
+const float kReservoirYaw = 1.95f;
+const float kReservoirDry = 3.0f;
 const int   kTownChunkZ = 6;
 const float kTownGateZ = 140.0f;
 
@@ -67,6 +71,12 @@ struct ChunkProp
 	float halfX = 0.0f;      // a collision box instead, along the prop's own axes, when not zero
 	float halfZ = 0.0f;
 };
+
+// Reeds standing in a few clumps along a pond's edge and a scatter of stones on the mud it left behind; the side
+// facing openAngle (a world direction, radians from +x toward +z) stays open, so the water shows and can be
+// reached from there. Nothing in it collides.
+void ShoreDressing(const Vec3& center, float halfX, float halfZ, float yaw, float dry, float openAngle, uint64_t seed,
+				   std::vector<ChunkProp>& out);
 
 struct ChunkSpawn
 {

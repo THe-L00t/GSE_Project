@@ -74,8 +74,10 @@ void Game::StartRoute()
 	enemyGroup = levelNode->AddChild(new Actor(ACTOR_NODE));
 	forageGroup = levelNode->AddChild(new Actor(ACTOR_NODE));
 
-	reservoir = levelNode->AddChild(new WaterActor(kReservoirSizeX, kReservoirSizeZ));
+	// The water has drawn back in the drought, and with it the mist: thinner than the village's own.
+	reservoir = levelNode->AddChild(new WaterActor(kReservoirSizeX, kReservoirSizeZ, kReservoirDry, 0.55f));
 	reservoir->SetPosition(Vec3(kReservoirCenter.x, 0.03f, kReservoirCenter.z));
+	reservoir->SetYaw(kReservoirYaw);
 	reservoirFound = false;
 	townReached = false;
 	townCardTimer = -1.0f;
@@ -585,7 +587,7 @@ void Game::ResolveRouteCollisions(Vec3& pos, float radius)
 	}
 
 	PushOutOfCircle(pos, radius, lantern->WorldPosition(), lantern->collider.radius);
-	PushOutOfBox(pos, radius, reservoir->WorldPosition(), reservoir->collider.halfX, reservoir->collider.halfZ);
+	reservoir->PushOut(pos, radius);
 }
 
 void Game::UpdateLandmarks(float dt)
@@ -756,7 +758,7 @@ void Game::UpdateRouteDeer(float dt)
 		deer = levelNode->AddChild(new DeerActor());
 		deer->SetPosition(player->Position() + dir * 6.0f);
 		deer->SetYaw(atan2f(dir.x, dir.z));
-		deer->goal = kReservoirCenter + Vec3(-kReservoirSizeX * 0.5f - 1.5f, 0.0f, 0.0f);
+		deer->goal = reservoir->EdgePoint(kPi, 1.5f);
 		deer->speed = 2.4f;
 		deer->leading = true;
 		deer->carriesGrandma = true;

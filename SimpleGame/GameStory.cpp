@@ -3,6 +3,7 @@
 
 #include <cstdio>
 
+#include "Mesh.h"
 #include "Models.h"
 
 // The road's story comes from three sides of one family (ContentDesign.md 5): grandmother's notes on the map,
@@ -601,8 +602,10 @@ void Game::DrawGrandmaMap(float x, float y, float w, float h, bool notes, int fo
 	params.focus = focus;
 	params.roadStartZ = kMapRoadStart;
 	params.roadEndZ = kOldTreeZ;
-	params.reservoirX = kReservoirSizeX;
-	params.reservoirZ = kReservoirSizeZ;
+	params.reservoirHalfX = kReservoirSizeX * 0.5f;
+	params.reservoirHalfZ = kReservoirSizeZ * 0.5f;
+	params.reservoirYaw = kReservoirYaw;
+	params.reservoirDry = kReservoirDry;
 	// Out on the road she is where she stands; still at home, she is in the village.
 	params.player = level == LEVEL_ROUTE ? player->Position() : kMapVillage;
 	params.playerShown = true;
@@ -617,11 +620,15 @@ void Game::DrawGrandmaMap(float x, float y, float w, float h, bool notes, int fo
 		float dy;
 		int   align;     // 1 starts there, -1 ends there, 0 centred
 	};
+	// The water is drawn to the paper's across-scale both ways, out to where it used to reach; its name sits
+	// under its southern edge.
+	Vec3 waterSouth = PondEdge(kReservoirCenter, kReservoirSizeX * 0.5f, kReservoirSizeZ * 0.5f, kReservoirYaw, kPi * 0.5f, kReservoirDry);
+	float underWater = 18.0f + (waterSouth.z - kReservoirCenter.z) * w / (kMapX1 - kMapX0);
 	const Word words[MEMO_COUNT] =
 	{
 		{ Vec3(RoadCenter(-34.0f), 0.0f, -34.0f), 12.0f, 4.0f, 1 },
 		{ BusStopPos(), -20.0f, 5.0f, -1 },
-		{ kReservoirCenter, 0.0f, 22.0f + kReservoirSizeZ * 0.58f * w / (kMapX1 - kMapX0), 0 },
+		{ kReservoirCenter, 0.0f, underWater, 0 },
 		{ TownGatePos() + Vec3(6.5f, 0.0f, 0.0f), 14.0f, -2.0f, 1 },
 		{ OldTreePos(), 0.0f, 0.0f, 1 },
 	};

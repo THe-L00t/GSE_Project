@@ -1,6 +1,6 @@
 #version 330
 
-// Mode 0: model. Mode 1: procedural ground. Mode 2: reservoir water. Mode 3: blob shadow.
+// Mode 0: model. Mode 1: procedural ground. Mode 2: pond water. Mode 3: blob shadow. Mode 4: mist on the pond.
 
 #include "Env.glsl"
 
@@ -56,6 +56,9 @@ uniform int   u_GlowCount;
 uniform vec4  u_GlowPos[kMaxGlows];
 
 uniform vec4  u_Cutaway;        // player's feet xyz, w how open the view through occluders is
+
+uniform vec4  u_Shore;          // the level's pond: centre x, z and half sizes x, z; zero sizes when there is none
+uniform vec4  u_ShoreShape;     // its turn, the width of mud it has drawn back from, how thick its mist lies
 
 uniform vec4  u_TorchPos;       // xyz, w = 1 while the torch is lit
 uniform vec3  u_TorchDir;
@@ -113,6 +116,57 @@ float fbm(vec2 p)
 		amp *= 0.5;
 	}
 	return v;
+}
+
+// How far a pond's edge reaches at an angle around its middle. Must match PondRadius in Mesh.h.
+float PondRadius(float a)
+{
+	return 1.0 + 0.10 * sin(2.0 * a + 0.8) + 0.07 * sin(3.0 * a + 2.1) + 0.04 * sin(5.0 * a + 4.0);
+}
+
+// Signed distance in metres from the pond's shore, negative over the water. Must match PondShore in Mesh.h.
+float PondShore(vec2 p)
+{
+	if (u_Shore.z <= 0.0) return 1e4;
+	vec2 d = p - u_Shore.xy;
+	float c = cos(u_ShoreShape.x);
+	float s = sin(u_ShoreShape.x);
+	vec2 l = vec2(c * d.x - s * d.y, s * d.x + c * d.y);
+	vec2 q = l / u_Shore.zw;
+	float rho = length(q);
+	if (rho < 1e-4) return -min(u_Shore.z, u_Shore.w);
+	float a = atan(q.y, q.x);
+	float r = PondRadius(a);
+	float slope = (0.20 * cos(2.0 * a + 0.8) + 0.21 * cos(3.0 * a + 2.1) + 0.20 * cos(5.0 * a + 4.0)) / r;
+	return length(l) / rho * (rho - r) / sqrt(1.0 + slope * slope);
+}
+
+// Dried mud splits into plates: how far a point is from the nearest crack between random cells.
+float MudCracks(vec2 p)
+{
+	vec2 cell = floor(p);
+	vec2 f = fract(p);
+	float first = 8.0;
+	float second = 8.0;
+	for (int y = -1; y <= 1; ++y)
+	{
+		for (int x = -1; x <= 1; ++x)
+		{
+			vec2 o = vec2(float(x), float(y));
+			vec2 seed = o + 0.1 + 0.8 * vec2(hash21(cell + o), hash21(cell + o + 31.7));
+			float d = length(seed - f);
+			if (d < first)
+			{
+				second = first;
+				first = d;
+			}
+			else if (d < second)
+			{
+				second = d;
+			}
+		}
+	}
+	return second - first;
 }
 
 // The dirt road winds gently along +Z. Echoed by RoadCenter() in ChunkMap.h.
@@ -287,6 +341,28 @@ void main()
 		if (v_Flash > 0.0)
 			alpha = (1.0 - smoothstep(0.0, v_Flash, abs(r - 1.0 + v_Flash))) * strength * (1.0 - fog);
 		FragColor = vec4(print ? v_Tint : vec3(0.0), alpha);
+		return;
+	}
+
+	if (u_Mode == 4)
+	{
+		// Mist lying low on the pond, in three thin sheets: drifting wisps, thickest over the water and thinning
+		// off its edge before the sheet ends, thinner the higher the sheet, heaviest at dawn and by night. It
+		// takes the sky's light and the lamps', and never glows of itself.
+		vec2 p = v_WorldPos.xz;
+		float sd = PondShore(p);
+		float layer = v_WorldPos.y;
+		vec2 drift = vec2(u_Time * 0.11, u_Time * 0.04) * (1.0 + layer);
+		float wisp = smoothstep(0.30, 0.75, fbm(p * 0.16 + drift + vec2(layer * 7.0, -layer * 5.0)));
+		float over = 1.0 - smoothstep(-1.5, 1.0, sd);
+		float lift = mix(1.0, 0.35, smoothstep(0.1, 0.8, layer));
+		float dark = 1.0 - smoothstep(0.05, 0.45, env.sunDir.y);
+		float alpha = wisp * over * lift * u_ShoreShape.z * (0.45 + 0.55 * dark) * 0.4 * (1.0 - 0.7 * fog);
+
+		vec3 up = vec3(0.0, 1.0, 0.0);
+		vec3 lit = env.skyColor * 0.55 + env.sunColor * 0.35 * CloudShade(p) + PointLights(v_WorldPos, up) * 0.6;
+		vec3 mistColor = env.fogColor * 0.7 + env.skyColor * 0.5 + lit * 0.45;
+		FragColor = vec4(mix(mistColor, env.fogColor, fog), alpha);
 		return;
 	}
 
@@ -487,6 +563,37 @@ void main()
 		base = mix(base, vec3(0.70, 0.70, 0.66), whitePaint * pave);
 		road = max(road, pave);
 
+		// Where the pond has drawn back in the drought: mud, wet and dark at the water, drying paler outward and
+		// split into plates that grow as it dries, with faint lines where the water stood a while on its way
+		// down and a pale crust along the old waterline. Grass takes the outer edge back in patches. Past it,
+		// low ground near water reads damp.
+		float mudGloss = 0.0;
+		float dryWidth = u_ShoreShape.y;
+		if (u_Shore.z > 0.0 && distance(p, u_Shore.xy) < max(u_Shore.z, u_Shore.w) * 1.25 + dryWidth + 7.0)
+		{
+			float sd = PondShore(p);
+			float reach = dryWidth + (valueNoise(p * 0.7 + 23.0) - 0.5) * 1.2;
+			float band = (1.0 - smoothstep(reach - 0.35, reach + 0.35, sd)) * step(-0.6, sd);
+			band *= 1.0 - smoothstep(0.55, 0.8, valueNoise(p * 1.7 + 5.0)) * smoothstep(reach - 1.2, reach, sd);
+			float wet = 1.0 - smoothstep(0.0, 0.8, sd);
+			float drying = smoothstep(0.2, max(dryWidth, 0.6), sd);
+
+			vec3 mud = mix(vec3(0.20, 0.17, 0.13), vec3(0.47, 0.41, 0.33), drying) * (0.92 + 0.16 * grain);
+			float crack = 1.0 - smoothstep(0.02, 0.07 + 0.03 * drying, MudCracks(p * mix(2.6, 1.3, drying)));
+			mud = mix(mud, mud * 0.45, crack * smoothstep(0.1, 0.5, drying));
+			float wander = (valueNoise(p * 1.1 + 41.0) - 0.5) * 0.25;
+			float stood = (1.0 - smoothstep(0.03, 0.12, abs(sd + wander - dryWidth * 0.4)))
+						+ (1.0 - smoothstep(0.03, 0.12, abs(sd + wander - dryWidth * 0.75)));
+			mud = mix(mud, vec3(0.58, 0.54, 0.46), clamp(stood, 0.0, 1.0) * 0.3 * step(1.0, dryWidth));
+			mud = mix(mud, vec3(0.66, 0.62, 0.54), (1.0 - smoothstep(0.0, 0.2, abs(sd - reach + 0.3))) * 0.35);
+
+			base = mix(base, mud, band);
+			n = normalize(mix(n, vec3(0.0, 1.0, 0.0), band * 0.6));
+			road = max(road, band);
+			mudGloss = wet * band * 0.6;
+			base *= 1.0 - 0.12 * (1.0 - smoothstep(reach, reach + 6.0, sd)) * (1.0 - band);
+		}
+
 		// Fine detail: grass tufts off the road, pebbles and cracks on it.
 		float tuft = valueNoise(p * vec2(4.1, 1.3)) * valueNoise(p * vec2(1.2, 3.7));
 		base *= mix(1.0, 0.80 + 0.35 * tuft, 1.0 - road);
@@ -529,6 +636,7 @@ void main()
 				base += vec3(0.05) * drop.z * wet;
 			}
 		}
+		gloss = max(gloss, mudGloss);
 
 		// Snow lies in drifts first, then covers everything; the road keeps its wheel ruts longest.
 		if (u_Season.w > 0.001)
@@ -543,7 +651,7 @@ void main()
 	}
 	else if (u_Mode == 2)
 	{
-		// Reservoir. Ripple normals, and a reflection of the sky, the sun and the lamps without a second pass.
+		// A pond. Ripple normals, and a reflection of the sky, the sun and the lamps without a second pass.
 		vec2 p = v_WorldPos.xz;
 		float w1 = sin(p.x * 1.30 + u_Time * 0.75);
 		float w2 = sin(p.y * 1.70 - u_Time * 0.55);
@@ -558,10 +666,14 @@ void main()
 		vec3 eye = normalize(u_CamPos - v_WorldPos);
 		float fres = pow(1.0 - clamp(dot(n, eye), 0.0, 1.0), 3.0);
 
-		// Deeper toward the middle, with a pale lapping band along the shore.
-		float edge = max(abs(v_Local.x), abs(v_Local.z)) * 2.0;
-		vec3 deep = mix(vec3(0.05, 0.11, 0.13), vec3(0.10, 0.18, 0.18), smoothstep(0.4, 1.0, edge));
+		// Deeper toward the middle; near the shore the muddy bottom shows through, and a pale band laps at the
+		// edge, its ripples running in to the shore.
+		float sd = PondShore(p);
+		float depth = clamp(-sd / (0.45 * min(u_Shore.z, u_Shore.w) + 0.01), 0.0, 1.0);
+		vec3 deep = mix(vec3(0.10, 0.18, 0.18), vec3(0.05, 0.11, 0.13), smoothstep(0.0, 0.8, depth));
 		base = mix(deep, env.skyColor * 0.9, 0.20 + fres * 0.30);
+		float shallow = 1.0 - smoothstep(0.0, 1.6, -sd);
+		base = mix(base, vec3(0.22, 0.19, 0.14), shallow * 0.55);
 
 		// The sky seen in the water: hazy at the horizon, clearer overhead, stronger at a grazing angle.
 		vec3 r = reflect(-eye, n);
@@ -579,10 +691,10 @@ void main()
 			reflected += u_LightColor[i] * pow(max(dot(r, toLight / max(d, 0.001)), 0.0), 40.0) * reach * 0.8;
 		}
 
-		float lap = 0.5 + 0.5 * sin(edge * 60.0 - u_Time * 1.6);
-		float foam = smoothstep(0.90, 1.0, edge) * (0.55 + 0.45 * lap);
-		base = mix(base, vec3(0.55, 0.62, 0.60), foam * 0.45);
-		reflected *= 1.0 - foam * 0.6;
+		float lap = 0.5 + 0.5 * sin(sd * 9.0 - u_Time * 1.6);
+		float foam = (1.0 - smoothstep(0.0, 0.7, -sd)) * (0.55 + 0.45 * lap);
+		base = mix(base, vec3(0.55, 0.62, 0.60), foam * 0.4);
+		reflected *= 1.0 - foam * 0.6 - shallow * 0.3;
 		gloss = 0.4;   // the mirrored sun above carries most of the highlight now
 		emissive = 0.0;
 	}

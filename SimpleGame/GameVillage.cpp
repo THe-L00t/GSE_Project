@@ -262,9 +262,20 @@ void Game::BuildVillage()
 	PropActor* sign = AddProp(MODEL_SIGN, Vec3(RoadCenter(signZ) + 3.2f, 0.0f, signZ), kUnitScale, 0.0f, 0.0f, 0.0f);
 	sign->emissive = 0.10f;
 
-	// After the props: the player is pushed out of the water last.
-	water = levelNode->AddChild(new WaterActor(22.0f, 18.0f));
-	water->SetPosition(Vec3(-15.0f, 0.03f, -14.0f));
+	// The pond whose mist kept the village: clear of grandmother's house and the tree by it, turned so its
+	// long side faces the deer's path. The well ran dry first; the pond has only just begun to draw back.
+	water = levelNode->AddChild(new WaterActor(19.6f, 16.8f, 1.2f, 1.0f));
+	water->SetPosition(Vec3(-17.0f, 0.03f, -15.0f));
+	water->SetYaw(1.5f);
+
+	// Reeds round all but the house side, where the deer slips away at night, and stones on the bared mud.
+	std::vector<ChunkProp> shore;
+	ShoreDressing(Vec3(-17.0f, 0.0f, -15.0f), 9.8f, 8.4f, 1.5f, 1.2f, 0.0f, 0x0A11A9E5ULL, shore);
+	for (size_t i = 0; i < shore.size(); ++i)
+	{
+		float s = shore[i].scale;
+		AddProp(shore[i].model, shore[i].pos, Vec3(s, s, s), shore[i].yaw, 0.0f, 0.0f);
+	}
 
 	GroundParams ground;
 	ground.stage = 0.0f;
@@ -445,6 +456,7 @@ void Game::ResolveVillageCollisions()
 		else if (a->collider.shape == COLLIDER_CIRCLE)
 			PushOutOfCircle(pos, player->collider.radius, a->WorldPosition(), a->collider.radius);
 	}
+	water->PushOut(pos, player->collider.radius);
 	player->SetPosition(pos);
 }
 

@@ -92,18 +92,28 @@ public:
 	GroundParams params;
 };
 
+// A pond: the oval with its wandering shore (PondShore in Mesh.h), turned by the actor's yaw. Around it the
+// ground shows the band of cracked mud the drought left, and mist lies low on it.
 class WaterActor : public Actor
 {
 public:
-	WaterActor(float width, float depth);
+	WaterActor(float width, float depth, float dryBand, float mistAmount);
 
 	void Draw(const DrawContext& dc) const override;
 
+	// Signed distance on the XZ plane from the shore: negative over the water.
+	float Shore(const Vec3& pos) const;
 	// Distance on the XZ plane from the shore; zero over the water.
 	float ShoreDistance(const Vec3& pos) const;
+	// Keeps a circle of this radius on dry land.
+	void  PushOut(Vec3& pos, float radius) const;
+	// A point offset out from the shore in a world direction (radians from +x toward +z) from the middle.
+	Vec3  EdgePoint(float angle, float offset) const;
 
 	float sizeX = 0.0f;
 	float sizeZ = 0.0f;
+	float dry = 0.0f;             // width of the mud band where the water used to reach
+	float mist = 0.0f;            // how thick the mist lying on it is
 	float clearRange = 4.5f;      // spore exposure falls this close to the shore
 	float outline = 0.0f;         // [0,1] ringed on screen in outlineColor while a note speaks of it
 	Vec3  outlineColor;

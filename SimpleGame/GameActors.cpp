@@ -3,6 +3,7 @@
 
 #include <cstdlib>
 
+#include "Mesh.h"
 #include "Models.h"
 
 namespace
@@ -116,27 +117,68 @@ void GroundActor::Draw(const DrawContext& dc) const
 	dc.renderer->DrawGround(dc.viewCenter, extent, params);
 }
 
-WaterActor::WaterActor(float width, float depth)
-	: Actor(ACTOR_WATER), sizeX(width), sizeZ(depth)
+WaterActor::WaterActor(float width, float depth, float dryBand, float mistAmount)
+	: Actor(ACTOR_WATER), sizeX(width), sizeZ(depth), dry(dryBand), mist(mistAmount)
 {
+	// The shore is not a collider shape; the levels keep walkers out of it with PushOut.
 	layer = LAYER_WATER;
-	collider.shape = COLLIDER_BOX;
-	collider.halfX = width * 0.5f;
-	collider.halfZ = depth * 0.5f;
 }
 
 void WaterActor::Draw(const DrawContext& dc) const
 {
-	dc.renderer->DrawWater(WorldPosition(), sizeX, sizeZ);
-	if (outline > 0.0f) dc.renderer->OutlineGround(WorldPosition(), sizeX, sizeZ, outlineColor, outline);
+	Vec3 center = WorldPosition();
+	float turn = Yaw();
+
+	// The ground's mud band and the water's own shading both read the shore from here.
+	ShoreParams shore;
+	shore.center = center;
+	shore.halfX = sizeX * 0.5f;
+	shore.halfZ = sizeZ * 0.5f;
+	shore.yaw = turn;
+	shore.dry = dry;
+	shore.mist = mist;
+	dc.renderer->SetShore(shore);
+
+	dc.renderer->DrawWater(center, turn, sizeX, sizeZ);
+	if (mist > 0.0f) dc.renderer->DrawWaterMist(center, turn, sizeX, sizeZ);
+	if (outline > 0.0f)
+	{
+		Mat4 model = Mul(Mul(MatTranslate(center), MatRotateY(turn)), MatScale(Vec3(sizeX, 1.0f, sizeZ)));
+		dc.renderer->OutlineMesh(MODEL_WATER, model, outlineColor, outline);
+	}
+}
+
+float WaterActor::Shore(const Vec3& pos) const
+{
+	Vec3 center = WorldPosition();
+	return PondShore(pos.x - center.x, pos.z - center.z, sizeX * 0.5f, sizeZ * 0.5f, Yaw());
 }
 
 float WaterActor::ShoreDistance(const Vec3& pos) const
 {
-	Vec3 center = WorldPosition();
-	float nearX = Maxf(fabsf(pos.x - center.x) - sizeX * 0.5f, 0.0f);
-	float nearZ = Maxf(fabsf(pos.z - center.z) - sizeZ * 0.5f, 0.0f);
-	return sqrtf(nearX * nearX + nearZ * nearZ);
+	return Maxf(Shore(pos), 0.0f);
+}
+
+void WaterActor::PushOut(Vec3& pos, float radius) const
+{
+	float d = Shore(pos);
+	if (d >= radius) return;
+
+	// Straight out across the shore, its direction taken from the distance a step either side.
+	const float step = 0.05f;
+	float gx = Shore(pos + Vec3(step, 0.0f, 0.0f)) - Shore(pos - Vec3(step, 0.0f, 0.0f));
+	float gz = Shore(pos + Vec3(0.0f, 0.0f, step)) - Shore(pos - Vec3(0.0f, 0.0f, step));
+	float len = sqrtf(gx * gx + gz * gz);
+	if (len < 1e-6f) return;
+	pos.x += gx / len * (radius - d);
+	pos.z += gz / len * (radius - d);
+}
+
+Vec3 WaterActor::EdgePoint(float angle, float offset) const
+{
+	Vec3 p = PondEdge(WorldPosition(), sizeX * 0.5f, sizeZ * 0.5f, Yaw(), angle, offset);
+	p.y = 0.0f;
+	return p;
 }
 
 PropActor::PropActor(int actorKind, int propModel)

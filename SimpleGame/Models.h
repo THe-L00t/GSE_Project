@@ -75,6 +75,8 @@ enum ModelId
 	MODEL_STREETLAMP,
 	MODEL_TRAFFIC_LIGHT,
 	MODEL_ROAD_SIGN,
+	MODEL_WATER,          // a pond's surface: the oval with its wandering shore, scaled to each pond
+	MODEL_REEDS,          // a clump of reeds at the water's edge
 	MODEL_COUNT
 };
 

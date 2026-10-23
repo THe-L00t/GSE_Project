@@ -20,6 +20,7 @@ namespace
 		"relic_torch", "relic_peaches", "relic_watch", "relic_radio", "relic_ticket", "relic_photo", "relic_phone", "relic_badge",
 		"office_4f", "villa_3f", "shop_2f", "store_1f", "collapsed_building",
 		"empty_house", "house_site", "block_wall", "guardrail", "streetlamp", "traffic_light", "road_sign",
+		"water", "reeds",
 	};
 
 	const Vec3 kMoss(0.24f, 0.38f, 0.24f);
@@ -140,6 +141,7 @@ OccluderSize ModelOccluder(int id)
 	case MODEL_EMPTY_HOUSE: return { 4.5f, 3.6f };
 	case MODEL_BLOCK_WALL: return { 2.0f, 1.6f };
 	case MODEL_ROAD_SIGN: return { 1.4f, 3.4f };
+	case MODEL_REEDS:    return { 0.9f, 1.9f };
 	default:             return { 0.0f, 0.0f };
 	}
 }
@@ -874,6 +876,29 @@ ModelRecipe BuildRecipe(int id)
 		r.Add(SHAPE_BOX, Vec3(1.1f, 1.7f, 0.0f), Vec3(0.1f, 3.4f, 0.1f), kMetal);
 		r.Add(SHAPE_BOX, Vec3(0.0f, 2.7f, 0.08f), Vec3(2.6f, 1.4f, 0.05f), Vec3(0.16f, 0.36f, 0.26f));
 		break;
+
+	case MODEL_WATER:
+		r.Add(SHAPE_POND, Vec3(0.0f, 0.0f, 0.0f), Vec3(1.0f, 1.0f, 1.0f), Vec3(1.0f, 1.0f, 1.0f));
+		break;
+
+	case MODEL_REEDS:
+	{
+		// Stand-in for the Blender clump: thin stems splaying from one root, a plume on most.
+		const Vec3 stem(0.50f, 0.54f, 0.34f);
+		const Vec3 plume(0.72f, 0.64f, 0.53f);
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 0.02f, 0.0f), Vec3(0.44f, 0.10f, 0.40f), Vec3(0.24f, 0.27f, 0.18f));
+		for (int i = 0; i < 9; ++i)
+		{
+			float a = (float)i / 9.0f * 2.0f * kPi;
+			float h = 1.1f + 0.45f * (float)((i * 5) % 9) / 8.0f;
+			Vec3 lean(cosf(a) * 0.12f, 0.0f, sinf(a) * 0.12f);
+			r.Add(SHAPE_CYLINDER, Vec3(lean.x * 0.5f, h * 0.5f, lean.z * 0.5f), Vec3(0.022f, h, 0.022f), stem, ANIM_SWAY)
+				.Rotated(Vec3(sinf(a) * 0.12f, 0.0f, -cosf(a) * 0.12f));
+			if (i % 3 != 2)
+				r.Add(SHAPE_ELLIPSOID, Vec3(lean.x, h + 0.08f, lean.z), Vec3(0.07f, 0.24f, 0.07f), plume, ANIM_SWAY);
+		}
+		break;
+	}
 
 	default:
 		r.Add(SHAPE_BOX, Vec3(0.0f, 0.5f, 0.0f), Vec3(1.0f, 1.0f, 1.0f), Vec3(1.0f, 0.0f, 1.0f));
