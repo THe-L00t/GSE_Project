@@ -284,6 +284,7 @@ private:
 	void DeactivateChunk(ChunkState& state);
 	ChunkActor* EnsureChunk(int cx, int cz);
 	void PrepareChunkView();
+	bool ChunkInView(int cx, int cz, float reach, float top) const;
 	void ResolveRouteCollisions(Vec3& pos, float radius);
 	void UpdateLandmarks(float dt);
 	void UpdateRouteDeer(float dt);

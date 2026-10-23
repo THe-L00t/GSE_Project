@@ -27,6 +27,23 @@ namespace
 		glGetProgramInfoLog(program, sizeof(log), NULL, log);
 		std::cout << name << " program does not validate: " << log << "\n";
 	}
+
+	// The far fog colour of Env.glsl, without the season tint: whatever the world leaves uncovered reads as mist.
+	Vec3 FogColorAt(float timeOfDay, const WeatherParams& weather)
+	{
+		const Vec3 kFog[5] = { Vec3(0.05f, 0.07f, 0.13f), Vec3(0.50f, 0.45f, 0.58f), Vec3(0.63f, 0.70f, 0.65f),
+							   Vec3(0.60f, 0.46f, 0.38f), Vec3(0.05f, 0.07f, 0.13f) };
+		float t = Clampf(timeOfDay, 0.0f, 0.9999f) * 4.0f;
+		int i = (int)floorf(t);
+		float f = t - (float)i;
+		f = f * f * (3.0f - 2.0f * f);
+		Vec3 fog = LerpV(kFog[i], kFog[i + 1], f);
+
+		float overcast = Clampf(weather.rain + weather.snow * 0.8f + weather.wind * 0.25f, 0.0f, 1.0f);
+		float luma = fog.x * 0.299f + fog.y * 0.587f + fog.z * 0.114f;
+		Vec3 grey = LerpV(Vec3(0.92f, 0.98f, 1.0f), Vec3(1.08f, 1.08f, 1.08f), weather.snow) * luma;
+		return LerpV(fog, grey, overcast * 0.6f);
+	}
 }
 
 Renderer::Renderer(int sizeX, int sizeY)
@@ -842,8 +859,9 @@ void Renderer::BeginFrame()
 	BindSceneTarget();
 	shadowActive = false;
 
-	// The ground plane always fills the orthographic view, so the clear colour never shows.
-	glClearColor(0.05f, 0.06f, 0.07f, 1.0f);
+	// The ground should fill the view; if a frame ever leaves a gap, it shows the fog instead of black.
+	Vec3 clear = FogColorAt(timeOfDay, weather);
+	glClearColor(clear.x, clear.y, clear.z, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glEnable(GL_DEPTH_TEST);

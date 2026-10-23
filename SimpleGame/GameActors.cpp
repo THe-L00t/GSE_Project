@@ -267,14 +267,17 @@ ChunkActor::ChunkActor(const Chunk& chunk)
 			prop->collider.shape = COLLIDER_CIRCLE;
 			prop->collider.radius = p.radius;
 		}
+
+		// Poles and lamps are thin but tall, so nothing is reckoned shorter than one.
+		OccluderSize o = ModelOccluder(p.model);
+		reach = Maxf(reach, Maxf(o.radius, 1.5f) * p.scale);
+		top = Maxf(top, Maxf(o.height, 8.5f) * p.scale);
 	}
 }
 
 bool ChunkActor::IsDrawn(const DrawContext& dc) const
 {
-	int viewX, viewZ;
-	ChunkMap::ChunkCoords(dc.viewCenter, viewX, viewZ);
-	return visible && abs(cx - viewX) <= kChunkDrawRadius && abs(cz - viewZ) <= kChunkDrawRadius;
+	return visible && inView;
 }
 
 void ChunkActor::Draw(const DrawContext& dc) const

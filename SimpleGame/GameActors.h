@@ -11,7 +11,9 @@ const float kPlayerRadius = 0.38f;
 const float kSwingTime = 0.22f;
 const float kRollTime = 0.28f;
 const float kDyingTime = 0.9f;
-const int   kChunkDrawRadius = 1;   // chunks drawn around the camera; covers the orthographic view
+const int   kChunkViewRange = 3;    // chunks around the camera that are tested against the view
+const float kChunkPropReach = 7.0f; // furthest any chunk prop spreads past its origin
+const float kChunkPropTop = 14.0f;  // tallest any chunk prop stands
 
 enum EnemyState
 {
@@ -226,6 +228,9 @@ public:
 	float    modernity = 1.0f;
 	uint64_t hash = 0;
 	int      lastTick = 0;           // last update that looked the chunk up
+	bool     inView = false;         // set each frame by the game from the camera
+	float    reach = 0.0f;           // how far its props spread past the chunk square
+	float    top = 0.0f;             // how tall its tallest prop stands
 	bool     hasNeighborStages = false;
 	float    neighborStage[4] = { 0.0f, 0.0f, 0.0f, 0.0f };   // -x, +x, -z, +z
 };

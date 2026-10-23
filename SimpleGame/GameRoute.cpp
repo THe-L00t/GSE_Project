@@ -464,17 +464,24 @@ ChunkActor* Game::EnsureChunk(int cx, int cz)
 
 void Game::PrepareChunkView()
 {
-	// The ground blends toward each neighbour's stage, so a chunk needs them before it is drawn.
+	for (std::unordered_map<uint64_t, ChunkActor*>::iterator it = chunkActors.begin(); it != chunkActors.end(); ++it)
+		it->second->inView = false;
+
 	int cx, cz;
 	ChunkMap::ChunkCoords(camera->Position(), cx, cz);
 
-	for (int dz = -kChunkDrawRadius; dz <= kChunkDrawRadius; ++dz)
+	for (int dz = -kChunkViewRange; dz <= kChunkViewRange; ++dz)
 	{
-		for (int dx = -kChunkDrawRadius; dx <= kChunkDrawRadius; ++dx)
+		for (int dx = -kChunkViewRange; dx <= kChunkViewRange; ++dx)
 		{
-			ChunkActor* c = EnsureChunk(cx + dx, cz + dz);
-			if (c->hasNeighborStages) continue;
+			// Only a chunk that could show is built; then its own props decide.
+			if (!ChunkInView(cx + dx, cz + dz, kChunkPropReach, kChunkPropTop)) continue;
 
+			ChunkActor* c = EnsureChunk(cx + dx, cz + dz);
+			c->inView = ChunkInView(c->cx, c->cz, c->reach, c->top);
+			if (!c->inView || c->hasNeighborStages) continue;
+
+			// The ground blends toward each neighbour's stage, so a chunk needs them before it is drawn.
 			c->neighborStage[0] = (float)routeMap.Get(c->cx - 1, c->cz).stage;
 			c->neighborStage[1] = (float)routeMap.Get(c->cx + 1, c->cz).stage;
 			c->neighborStage[2] = (float)routeMap.Get(c->cx, c->cz - 1).stage;
@@ -482,6 +489,40 @@ void Game::PrepareChunkView()
 			c->hasNeighborStages = true;
 		}
 	}
+}
+
+bool Game::ChunkInView(int cx, int cz, float reach, float top) const
+{
+	// The orthographic view shows a rectangle of ground, measured across the screen and away from the eye.
+	// Anything standing up also shows from below the bottom edge, as far as its height lifts it on screen.
+	float yaw = camera->Yaw();
+	Vec3 away(-sinf(yaw), 0.0f, -cosf(yaw));
+	Vec3 across(cosf(yaw), 0.0f, -sinf(yaw));
+	float aspect = (float)renderer->GetWidth() / Maxf((float)renderer->GetHeight(), 1.0f);
+	float hh = camera->orthoHeight * 0.5f;
+	float halfAcross = hh * aspect + 1.0f;
+	float farEdge = hh / sinf(camera->elevation) + 1.0f;
+	float nearEdge = -(hh / sinf(camera->elevation) + top / tanf(camera->elevation) + 1.0f);
+
+	// The chunk square, grown by its props' spread, against that rectangle: separating axes are the
+	// rectangle's two and the world's two.
+	Vec3 c = ChunkMap::ChunkCenter(cx, cz) - camera->Position();
+	float half = kChunkSize * 0.5f + reach;
+
+	float onAcross = c.x * across.x + c.z * across.z;
+	float onAway = c.x * away.x + c.z * away.z;
+	float spanAcross = half * (fabsf(across.x) + fabsf(across.z));
+	float spanAway = half * (fabsf(away.x) + fabsf(away.z));
+	if (onAcross + spanAcross < -halfAcross || onAcross - spanAcross > halfAcross) return false;
+	if (onAway + spanAway < nearEdge || onAway - spanAway > farEdge) return false;
+
+	float mid = (farEdge + nearEdge) * 0.5f;
+	float halfAway = (farEdge - nearEdge) * 0.5f;
+	float spanX = halfAcross * fabsf(across.x) + halfAway * fabsf(away.x);
+	float spanZ = halfAcross * fabsf(across.z) + halfAway * fabsf(away.z);
+	if (fabsf(c.x - away.x * mid) > half + spanX) return false;
+	if (fabsf(c.z - away.z * mid) > half + spanZ) return false;
+	return true;
 }
 
 void Game::ResolveRouteCollisions(Vec3& pos, float radius)
