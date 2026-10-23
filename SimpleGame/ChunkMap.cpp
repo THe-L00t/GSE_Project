@@ -65,14 +65,16 @@ namespace
 	const float kClearingRadius = 9.0f;
 	const float kLotClearingRadius = 5.5f;
 
-	// The ground a placed thing keeps to itself: a circle, or a box turned by yaw.
+	// The ground a placed thing keeps to itself: a circle, or a box turned by yaw. A box keeps the cosine and
+	// sine of its turn: placing one chunk tests thousands of pairs, and the trigonometry was most of the cost.
 	struct Footprint
 	{
 		Vec3  center;
 		float radius = 0.0f;
 		float halfX = 0.0f;
 		float halfZ = 0.0f;
-		float yaw = 0.0f;
+		float cosYaw = 1.0f;
+		float sinYaw = 0.0f;
 
 		bool IsBox() const { return halfX > 0.0f; }
 	};
@@ -89,7 +91,8 @@ namespace
 	{
 		Footprint f;
 		f.center = center;
-		f.yaw = yaw;
+		f.cosYaw = cosf(yaw);
+		f.sinYaw = sinf(yaw);
 		f.halfX = halfX;
 		f.halfZ = halfZ;
 		return f;
@@ -98,8 +101,8 @@ namespace
 	// Distance from a point to a box footprint, zero inside it.
 	float BoxDistance(const Footprint& box, const Vec3& p)
 	{
-		float c = cosf(box.yaw);
-		float s = sinf(box.yaw);
+		float c = box.cosYaw;
+		float s = box.sinYaw;
 		float dx = p.x - box.center.x;
 		float dz = p.z - box.center.z;
 		float ex = Maxf(fabsf(dx * c - dz * s) - box.halfX, 0.0f);
@@ -110,8 +113,8 @@ namespace
 	// Half the length of a box's shadow on a unit axis.
 	float BoxExtent(const Footprint& box, float ax, float az)
 	{
-		float c = cosf(box.yaw);
-		float s = sinf(box.yaw);
+		float c = box.cosYaw;
+		float s = box.sinYaw;
 		return box.halfX * fabsf(c * ax - s * az) + box.halfZ * fabsf(s * ax + c * az);
 	}
 
@@ -125,8 +128,8 @@ namespace
 		const Footprint* boxes[2] = { &a, &b };
 		for (int i = 0; i < 2; ++i)
 		{
-			float c = cosf(boxes[i]->yaw);
-			float s = sinf(boxes[i]->yaw);
+			float c = boxes[i]->cosYaw;
+			float s = boxes[i]->sinYaw;
 			const float axes[2][2] = { { c, -s }, { s, c } };
 			for (int k = 0; k < 2; ++k)
 			{

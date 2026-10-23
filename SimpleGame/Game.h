@@ -282,6 +282,7 @@ private:
 	void UpdateChunkActivation();
 	void ActivateChunk(int cx, int cz);
 	void DeactivateChunk(ChunkState& state);
+	bool HasChunk(int cx, int cz) const;
 	ChunkActor* EnsureChunk(int cx, int cz);
 	void PrepareChunkView();
 	bool ChunkInView(int cx, int cz, float reach, float top) const;

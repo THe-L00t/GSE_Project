@@ -16,6 +16,7 @@ namespace
 
 	const int kStreamRadius = 2;   // chunks kept generated around the player
 	const int kSimRadius = 1;      // chunks whose creatures and finds are live
+	const int kAheadBuildsPerFrame = 1;   // chunks built ahead of need, per call, so a border crossing does not hitch
 
 	const float kSleepDuration = 2.2f;
 	const float kSporeDrain = 4.0f;  // health per second once exposure is full
@@ -324,10 +325,21 @@ void Game::StreamChunks()
 {
 	ChunkMap::ChunkCoords(player->Position(), playerChunkX, playerChunkZ);
 
+	// The rings the player can reach are built at once. The outer ring is only got ready ahead, one new
+	// chunk an update, so stepping over a border does not build a whole row in one frame.
+	int spare = kAheadBuildsPerFrame;
 	for (int dz = -kStreamRadius; dz <= kStreamRadius; ++dz)
 	{
 		for (int dx = -kStreamRadius; dx <= kStreamRadius; ++dx)
+		{
+			bool ahead = abs(dx) == kStreamRadius || abs(dz) == kStreamRadius;
+			if (ahead && !HasChunk(playerChunkX + dx, playerChunkZ + dz))
+			{
+				if (spare <= 0) continue;
+				--spare;
+			}
 			EnsureChunk(playerChunkX + dx, playerChunkZ + dz);
+		}
 	}
 
 	// Chunk actors nothing looked up last update go; the map rebuilds them when they are needed again.
@@ -445,6 +457,11 @@ void Game::DeactivateChunk(ChunkState& state)
 	}
 }
 
+bool Game::HasChunk(int cx, int cz) const
+{
+	return chunkActors.find(ChunkMap::Key(cx, cz)) != chunkActors.end();
+}
+
 ChunkActor* Game::EnsureChunk(int cx, int cz)
 {
 	uint64_t key = ChunkMap::Key(cx, cz);
@@ -470,12 +487,21 @@ void Game::PrepareChunkView()
 	int cx, cz;
 	ChunkMap::ChunkCoords(camera->Position(), cx, cz);
 
+	int spare = kAheadBuildsPerFrame;
 	for (int dz = -kChunkViewRange; dz <= kChunkViewRange; ++dz)
 	{
 		for (int dx = -kChunkViewRange; dx <= kChunkViewRange; ++dx)
 		{
 			// Only a chunk that could show is built; then its own props decide.
 			if (!ChunkInView(cx + dx, cz + dz, kChunkPropReach, kChunkPropTop)) continue;
+
+			// One whose ground is on screen is built now. One that only a tall prop might reach into from below
+			// the edge is built ahead, a frame at a time; it is well before its ground comes into view.
+			if (!HasChunk(cx + dx, cz + dz) && !ChunkInView(cx + dx, cz + dz, 0.0f, 0.0f))
+			{
+				if (spare <= 0) continue;
+				--spare;
+			}
 
 			ChunkActor* c = EnsureChunk(cx + dx, cz + dz);
 			c->inView = ChunkInView(c->cx, c->cz, c->reach, c->top);
