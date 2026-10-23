@@ -68,7 +68,7 @@ void Game::UpdateSurvival(float dt)
 	if (!warmthActive) return;
 
 	bool night = timeOfDay < 0.22f || timeOfDay > 0.78f;
-	bool nearLantern = lantern && DistXZ(player->Position(), lantern->WorldPosition()) < lantern->zoneRadius;
+	bool nearLantern = lantern && NearLantern(player->Position(), lantern->zoneRadius);
 
 	// Rain and snow chill you even by day; wind makes any cold bite harder.
 	float chill = (night ? 1.0f + 0.5f * snowLevel : 0.5f * rainLevel + 0.8f * snowLevel) * (1.0f + 0.5f * windLevel);

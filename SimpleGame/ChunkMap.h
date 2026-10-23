@@ -46,6 +46,12 @@ const float kReservoirSizeZ = 9.0f;
 const int   kTownChunkZ = 6;
 const float kTownGateZ = 140.0f;
 
+// The lone tree at the south end of grandmother's map, where her road gives out. West of the road, so it
+// stands behind the road from the quarter-view camera instead of in front of it.
+const int   kOldTreeChunkZ = 10;
+const float kOldTreeZ = 240.0f;
+inline Vec3 OldTreePos() { return Vec3(RoadCenter(kOldTreeZ) - 6.5f, 0.0f, kOldTreeZ); }
+
 struct ChunkProp
 {
 	int   model = 0;
@@ -99,7 +105,9 @@ struct Chunk
 	int      stage = 1;      // naturalisation stage 1..3
 	float    modernity = 1.0f; // 1 near the village, 0 far out: how much of the old world is left
 	float    urban = 0.0f;     // how much of the old town stands at the chunk's centre
+	bool     rest = false;     // no creature nests here: a quiet stretch between their nests
 	std::vector<ChunkProp>  props;
+	std::vector<Vec3>       lanterns;  // stone lanterns still burning at a rest
 	std::vector<ChunkSpawn> spawns;
 	std::vector<ChunkItem>  items;
 	std::vector<Vec3>       swarms;    // the cars the mites gather on
@@ -114,6 +122,8 @@ public:
 
 	// Generates the chunk, and any missing ancestors, on first use.
 	const Chunk& Get(int cx, int cz);
+	// The chunk if it has been generated, without generating it.
+	const Chunk* Find(int cx, int cz) const;
 
 	uint64_t WorldSeed() const { return worldSeed; }
 	int      GeneratedCount() const { return (int)chunks.size(); }

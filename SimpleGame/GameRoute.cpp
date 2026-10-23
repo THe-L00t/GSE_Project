@@ -166,11 +166,18 @@ void Game::UpdateRoute(float dt, const bool* keys)
 	// Open water clears the air, as the reservoir did at home.
 	if (reservoir->ShoreDistance(player->Position()) < reservoir->clearRange) rate = -0.075f;
 
-	// The lantern clears the air and mends wounds.
-	if (DistXZ(player->Position(), lantern->WorldPosition()) < lantern->zoneRadius && deathTimer < 0.0f)
+	// A lantern clears the air and mends wounds.
+	Vec3 lanternAt;
+	if (NearLantern(player->Position(), lantern->zoneRadius, &lanternAt) && deathTimer < 0.0f)
 	{
 		rate = -0.08f;
 		health = Minf(health + 3.0f * dt, MaxHealth(stats));
+
+		if (!restLanternSeen && DistXZ(lanternAt, lantern->WorldPosition()) > 0.5f)
+		{
+			restLanternSeen = true;
+			ShowMessage("길가 석등에 아직 불이 남아 있다. 짐승들은 이 불빛 안으로 들어오지 않는다.", 5.5f);
+		}
 	}
 
 	sporeExposure = Saturatef(sporeExposure + rate * dt);
@@ -690,7 +697,35 @@ void Game::PickRouteBush(ForageActor& bush)
 
 bool Game::NearLanternFire() const
 {
-	return inventory[ITEM_MEAT] > 0 && DistXZ(player->Position(), lantern->WorldPosition()) < 2.4f;
+	return inventory[ITEM_MEAT] > 0 && NearLantern(player->Position(), 2.4f);
+}
+
+bool Game::NearLantern(const Vec3& pos, float range, Vec3* at) const
+{
+	if (lantern && DistXZ(pos, lantern->WorldPosition()) < range)
+	{
+		if (at) *at = lantern->WorldPosition();
+		return true;
+	}
+
+	// Rest lanterns stand well inside their chunk, so the chunks around this one hold any that could reach.
+	int cx, cz;
+	ChunkMap::ChunkCoords(pos, cx, cz);
+	for (int dz = -1; dz <= 1; ++dz)
+	{
+		for (int dx = -1; dx <= 1; ++dx)
+		{
+			const Chunk* chunk = routeMap.Find(cx + dx, cz + dz);
+			if (!chunk) continue;
+			for (size_t i = 0; i < chunk->lanterns.size(); ++i)
+			{
+				if (DistXZ(pos, chunk->lanterns[i]) >= range) continue;
+				if (at) *at = chunk->lanterns[i];
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 void Game::UpdateRouteDeer(float dt)

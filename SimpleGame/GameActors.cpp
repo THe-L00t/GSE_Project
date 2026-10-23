@@ -293,6 +293,14 @@ ChunkActor::ChunkActor(const Chunk& chunk)
 		reach = Maxf(reach, Maxf(o.radius, 1.5f) * p.scale);
 		top = Maxf(top, Maxf(o.height, 8.5f) * p.scale);
 	}
+
+	// A lantern still lit at a rest lights, warms and keeps creatures off like the one where the road begins.
+	for (size_t i = 0; i < chunk.lanterns.size(); ++i)
+	{
+		LanternActor* lantern = AddChild(new LanternActor());
+		lantern->SetPosition(chunk.lanterns[i]);
+		lantern->SetYaw(chunk.lanterns[i].x * 0.7f + chunk.lanterns[i].z * 0.3f);
+	}
 }
 
 bool ChunkActor::IsDrawn(const DrawContext& dc) const

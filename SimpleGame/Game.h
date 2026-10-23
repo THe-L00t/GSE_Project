@@ -291,6 +291,7 @@ private:
 	void UpdateRouteDeer(float dt);
 	void TryRouteInteract();
 	bool NearLanternFire() const;   // close enough to roast, with raw meat in the bag
+	bool NearLantern(const Vec3& pos, float range, Vec3* at = nullptr) const;   // the road's first lantern, or one lit at a rest
 	void UpdateRouteForage();
 	void PickRouteBush(ForageActor& bush);
 	void DrawRouteHud();
@@ -446,6 +447,8 @@ private:
 	LanternActor* lantern = nullptr;
 	Actor*        safePoint = nullptr;   // where the long sleep ends
 	WaterActor*   reservoir = nullptr;   // hidden east of the road; the lantern deer knows the way
+	bool  sheltered = false;     // the player stands in a lantern's light, where creatures do not follow
+	bool  restLanternSeen = false;
 	bool  busQueueSeen = false;  // the husks lined up at the bus stop, still waiting
 	bool  reservoirFound = false;
 	bool  townReached = false;

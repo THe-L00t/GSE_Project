@@ -249,6 +249,8 @@ void Game::WakeAtSafePoint()
 
 void Game::UpdateEnemies(float dt)
 {
+	sheltered = lantern && NearLantern(player->Position(), lantern->zoneRadius);
+
 	std::vector<EnemyActor*> enemies = LiveEnemies();
 	for (size_t i = 0; i < enemies.size(); ++i)
 		UpdateEnemy(*enemies[i], dt);
@@ -324,7 +326,7 @@ void Game::UpdateEnemy(EnemyActor& e, float dt)
 			}
 			MoveToward(pos, yaw, e.moveTarget, speed * 0.35f, dt);
 		}
-		if (playerAwake && (dist < info.aggroRange || (e.guarding && DistXZ(player->Position(), e.guardPos) < kGuardRange)))
+		if (playerAwake && !sheltered && (dist < info.aggroRange || (e.guarding && DistXZ(player->Position(), e.guardPos) < kGuardRange)))
 		{
 			e.state = ENEMY_CHASE;
 			e.provoked = true;
@@ -334,7 +336,8 @@ void Game::UpdateEnemy(EnemyActor& e, float dt)
 
 	case ENEMY_CHASE:
 		// A provoked creature chases well past its notice range; the boar is only ever provoked.
-		if (!playerAwake || dist > Maxf(info.aggroRange * 1.8f, e.provoked ? 16.0f : 0.0f) || DistXZ(pos, e.home) > 22.0f)
+		// None follows into a lantern's light.
+		if (!playerAwake || sheltered || dist > Maxf(info.aggroRange * 1.8f, e.provoked ? 16.0f : 0.0f) || DistXZ(pos, e.home) > 22.0f)
 		{
 			e.provoked = false;
 			e.state = ENEMY_IDLE;
@@ -401,6 +404,11 @@ void Game::UpdateEnemy(EnemyActor& e, float dt)
 	ResolveRouteCollisions(pos, e.collider.radius);
 	if (e.state != ENEMY_STRIKE && playerAwake)
 		PushOutOfCircle(pos, e.collider.radius, player->Position(), player->collider.radius);
+
+	// The light itself keeps them out.
+	Vec3 lanternAt;
+	if (lantern && NearLantern(pos, lantern->zoneRadius + e.collider.radius, &lanternAt))
+		PushOutOfCircle(pos, e.collider.radius, lanternAt, lantern->zoneRadius);
 
 	e.SetPosition(pos);
 	e.SetYaw(yaw);

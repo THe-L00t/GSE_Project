@@ -183,7 +183,26 @@ namespace
 			k.center = Vec3(RoadCenter(kTownGateZ), 0.0f, kTownGateZ + 3.0f);
 			k.radius = 11.0f;
 		}
+		else if (cx == 0 && cz == kOldTreeChunkZ)
+		{
+			k.center = OldTreePos();
+			k.radius = 6.0f;
+		}
 		return k;
+	}
+
+	int RingOf(int cx, int cz)
+	{
+		return abs(cx) > abs(cz) ? abs(cx) : abs(cz);
+	}
+
+	// Every third chunk on a lattice is left to rest: no creature nests there. Each of the others touches one
+	// along an edge, so a quiet stretch is never more than a chunk away. The world seed shifts the lattice.
+	bool IsRestChunk(int cx, int cz, uint64_t worldSeed)
+	{
+		if (RingOf(cx, cz) < 2 || (cx == 0 && cz == kBusStopChunkZ)) return false;
+		int v = (cx + 2 * cz + (int)(worldSeed % 3)) % 3;
+		return v == 0;
 	}
 
 	// Modernity: whole within three rings of the village, gone by ring twelve.
@@ -261,6 +280,11 @@ namespace
 			AddFixedProp(c, footprints, MODEL_SIGN, Vec3(road + 4.2f, 0.0f, kTownGateZ - 3.0f), 0.0f, 1.0f, 0.0f);
 			AddFixedProp(c, footprints, MODEL_POLE, Vec3(road - 4.2f, 0.0f, kTownGateZ - 6.0f), 0.0f, 1.0f, 0.25f);
 		}
+		else if (c.cx == 0 && c.cz == kOldTreeChunkZ)
+		{
+			// Where the road gives out: one old tree, larger than any around it.
+			AddFixedProp(c, footprints, MODEL_TREE, OldTreePos(), 0.4f, 2.1f, 0.55f);
+		}
 	}
 
 	struct GrowStep
@@ -315,6 +339,115 @@ namespace
 			return true;
 		}
 		return false;
+	}
+
+	// An open spot within spread of a point, on either axis.
+	bool FindSpotNear(Rng& rng, const Chunk& c, const std::vector<Footprint>& footprints, const Vec3& near, float spread,
+					  float footprint, Vec3& out)
+	{
+		for (int attempt = 0; attempt < 8; ++attempt)
+		{
+			float offsetX = rng.Range(-spread, spread);
+			float offsetZ = rng.Range(-spread, spread);
+			Vec3 pos(near.x + offsetX, 0.0f, near.z + offsetZ);
+			if (!Fits(c, footprints, Circle(pos, footprint), 0.6f)) continue;
+
+			out = pos;
+			return true;
+		}
+		return false;
+	}
+
+	// A stone lantern still burning at a rest: at the roadside when the road runs through, else somewhere open.
+	// Nothing else grows or is left within a few steps of it.
+	void AddRestLantern(Chunk& c, std::vector<Footprint>& footprints, Rng& rng)
+	{
+		Vec3 center = ChunkMap::ChunkCenter(c.cx, c.cz);
+		for (int attempt = 0; attempt < 12; ++attempt)
+		{
+			Vec3 pos;
+			if (c.cx == 0)
+			{
+				float z = center.z + rng.Range(-8.0f, 8.0f);
+				float side = rng.Chance(0.5f) ? 1.0f : -1.0f;
+				float out = rng.Range(4.6f, 6.4f);
+				pos = Vec3(RoadCenter(z) + side * out, 0.0f, z);
+				if (UrbanAt(pos.x, pos.z) >= 0.25f && AtCrossStreet(z, 0.8f)) continue;
+			}
+			else
+			{
+				float offsetX = rng.Range(-6.0f, 6.0f);
+				float offsetZ = rng.Range(-6.0f, 6.0f);
+				pos = Vec3(center.x + offsetX, 0.0f, center.z + offsetZ);
+				if (OnStreet(pos, 1.0f)) continue;
+			}
+			if (!Fits(c, footprints, Circle(pos, 1.0f), 0.3f)) continue;
+
+			c.lanterns.push_back(pos);
+			footprints.push_back(Circle(pos, 3.0f));
+			return;
+		}
+	}
+
+	// Creatures keep to one nest a chunk, well inside it, so the ground between nests is left quiet. The car
+	// nearest the middle draws the mites, one swarm however many cars stand about; what else lives here gathers
+	// at the same place, or, with no swarm, somewhere in the middle of the chunk.
+	void AddNest(Chunk& c, const std::vector<Footprint>& footprints, Rng& rng, int ring)
+	{
+		Vec3 center = ChunkMap::ChunkCenter(c.cx, c.cz);
+		Vec3 nest;
+		bool hasNest = false;
+
+		int car = -1;
+		float carDist = 1e9f;
+		for (size_t j = 0; j < c.props.size(); ++j)
+		{
+			if (c.props[j].model != MODEL_CAR) continue;
+			float d = DistXZ(c.props[j].pos, center);
+			if (d < carDist)
+			{
+				carDist = d;
+				car = (int)j;
+			}
+		}
+		if (car >= 0 && rng.Chance(0.7f))
+		{
+			const Vec3 at = c.props[car].pos;
+			int swarm = (int)c.swarms.size();
+			c.swarms.push_back(at);
+			int mites = 2 + rng.RangeInt(0, 1);
+			for (int k = 0; k < mites; ++k)
+			{
+				float angle = (float)k * 2.1f + rng.Range(0.0f, 1.0f);
+				ChunkSpawn spawn;
+				spawn.enemyType = ENEMY_SPORE_MITE;
+				spawn.level = 1 + ring / 2;
+				spawn.pos = at + Vec3(sinf(angle) * 2.2f, 0.0f, cosf(angle) * 2.2f);
+				spawn.swarm = swarm;
+				c.spawns.push_back(spawn);
+			}
+			nest = at;
+			hasNest = true;
+		}
+
+		// A third of the chunks rest, so the nests are fuller than creatures once were spread.
+		int spawnCount = rng.RangeInt(1, 2 + c.stage);
+		if (!hasNest) hasNest = FindSpotNear(rng, c, footprints, center, kChunkSize * 0.25f, 1.2f, nest);
+		if (!hasNest) return;
+
+		for (int i = 0; i < spawnCount; ++i)
+		{
+			float roll = rng.Unit();
+			int type = ENEMY_SPORE_MITE;
+			if (ring >= 3 && roll < 0.25f) type = ENEMY_MOSS_BOAR;
+			else if (roll < 0.55f) type = ENEMY_HUSK;
+
+			ChunkSpawn spawn;
+			if (!FindSpotNear(rng, c, footprints, nest, 4.5f, 0.8f, spawn.pos)) continue;
+			spawn.enemyType = type;
+			spawn.level = 1 + ring / 2 + (rng.Chance(0.3f) ? 1 : 0);
+			c.spawns.push_back(spawn);
+		}
 	}
 
 	// What a town lot can hold. Sizes run along the street (width) and back from it (depth).
@@ -763,6 +896,12 @@ namespace
 			h = HashInt(h, Quantise(b.pos.x));
 			h = HashInt(h, Quantise(b.pos.z));
 		}
+		h = HashInt(h, c.rest ? 1 : 0);
+		for (size_t i = 0; i < c.lanterns.size(); ++i)
+		{
+			h = HashInt(h, Quantise(c.lanterns[i].x));
+			h = HashInt(h, Quantise(c.lanterns[i].z));
+		}
 		return h;
 	}
 }
@@ -861,6 +1000,12 @@ const Chunk& ChunkMap::Get(int cx, int cz)
 	return chunks[Key(cx, cz)];
 }
 
+const Chunk* ChunkMap::Find(int cx, int cz) const
+{
+	std::unordered_map<uint64_t, Chunk>::const_iterator found = chunks.find(Key(cx, cz));
+	return found != chunks.end() ? &found->second : nullptr;
+}
+
 Chunk ChunkMap::Generate(int cx, int cz, uint64_t seed, int parentDir) const
 {
 	Chunk c;
@@ -888,6 +1033,10 @@ Chunk ChunkMap::Generate(int cx, int cz, uint64_t seed, int parentDir) const
 	BuildTown(c, footprints, rng, origin);
 	if (!origin && ring >= 3 && c.urban < 0.35f && rng.Chance(0.55f * c.modernity))
 		AddHomestead(c, footprints, rng);
+
+	// Some rests keep a lantern lit, more of them where the old world is nearer.
+	c.rest = IsRestChunk(cx, cz, worldSeed);
+	if (c.rest && rng.Chance(0.35f + 0.4f * c.modernity)) AddRestLantern(c, footprints, rng);
 
 	// Then whatever the land and the old world scattered about; the town leaves little room for it.
 	int count = (int)((float)(8 + rng.RangeInt(0, 6) + (c.stage - 1) * 3) * (1.0f - 0.6f * c.urban) + 0.5f);
@@ -921,45 +1070,12 @@ Chunk ChunkMap::Generate(int cx, int cz, uint64_t seed, int parentDir) const
 	// fights are not interrupted. Beyond that, creatures and finds are part of the seed.
 	if (!origin)
 	{
-		int spawnCount = ring >= 2 ? rng.RangeInt(0, 1 + c.stage) : 0;
-		for (int i = 0; i < spawnCount; ++i)
-		{
-			float roll = rng.Unit();
-			int type = ENEMY_SPORE_MITE;
-			if (ring >= 3 && roll < 0.25f) type = ENEMY_MOSS_BOAR;
-			else if (roll < 0.55f) type = ENEMY_HUSK;
-
-			ChunkSpawn spawn;
-			if (!FindOpenSpot(rng, c, footprints, 1.2f, false, false, spawn.pos)) continue;
-			spawn.enemyType = type;
-			spawn.level = 1 + ring / 2 + (rng.Chance(0.3f) ? 1 : 0);
-			c.spawns.push_back(spawn);
-		}
-
 		// Mites gather on what the old world left full of memory: an abandoned car draws a swarm.
+		if (ring >= 2 && !c.rest) AddNest(c, footprints, rng, ring);
+
 		if (ring >= 2)
 		{
-			size_t propCount = c.props.size();
-			for (size_t j = 0; j < propCount; ++j)
-			{
-				if (c.props[j].model != MODEL_CAR || !rng.Chance(0.7f)) continue;
-
-				int swarm = (int)c.swarms.size();
-				c.swarms.push_back(c.props[j].pos);
-				int mites = 2 + rng.RangeInt(0, 1);
-				for (int k = 0; k < mites; ++k)
-				{
-					float angle = (float)k * 2.1f + rng.Range(0.0f, 1.0f);
-					ChunkSpawn spawn;
-					spawn.enemyType = ENEMY_SPORE_MITE;
-					spawn.level = 1 + ring / 2;
-					spawn.pos = c.props[j].pos + Vec3(sinf(angle) * 2.2f, 0.0f, cosf(angle) * 2.2f);
-					spawn.swarm = swarm;
-					c.spawns.push_back(spawn);
-				}
-			}
-
-			// Now and then a sleeper by the road, and a boar asleep at their side, keeping watch.
+			// Now and then a sleeper by the road, and, away from a rest, a boar asleep at their side keeping watch.
 			ChunkSleeper sleeper;
 			if (rng.Chance(0.3f) && FindOpenSpot(rng, c, footprints, 1.6f, true, false, sleeper.pos))
 			{
@@ -968,12 +1084,15 @@ Chunk ChunkMap::Generate(int cx, int cz, uint64_t seed, int parentDir) const
 				c.sleepers.push_back(sleeper);
 				AddFixedProp(c, footprints, MODEL_SLEEPER, sleeper.pos, sleeper.yaw, 1.0f, 0.0f);
 
-				ChunkSpawn guard;
-				guard.enemyType = ENEMY_MOSS_BOAR;
-				guard.level = 1 + ring / 2;
-				guard.pos = sleeper.pos + Vec3(sinf(sleeper.yaw + 1.6f) * 1.8f, 0.0f, cosf(sleeper.yaw + 1.6f) * 1.8f);
-				guard.guardOf = index;
-				c.spawns.push_back(guard);
+				if (!c.rest)
+				{
+					ChunkSpawn guard;
+					guard.enemyType = ENEMY_MOSS_BOAR;
+					guard.level = 1 + ring / 2;
+					guard.pos = sleeper.pos + Vec3(sinf(sleeper.yaw + 1.6f) * 1.8f, 0.0f, cosf(sleeper.yaw + 1.6f) * 1.8f);
+					guard.guardOf = index;
+					c.spawns.push_back(guard);
+				}
 			}
 		}
 
