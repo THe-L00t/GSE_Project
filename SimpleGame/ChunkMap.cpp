@@ -604,7 +604,7 @@ namespace
 					Vec3 at(RoadCenter(mid) + side * 3.9f, 0.0f, mid);
 					if (UrbanAt(at.x, at.z) > 0.15f && AtCrossStreet(mid, 2.0f)) continue;
 					if (Fits(c, footprints, Box(at, yaw, 2.0f, 0.25f), 0.1f))
-						AddBoxProp(c, footprints, MODEL_GUARDRAIL, at, yaw, 1.0f, 2.0f, 0.2f);
+						AddBoxProp(c, footprints, MODEL_GUARDRAIL, at, yaw, 1.0f, 2.0f, 0.23f);
 				}
 			}
 		}
