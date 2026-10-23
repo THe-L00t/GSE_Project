@@ -74,6 +74,7 @@ void Renderer::Initialize(int sizeX, int sizeY)
 	shadowShader    = CompileShaders("Shaders/Lit.vs",       "Shaders/Shadow.fs");
 	outlineShader   = CompileShaders("Shaders/Lit.vs",       "Shaders/Outline.fs");
 	textShader      = CompileShaders("Shaders/Text.vs",      "Shaders/Text.fs");
+	mapShader       = CompileShaders("Shaders/Overlay.vs",   "Shaders/Map.fs");
 
 	CreateVertexBufferObjects();
 	CacheUniformLocations();
@@ -628,6 +629,16 @@ void Renderer::CacheUniformLocations()
 
 	textScreen = glGetUniformLocation(textShader, "u_Screen");
 	textAtlas = glGetUniformLocation(textShader, "u_Atlas");
+
+	mapLoc.rect = glGetUniformLocation(mapShader, "u_Rect");
+	mapLoc.size = glGetUniformLocation(mapShader, "u_Size");
+	mapLoc.world = glGetUniformLocation(mapShader, "u_World");
+	mapLoc.places = glGetUniformLocation(mapShader, "u_Places");
+	mapLoc.road = glGetUniformLocation(mapShader, "u_Road");
+	mapLoc.reservoir = glGetUniformLocation(mapShader, "u_Reservoir");
+	mapLoc.player = glGetUniformLocation(mapShader, "u_Player");
+	mapLoc.time = glGetUniformLocation(mapShader, "u_Time");
+	mapLoc.positionAttrib = glGetAttribLocation(mapShader, "a_Position");
 }
 
 void Renderer::LoadModels()
@@ -1902,6 +1913,42 @@ void Renderer::DrawFade(const Vec3& color, float alpha)
 	params.color = color;
 	params.alpha = alpha;
 	DrawOverlayQuad(-1.0f, -1.0f, 2.0f, 2.0f, params);
+}
+
+void Renderer::DrawMap(float x, float y, float w, float h, const MapParams& params)
+{
+	if (mapShader == 0 || mapLoc.positionAttrib < 0 || w <= 0.0f || h <= 0.0f) return;
+
+	// Text queued so far belongs under the paper.
+	FlushText();
+	glUseProgram(mapShader);
+
+	float ndcX = (x / (float)windowSizeX) * 2.0f - 1.0f;
+	float ndcY = 1.0f - ((y + h) / (float)windowSizeY) * 2.0f;
+	glUniform4f(mapLoc.rect, ndcX, ndcY, (w / (float)windowSizeX) * 2.0f, (h / (float)windowSizeY) * 2.0f);
+	glUniform2f(mapLoc.size, w, h);
+	glUniform4f(mapLoc.world, params.x0, params.z0, params.x1 - params.x0, params.z1 - params.z0);
+
+	float places[5 * 4];
+	for (int i = 0; i < 5; ++i)
+	{
+		places[i * 4 + 0] = params.places[i].x;
+		places[i * 4 + 1] = params.places[i].z;
+		places[i * 4 + 2] = 0.0f;
+		places[i * 4 + 3] = params.placeRead[i] ? 1.0f : 0.0f;
+	}
+	glUniform4fv(mapLoc.places, 5, places);
+	glUniform2f(mapLoc.road, params.roadStartZ, params.roadEndZ);
+	glUniform2f(mapLoc.reservoir, params.reservoirX, params.reservoirZ);
+	glUniform4f(mapLoc.player, params.player.x, params.player.z, params.playerShown ? 1.0f : 0.0f, 0.0f);
+	glUniform1f(mapLoc.time, time);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vboScreen);
+	glEnableVertexAttribArray(mapLoc.positionAttrib);
+	glVertexAttribPointer(mapLoc.positionAttrib, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, 0);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+	++drawCalls;
+	glDisableVertexAttribArray(mapLoc.positionAttrib);
 }
 
 void Renderer::DrawTexts(int x, int y, const char* text, const Vec3& color, bool large)

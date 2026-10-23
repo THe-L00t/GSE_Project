@@ -870,6 +870,13 @@ void Game::DrawRouteHud()
 	GuideText(objective, sizeof(objective));
 	DrawObjective(objective);
 
+	// A note has come up on her map since it was last opened.
+	if (mapUnread)
+	{
+		float pulse = 0.75f + 0.25f * sinf(time * 3.0f);
+		renderer->DrawTexts(32, 104, "[M] 할머니의 지도에 새 글씨", Vec3(0.93f, 0.86f, 0.66f) * pulse, false);
+	}
+
 	const ChunkActor* here = EnsureChunk(playerChunkX, playerChunkZ);
 	char lines[5][128];
 	sprintf_s(lines[0], sizeof(lines[0]), "시드  %016llX", (unsigned long long)routeMap.WorldSeed());
@@ -893,7 +900,7 @@ void Game::DrawRouteHud()
 	DrawCombatHud();
 	DrawPopups();
 	DrawSurvivalHud();
-	DrawCommonHud("WASD 이동  SPACE 구르기  J 공격  Q 약초  R 마시기  F 먹기  L 손전등  I 배낭  B 도감  C 능력치  E 사용  F4 옵션");
+	DrawCommonHud("WASD 이동  SPACE 구르기  J 공격  Q 약초  R 마시기  F 먹기  L 손전등  I 배낭  B 도감  M 지도  C 능력치  E 사용  F4 옵션");
 	DrawTitleCard("32번 국도", "처음 나선 바깥");
 	DrawTitleCardAt("은행나무 읍내", "첫 길의 끝", townCardTimer);
 	DrawNarration();
@@ -901,6 +908,7 @@ void Game::DrawRouteHud()
 	DrawStatPanel();
 	DrawBagPanel();
 	DrawJournalPanel();
+	DrawMapPanel();
 }
 
 void Game::DrawGuideCard()

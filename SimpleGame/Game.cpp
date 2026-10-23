@@ -43,8 +43,17 @@ void Game::Update(float dt, const bool* keys)
 {
 	if (messageTimer > 0.0f) messageTimer -= dt;
 
-	// Panels pause the world so choices can be made calmly.
-	if (MenuOpen()) return;
+	// Panels pause the world so choices can be made calmly. Behind her spread-out map, the scene still eases
+	// into her pencil, and the mark where Hayul stands still pulses.
+	if (MenuOpen())
+	{
+		if (mapOpen)
+		{
+			time += dt;
+			UpdateScreenFx(dt);
+		}
+		return;
+	}
 
 	// On the road a story beat holds the world still like a panel; the dream on screen still eases in.
 	if (level == LEVEL_ROUTE && DialogOpen())
@@ -194,6 +203,16 @@ void Game::OnKeyDown(unsigned char key)
 
 	// While someone is talking or a letter is open, only E moves things on.
 	if (DialogOpen() || letterOpen) return;
+
+	if (key == 'm')
+	{
+		if (MapOwned())
+		{
+			mapOpen = true;
+			mapUnread = false;
+		}
+		return;
+	}
 
 	if (key == 'i')
 	{

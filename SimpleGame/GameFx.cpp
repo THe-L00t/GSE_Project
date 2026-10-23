@@ -56,7 +56,8 @@ void Game::UpdateScreenFx(float dt)
 	bool recallDialog = DialogOpen() && (dialogSpeaker == "하율" || dialogSpeaker == "기억 속 할머니");
 	bool recallSaid = said == "하율" || said == "기억 속 할머니";
 	float recall = recallDialog ? 1.0f : (recallSaid ? 0.3f : 0.0f);
-	screenFx.memo = Approach(screenFx.memo, memo ? 0.18f : 0.0f, 2.5f, dt);
+	// Her map spread out turns the whole scene behind it to her pencil.
+	screenFx.memo = Approach(screenFx.memo, mapOpen ? 1.0f : (memo ? 0.18f : 0.0f), mapOpen ? 3.0f : 2.5f, dt);
 	screenFx.recall = Approach(screenFx.recall, recall, recall > screenFx.recall ? 1.6f : 2.4f, dt);
 
 	// A relic's owner is told with the find held up mid-screen and the rest of the road in shade; when the dialog

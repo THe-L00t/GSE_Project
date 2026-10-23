@@ -393,6 +393,10 @@ private:
 	void DrawNarration();
 	const char* NarrationSpeaker() const;   // who says the line on screen now; empty when none
 	bool StoryCalm() const;   // nothing hostile close or closing in
+	bool MapOwned() const;    // found beside grandmother with her letter
+	void DrawMapPanel();      // M: her map spread out, notes beside the places they speak of
+	void DrawGrandmaMap(float x, float y, float w, float h, bool notes);
+	int  DrawWrapped(int x, int y, const char* text, int maxWidth, const Vec3& color);   // lines used
 	void MarkMemo(int memo);
 	bool PlaceInSight(const Vec3& at, float height) const;   // well inside the screen, not at its edge
 	void OutlineMemoPlace(int memo, float strength);          // rings the place a note speaks of
@@ -402,7 +406,7 @@ private:
 	void DrawRelicShowcase();
 	bool FindRouteSleeper();  // a sleeper close by, unvisited and unguarded; sets the rest target
 	void RestBySleeper();
-	void DrawMemoPage(int x, int y);
+	void DrawMemoPage(int x, int y, int maxWidth);
 
 	Renderer* renderer = nullptr;
 	int   level = LEVEL_VILLAGE;
@@ -494,6 +498,8 @@ private:
 	bool  bagOpen = false;
 	bool  journalOpen = false;
 	int   journalPage = 0;        // 0 the relics, 1 grandmother's map notes
+	bool  mapOpen = false;        // grandmother's map spread out (M)
+	bool  mapUnread = false;      // a note has come up on it since it was last opened
 	bool  packOpen = false;       // the departure: choosing what goes in the bag
 	int   mealsEaten = 0;
 	bool  enemySeen[ENEMY_TYPE_COUNT] = {};

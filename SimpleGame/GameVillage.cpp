@@ -486,7 +486,7 @@ void Game::SetTutorial(int next)
 
 	case TUT_PACK:
 		inventory[ITEM_HERB] += 2;
-		ShowMessage("할머니 선반에 천에 싼 약초 두 묶음이 있다. 문 앞에서 배낭을 꾸려라.", 5.0f);
+		ShowMessage("편지 곁의 지도를 챙겼다(M으로 펼치기). 선반의 약초 두 묶음도 챙겨, 문 앞에서 배낭을 꾸려라.", 6.0f);
 		break;
 
 	case TUT_LEAVE:
@@ -946,9 +946,10 @@ void Game::ObjectiveText(char* buf, size_t size) const
 void Game::VillageHelp(char* buf, size_t size) const
 {
 	// Keys appear as the day teaches them.
-	sprintf_s(buf, size, "WASD 이동   SPACE 구르기   E 상호작용%s%s   T 시간   F2 건너뛰기   F4 옵션   ESC 종료",
+	sprintf_s(buf, size, "WASD 이동   SPACE 구르기   E 상호작용%s%s%s   T 시간   F2 건너뛰기   F4 옵션   ESC 종료",
 			  tutorial >= TUT_FORAGE ? "   I 배낭   F 먹기" : "",
-			  torchOwned ? "   L 손전등   B 도감" : "");
+			  torchOwned ? "   L 손전등   B 도감" : "",
+			  tutorial >= TUT_PACK ? "   M 지도" : "");
 }
 
 void Game::DrawVillageHud()
@@ -975,6 +976,7 @@ void Game::DrawVillageHud()
 	DrawPackPanel();
 	DrawBagPanel();
 	DrawJournalPanel();
+	DrawMapPanel();
 	if (day == 1) DrawTitleCard("물안개 마을", "포자가 찾아온 아침");
 	DrawVillageFades();
 }

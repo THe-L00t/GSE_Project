@@ -69,6 +69,24 @@ struct ScreenFx
 	float spotlight = 0.0f;   // [0,1] all but the outlined models sinks into shade, as when a find is held up
 };
 
+// Grandmother's hand-drawn map of Route 32 (Shaders/Map.fs). Everything is in world units; the paper covers the
+// rectangle from (x0, z0) to (x1, z1) with north, the lower z, at the top.
+struct MapParams
+{
+	float x0 = 0.0f;
+	float z0 = 0.0f;
+	float x1 = 1.0f;
+	float z1 = 1.0f;
+	Vec3  places[5];                   // village, bus stop, reservoir, town gate, the lone tree
+	bool  placeRead[5] = {};           // its note has been read
+	float roadStartZ = 0.0f;           // where her line leaves the village
+	float roadEndZ = 0.0f;             // and where it gives out
+	float reservoirX = 1.0f;           // the water's size
+	float reservoirZ = 1.0f;
+	Vec3  player;
+	bool  playerShown = false;
+};
+
 // Graphics options; ApplySettings rebuilds only what a change touches.
 struct RenderSettings
 {
@@ -171,6 +189,8 @@ public:
 	void DrawBarPx(float x, float y, float w, float h, float fill, const Vec3& low, const Vec3& high);
 	void DrawAtmosphere(float vignette, float haze, const Vec3& hazeColor);
 	void DrawFade(const Vec3& color, float alpha);
+	// The map's paper and pencil, filling a pixel rectangle; the words on it are drawn as text after it.
+	void DrawMap(float x, float y, float w, float h, const MapParams& params);
 
 	// UTF-8 text with y on the baseline. Consecutive strings share one draw until another UI draw.
 	void DrawTexts(int x, int y, const char* text, const Vec3& color, bool large);
@@ -337,6 +357,19 @@ private:
 		GLint time = -1;
 	};
 
+	struct MapLocations
+	{
+		GLint rect = -1;
+		GLint size = -1;
+		GLint world = -1;
+		GLint places = -1;
+		GLint road = -1;
+		GLint reservoir = -1;
+		GLint player = -1;
+		GLint time = -1;
+		GLint positionAttrib = -1;
+	};
+
 	// An outlined model's silhouette, drawn flat into the outline target after the scene.
 	struct OutlineDraw
 	{
@@ -433,6 +466,8 @@ private:
 	GLuint postShader = 0;
 	GLuint volumeShader = 0;
 	GLuint textShader = 0;
+	GLuint mapShader = 0;
+	MapLocations mapLoc;
 
 	// Small and large faces; each queue holds glyph quads waiting for FlushText.
 	Font   fonts[2];

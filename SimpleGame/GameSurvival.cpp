@@ -26,7 +26,7 @@ namespace
 
 bool Game::MenuOpen() const
 {
-	return statPanelOpen || bagOpen || journalOpen || packOpen || optionsOpen;
+	return statPanelOpen || bagOpen || journalOpen || packOpen || optionsOpen || mapOpen;
 }
 
 void Game::UpdateSurvival(float dt)
@@ -210,6 +210,17 @@ bool Game::HandleMenuKey(unsigned char key)
 	{
 		if (key == 'b' || key == 27) journalOpen = false;
 		else if (key == '\t') journalPage = 1 - journalPage;
+		else if (key == 'm' && MapOwned())
+		{
+			journalOpen = false;
+			mapOpen = true;
+			mapUnread = false;
+		}
+		return true;
+	}
+	if (mapOpen)
+	{
+		if (key == 'm' || key == 27) mapOpen = false;
 		return true;
 	}
 	return false;
@@ -324,9 +335,14 @@ void Game::DrawJournalPanel()
 
 	if (journalPage == 1)
 	{
+		// Her map on the left, as she drew it; the notes read so far on the right.
 		renderer->DrawTexts(x, y, "할머니의 지도", kHudInk, true);
-		renderer->DrawTexts(x + 250, y, "여백에 남긴 메모들", kHudDim, false);
-		DrawMemoPage(x, y + 36);
+		renderer->DrawTexts(x + 250, y, "여백에 남긴 메모들   [M] 크게 펼치기", kHudDim, false);
+		float mh = ph - 110.0f;
+		float mw = mh * 0.62f;
+		DrawGrandmaMap((float)x, (float)y + 22.0f, mw, mh, false);
+		int listX = x + (int)mw + 28;
+		DrawMemoPage(listX, y + 50, (int)(px + pw) - listX - 30);
 		return;
 	}
 

@@ -33,6 +33,29 @@ namespace
 		Vec3(0.96f, 0.93f, 0.80f),
 	};
 
+	// The paper covers 80 m across and the road from past the village to past the lone tree. It is much narrower
+	// than it is long, so the width is stretched: the road's bends and the water off to the east both show. The
+	// village is its own place; on her map it sits north of where the road starts.
+	const float kMapX0 = -40.0f;
+	const float kMapX1 = 40.0f;
+	const float kMapZ0 = -75.0f;
+	const float kMapZ1 = 262.0f;
+	const Vec3  kMapVillage(0.0f, 0.0f, -62.0f);
+	const float kMapRoadStart = -55.0f;
+
+	// The names she wrote, and the few words beside each place once its note has been read; the lone tree has none.
+	const char* kMapNames[MEMO_COUNT] = { "32번 국도", "버스 정류장", "저수지", "은행나무읍", nullptr };
+	const char* kMapNotes[MEMO_COUNT] =
+	{
+		"네 할아버지 버스가 다니던 길",
+		"여기서 탔다",
+		"물이 줄면 안개도 준다",
+		"네 엄마 학교가 있다",
+		nullptr,
+	};
+	const Vec3 kMapInk(0.27f, 0.24f, 0.21f);      // her pencil
+	const Vec3 kMapNoteInk(0.20f, 0.24f, 0.42f);  // the blue-black she wrote the notes in
+
 	struct MemoText
 	{
 		const char* title;
@@ -269,6 +292,9 @@ void Game::MarkMemo(int memo)
 	if (outlineMemo >= 0 && outlineMemo != memo) OutlineMemoPlace(outlineMemo, 0.0f);
 	outlineMemo = memo;
 	outlineStrength = 0.01f;
+
+	// The words now stand beside the place on her map too.
+	mapUnread = true;
 }
 
 bool Game::PlaceInSight(const Vec3& at, float height) const
@@ -459,7 +485,7 @@ void Game::RestBySleeper()
 	dialogNext = -1;
 }
 
-void Game::DrawMemoPage(int x, int y)
+void Game::DrawMemoPage(int x, int y, int maxWidth)
 {
 	bool any = false;
 	for (int i = 0; i < MEMO_COUNT; ++i)
@@ -467,8 +493,134 @@ void Game::DrawMemoPage(int x, int y)
 		if (!memoSeen[i]) continue;
 		any = true;
 		renderer->DrawTexts(x, y, kMemos[i].title, Vec3(0.92f, 0.84f, 0.62f), false);
-		renderer->DrawTexts(x + 16, y + 20, kMemos[i].lines[1], kHudInk, false);
-		y += 50;
+		int lines = DrawWrapped(x + 16, y + 20, kMemos[i].lines[1], maxWidth - 16, kHudInk);
+		y += 30 + 20 * lines;
 	}
-	if (!any) renderer->DrawTexts(x, y, "아직 펼쳐 본 메모가 없다. 길을 걸으면 지도가 말을 건다.", kHudDim, false);
+	if (!any) DrawWrapped(x, y, "아직 펼쳐 본 메모가 없다. 길을 걸으면 지도가 말을 건다.", maxWidth, kHudDim);
+}
+
+int Game::DrawWrapped(int x, int y, const char* text, int maxWidth, const Vec3& color)
+{
+	// Breaks at spaces; a word too long for a whole line is left whole on its own.
+	std::string rest = text;
+	int lines = 0;
+	while (!rest.empty())
+	{
+		size_t cut = rest.size();
+		if (renderer->TextWidth(rest.c_str(), false) > maxWidth)
+		{
+			size_t fits = std::string::npos;
+			for (size_t space = rest.find(' '); space != std::string::npos; space = rest.find(' ', space + 1))
+			{
+				if (renderer->TextWidth(rest.substr(0, space).c_str(), false) > maxWidth) break;
+				fits = space;
+			}
+			if (fits == std::string::npos) fits = rest.find(' ');
+			if (fits != std::string::npos) cut = fits;
+		}
+		renderer->DrawTexts(x, y + 20 * lines, rest.substr(0, cut).c_str(), color, false);
+		++lines;
+		rest = cut < rest.size() ? rest.substr(cut + 1) : std::string();
+	}
+	return lines;
+}
+
+bool Game::MapOwned() const
+{
+	return level == LEVEL_ROUTE || tutorial >= TUT_PACK;
+}
+
+void Game::DrawGrandmaMap(float x, float y, float w, float h, bool notes)
+{
+	MapParams params;
+	params.x0 = kMapX0;
+	params.z0 = kMapZ0;
+	params.x1 = kMapX1;
+	params.z1 = kMapZ1;
+	params.places[0] = kMapVillage;
+	params.places[1] = BusStopPos();
+	params.places[2] = kReservoirCenter;
+	params.places[3] = TownGatePos();
+	params.places[4] = OldTreePos();
+	for (int i = 0; i < MEMO_COUNT; ++i) params.placeRead[i] = memoSeen[i];
+	params.roadStartZ = kMapRoadStart;
+	params.roadEndZ = kOldTreeZ;
+	params.reservoirX = kReservoirSizeX;
+	params.reservoirZ = kReservoirSizeZ;
+	// Out on the road she is where she stands; still at home, she is in the village.
+	params.player = level == LEVEL_ROUTE ? player->Position() : kMapVillage;
+	params.playerShown = true;
+	renderer->DrawMap(x, y, w, h, params);
+
+	// The words on the paper, laid out in pixels from the places they name and kept inside the sheet: a name
+	// starts at, ends at or is centred on its offset point, and the note sits under it the same way.
+	struct Word
+	{
+		Vec3  at;
+		float dx;
+		float dy;
+		int   align;     // 1 starts there, -1 ends there, 0 centred
+	};
+	const Word words[MEMO_COUNT] =
+	{
+		{ Vec3(RoadCenter(-34.0f), 0.0f, -34.0f), 12.0f, 4.0f, 1 },
+		{ BusStopPos(), -20.0f, 5.0f, -1 },
+		{ kReservoirCenter, 0.0f, 22.0f + kReservoirSizeZ * 0.58f * w / (kMapX1 - kMapX0), 0 },
+		{ TownGatePos() + Vec3(6.5f, 0.0f, 0.0f), 14.0f, -2.0f, 1 },
+		{ OldTreePos(), 0.0f, 0.0f, 1 },
+	};
+
+	// A sheet too small for her words only shows the drawing; the journal lists the notes beside it.
+	if (w < 300.0f) return;
+
+	float left = x + 10.0f;
+	float right = x + w - 10.0f;
+	float vx = x + (kMapVillage.x - kMapX0) / (kMapX1 - kMapX0) * w;
+	float vy = y + (kMapVillage.z - kMapZ0) / (kMapZ1 - kMapZ0) * h;
+	const char* village = "물안개 마을";
+	int villageWidth = renderer->TextWidth(village, false);
+	renderer->DrawTexts((int)Clampf(vx + 28.0f, left, right - (float)villageWidth), (int)vy + 6, village, kMapInk, false);
+
+	for (int i = 0; i < MEMO_COUNT; ++i)
+	{
+		if (!kMapNames[i]) continue;
+		const Word& word = words[i];
+		float ax = x + (word.at.x - kMapX0) / (kMapX1 - kMapX0) * w + word.dx;
+		float ay = y + (word.at.z - kMapZ0) / (kMapZ1 - kMapZ0) * h + word.dy;
+
+		const char* lines[2] = { kMapNames[i], notes && memoSeen[i] ? kMapNotes[i] : nullptr };
+		for (int k = 0; k < 2; ++k)
+		{
+			if (!lines[k]) continue;
+			float tw = (float)renderer->TextWidth(lines[k], false);
+			float tx = word.align > 0 ? ax : (word.align < 0 ? ax - tw : ax - tw * 0.5f);
+			tx = Clampf(tx, left, right - tw);
+			renderer->DrawTexts((int)tx, (int)ay + 19 * k, lines[k], k == 0 ? kMapInk : kMapNoteInk, false);
+		}
+	}
+}
+
+void Game::DrawMapPanel()
+{
+	if (!mapOpen) return;
+
+	const int w = renderer->GetWidth();
+	const int h = renderer->GetHeight();
+	renderer->DrawFade(Vec3(0.02f, 0.03f, 0.03f), 0.30f);
+
+	// Taller than wide, like the folded sheet she kept; its shadow falls a little down and to the right.
+	float ph = Minf((float)h * 0.84f, 820.0f);
+	float pw = ph * 0.62f;
+	float px = (float)w * 0.5f - pw * 0.5f;
+	float py = (float)h * 0.5f - ph * 0.5f + 10.0f;
+	renderer->DrawRectPx(px + 7.0f, py + 9.0f, pw, ph, Vec3(0.0f, 0.0f, 0.0f), 0.35f);
+	DrawGrandmaMap(px, py, pw, ph, true);
+
+	int read = 0;
+	for (int i = 0; i < MEMO_COUNT; ++i) read += memoSeen[i] ? 1 : 0;
+	char buf[64];
+	sprintf_s(buf, sizeof(buf), "읽은 메모 %d / %d", read, (int)MEMO_COUNT);
+	renderer->DrawTexts((int)px, (int)py - 14, "할머니의 지도", kHudInk, true);
+	renderer->DrawTexts((int)(px + pw) - renderer->TextWidth(buf, false), (int)py - 14, buf, kHudDim, false);
+	renderer->DrawTexts((int)px, (int)(py + ph) + 28, "[M] 닫기", kHudAccent, false);
 }
