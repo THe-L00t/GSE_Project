@@ -135,7 +135,7 @@ public:
 	void SetTorch(bool on, const Vec3& pos, const Vec3& dir);
 
 	// Trees, roofs and cars in front of the player are cut open in a cylinder along the view, ray-marched
-	// in Lit.fs. Strength 0 turns it off.
+	// in Lit.fs only where the ray can come near the player. Strength 0 turns it off.
 	void SetCutaway(const Vec3& playerPos, float strength);
 
 	// The skeleton and clips of a rigged Blender model; null for anything else.
