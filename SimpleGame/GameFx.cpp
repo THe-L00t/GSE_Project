@@ -49,20 +49,27 @@ void Game::UpdateScreenFx(float dt)
 	bool dreaming = DialogOpen() && dialogSpeaker.find("꿈 조각") == 0;
 	screenFx.dream = Approach(screenFx.dream, dreaming ? 1.0f : 0.0f, dreaming ? 1.4f : 2.2f, dt);
 
-	// Grandmother's map notes read as a sketch on her paper; Hayul's memories as an old photograph. Said over play,
-	// they only tint the scene, so the road stays easy to read.
+	// Grandmother's map notes, which stop the road, read as a sketch on her paper, as does her map spread out.
+	// Hayul's memories are an old photograph: fully while a dialog holds the road, only a tint when said over play.
+	const char* memoSpeaker = "할머니의 지도 메모";
+	bool memo = DialogOpen() && dialogSpeaker == memoSpeaker;
 	std::string said = NarrationSpeaker();
-	bool memo = said == "할머니의 지도 메모";
 	bool recallDialog = DialogOpen() && (dialogSpeaker == "하율" || dialogSpeaker == "기억 속 할머니");
 	bool recallSaid = said == "하율" || said == "기억 속 할머니";
 	float recall = recallDialog ? 1.0f : (recallSaid ? 0.3f : 0.0f);
-	// Her map spread out turns the whole scene behind it to her pencil.
-	screenFx.memo = Approach(screenFx.memo, mapOpen ? 1.0f : (memo ? 0.18f : 0.0f), mapOpen ? 3.0f : 2.5f, dt);
+	screenFx.memo = Approach(screenFx.memo, (memo || mapOpen) ? 1.0f : 0.0f, mapOpen ? 3.0f : 2.5f, dt);
 	screenFx.recall = Approach(screenFx.recall, recall, recall > screenFx.recall ? 1.6f : 2.4f, dt);
 
-	// A relic's owner is told with the find held up mid-screen and the rest of the road in shade; when the dialog
-	// closes the find comes apart into light and the shade lifts.
-	bool telling = showcaseRelic >= 0 && DialogOpen();
+	// The place a note speaks of is ringed while the note is open, or waiting to open, and lets go once it closes.
+	if (outlineMemo >= 0)
+	{
+		bool reading = memo || (!storyQueue.empty() && storyQueue.front().speaker == memoSpeaker);
+		outlineStrength = Approach(outlineStrength, reading ? 1.0f : 0.0f, reading ? 1.6f : 2.0f, dt);
+	}
+
+	// A relic's owner is told with the find held up mid-screen and the rest of the road in shade; when that
+	// dialog closes, or gives way to Hayul's own thought, the find comes apart into light and the shade lifts.
+	bool telling = showcaseRelic >= 0 && DialogOpen() && dialogSpeaker == RelicName(showcaseRelic);
 	if (showcaseRelic >= 0)
 	{
 		showcaseFade = Approach(showcaseFade, telling ? 1.0f : 0.0f, telling ? 2.2f : 1.8f, dt);

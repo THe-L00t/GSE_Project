@@ -91,13 +91,13 @@ enum StoryMemo
 	MEMO_COUNT
 };
 
-// A dialog waiting for a quiet moment on the road: what a relic's owner left behind, held up to the light.
+// A dialog waiting for a quiet moment on the road.
 struct StoryBeat
 {
 	std::string speaker;
 	std::vector<std::string> lines;
-	int relic = -1;                   // the find shown in the middle of the screen while it is told
-	std::vector<std::string> after;   // Hayul's own words once it closes, said over play
+	int  relic = -1;        // the find shown in the middle of the screen while it is told
+	bool follows = false;   // opens as soon as the dialog before it closes, without waiting for quiet
 };
 
 // A line said over play, without stopping it.

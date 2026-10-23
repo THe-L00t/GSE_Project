@@ -7,7 +7,7 @@
 
 // The road's story comes from three sides of one family (ContentDesign.md 5): grandmother's notes on the map,
 // opened by reaching their place; Hayul's own memories, opened by growing; and the owners of what is found.
-// Notes and memories are said over play; only a relic's owner, and a dream chosen beside a sleeper, stop the road.
+// Hayul's memories and grandmother's remembered words are said over play; notes, relics and dreams stop the road.
 
 namespace
 {
@@ -156,7 +156,6 @@ namespace
 
 	Vec3 SpeakerColor(const std::string& speaker)
 	{
-		if (speaker == "할머니의 지도 메모") return Vec3(0.93f, 0.88f, 0.74f);
 		if (speaker == "기억 속 할머니") return Vec3(0.95f, 0.82f, 0.62f);
 		return Vec3(0.78f, 0.86f, 0.95f);
 	}
@@ -174,17 +173,11 @@ void Game::UpdateStory(float dt)
 
 	UpdateNarration(dt);
 
-	// The place a note speaks of stays ringed while any of the note is still to be read, then lets go.
-	if (outlineMemo >= 0)
-	{
-		bool reading = false;
-		for (size_t i = 0; i < narration.size() && !reading; ++i) reading = narration[i].speaker == kMemoSpeaker;
-		outlineStrength = Approach(outlineStrength, reading ? 1.0f : 0.0f, reading ? 1.6f : 0.7f, dt);
-	}
-
-	// A beat never opens in the middle of a fight; it waits until the road has been quiet a moment.
+	// A beat never opens in the middle of a fight; it waits until the road has been quiet a moment. One that
+	// follows the beat before it opens as soon as that one closes.
 	storyCalm = (deathTimer < 0.0f && StoryCalm()) ? storyCalm + dt : 0.0f;
-	if (storyQueue.empty() || DialogOpen() || storyCalm < kStoryCalm) return;
+	if (storyQueue.empty() || DialogOpen()) return;
+	if (storyCalm < kStoryCalm && !storyQueue.front().follows) return;
 
 	StoryBeat beat = storyQueue.front();
 	storyQueue.erase(storyQueue.begin());
@@ -197,15 +190,6 @@ void Game::UpdateStory(float dt)
 	{
 		showcaseRelic = beat.relic;
 		showcaseFade = 0.0f;
-	}
-
-	// Said over play once the dialog closes: the narration waits while any dialog is open.
-	for (size_t i = 0; i < beat.after.size(); ++i)
-	{
-		NarrationLine line;
-		line.speaker = "하율";
-		line.text = beat.after[i];
-		narration.push_back(line);
 	}
 }
 
@@ -277,18 +261,33 @@ void Game::MarkMemo(int memo)
 	if (memoSeen[memo]) return;
 	memoSeen[memo] = true;
 
-	// A note is read while its place is in sight, so it goes ahead of whatever else is waiting to be said.
-	size_t at = narration.empty() ? 0 : 1;
-	for (int i = 0; i < 3; ++i)
+	// A note stops the road and is read line by line. A note with a place opens the moment that place is in
+	// sight, without waiting for the road to be quiet, or the place could leave the screen before the words
+	// arrive. The road's own note has nothing to show and waits for quiet as before.
+	StoryBeat beat;
+	beat.speaker = kMemoSpeaker;
+	beat.lines.assign(kMemos[memo].lines, kMemos[memo].lines + 3);
+	if (memo == MEMO_ROAD)
 	{
-		NarrationLine line;
-		line.speaker = kMemoSpeaker;
-		line.text = kMemos[memo].lines[i];
-		narration.insert(narration.begin() + at + i, line);
+		storyQueue.push_back(beat);
+		mapUnread = true;
+		return;
+	}
+	if (DialogOpen())
+	{
+		beat.follows = true;
+		storyQueue.insert(storyQueue.begin(), beat);
+	}
+	else
+	{
+		dialogSpeaker = beat.speaker;
+		dialogLines = beat.lines;
+		dialogIndex = 0;
+		dialogNext = -1;
 	}
 
-	// Its place is ringed from now until the note has been read. Starting just above zero keeps the ring
-	// from being let go before it has faded in.
+	// Its place is ringed while the note is open. Starting just above zero keeps the ring from being let go
+	// before it has faded in.
 	if (outlineMemo >= 0 && outlineMemo != memo) OutlineMemoPlace(outlineMemo, 0.0f);
 	outlineMemo = memo;
 	outlineStrength = 0.01f;
@@ -375,21 +374,25 @@ void Game::TellRelicOwner(int relic)
 	beat.speaker = RelicName(relic);
 	beat.lines.push_back(kOwnerLines[relic]);
 	beat.relic = relic;
+	storyQueue.push_back(beat);
 
-	// Hayul's thoughts on how many have been found follow the owner's line, over play.
+	// Hayul's thoughts on how many have been found are a dialog of their own, opening as the owner's closes.
+	StoryBeat thought;
+	thought.speaker = "하율";
+	thought.follows = true;
 	int found = 0;
 	for (int i = 0; i < kRelicCount; ++i) found += relicFound[i] ? 1 : 0;
 	if (found >= 3 && relicsTold < 3)
 	{
 		relicsTold = 3;
-		beat.after.assign(kThreeRelics, kThreeRelics + 2);
+		thought.lines.assign(kThreeRelics, kThreeRelics + 2);
 	}
 	if (found >= 6 && relicsTold < 6)
 	{
 		relicsTold = 6;
-		beat.after.assign(kSixRelics, kSixRelics + 2);
+		thought.lines.assign(kSixRelics, kSixRelics + 2);
 	}
-	storyQueue.push_back(beat);
+	if (!thought.lines.empty()) storyQueue.push_back(thought);
 }
 
 Vec3 Game::ShowcasePosition() const
