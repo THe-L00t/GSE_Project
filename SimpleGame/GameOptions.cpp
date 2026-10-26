@@ -142,8 +142,8 @@ void Game::DrawOptionsPanel()
 	float pw = 600.0f, ph = 410.0f;
 	float px = (float)w * 0.5f - pw * 0.5f;
 	float py = (float)h * 0.5f - ph * 0.5f;
-	renderer->DrawRectPx(px, py, pw, ph, Vec3(0.10f, 0.11f, 0.10f), 0.94f);
-	renderer->DrawRectPx(px, py, pw, 3.0f, Vec3(0.45f, 0.60f, 0.50f), 0.8f);
+	renderer->DrawPanelPx(px, py, pw, ph, UI_WINDOW, Vec3(0.10f, 0.11f, 0.10f), 0.94f);
+	renderer->DrawPanelPx(px, py, pw, 3.0f, UI_RULE, Vec3(0.45f, 0.60f, 0.50f), 0.8f);
 
 	int x = (int)px + 36;
 	int y = (int)py + 44;
@@ -168,7 +168,7 @@ void Game::DrawOptionsPanel()
 
 		bool selected = r == optionsCursor;
 		if (selected)
-			renderer->DrawRectPx((float)x - 14.0f, (float)y - 18.0f, pw - 44.0f, 26.0f, Vec3(0.25f, 0.40f, 0.34f), 0.45f);
+			renderer->DrawPanelPx((float)x - 14.0f, (float)y - 18.0f, pw - 44.0f, 26.0f, UI_SELECT, Vec3(0.25f, 0.40f, 0.34f), 0.45f);
 
 		Vec3 color = selected ? kHudInk : kHudDim;
 		renderer->DrawTexts(x + 16, y, kRowNames[r], color, false);

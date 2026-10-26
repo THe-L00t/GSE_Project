@@ -785,7 +785,7 @@ void Game::DrawCombatHud()
 	if (!UnderMemoMap(18.0f, top, 330.0f, panelH))
 	{
 		int y = (int)top;
-		renderer->DrawRectPx(18.0f, top, 330.0f, 100.0f, kHudPanel, 0.38f);
+		renderer->DrawPanelPx(18.0f, top, 330.0f, 100.0f, UI_MIST, kHudPanel, 0.38f);
 
 		sprintf_s(buf, sizeof(buf), "Lv %d", stats.level);
 		renderer->DrawTexts(32, y + 32, buf, kHudAccent, true);
@@ -810,7 +810,7 @@ void Game::DrawCombatHud()
 		{
 			float pulse = 0.65f + 0.35f * sinf(time * 5.0f);
 			sprintf_s(buf, sizeof(buf), "분배할 능력치 %d점  [C]", stats.unspentPoints);
-			renderer->DrawRectPx(18.0f, top + 106.0f, 330.0f, 28.0f, kHudPanel, 0.38f);
+			renderer->DrawPanelPx(18.0f, top + 106.0f, 330.0f, 28.0f, UI_MIST, kHudPanel, 0.38f);
 			renderer->DrawTexts(32, y + 125, buf, kHudAccent * pulse, false);
 		}
 	}
@@ -839,8 +839,8 @@ void Game::DrawStatPanel()
 	float pw = 640.0f, ph = 380.0f;
 	float px = (float)w * 0.5f - pw * 0.5f;
 	float py = (float)h * 0.5f - ph * 0.5f;
-	renderer->DrawRectPx(px, py, pw, ph, Vec3(0.10f, 0.11f, 0.10f), 0.94f);
-	renderer->DrawRectPx(px, py, pw, 3.0f, Vec3(0.45f, 0.60f, 0.50f), 0.8f);
+	renderer->DrawPanelPx(px, py, pw, ph, UI_WINDOW, Vec3(0.10f, 0.11f, 0.10f), 0.94f);
+	renderer->DrawPanelPx(px, py, pw, 3.0f, UI_RULE, Vec3(0.45f, 0.60f, 0.50f), 0.8f);
 
 	int pending = 0;
 	CharacterStats preview = stats;
@@ -866,7 +866,7 @@ void Game::DrawStatPanel()
 	{
 		bool selected = (i == statCursor);
 		if (selected)
-			renderer->DrawRectPx((float)x - 14.0f, (float)y - 18.0f, pw - 44.0f, 26.0f, Vec3(0.25f, 0.40f, 0.34f), 0.45f);
+			renderer->DrawPanelPx((float)x - 14.0f, (float)y - 18.0f, pw - 44.0f, 26.0f, UI_SELECT, Vec3(0.25f, 0.40f, 0.34f), 0.45f);
 
 		// Columns sit at fixed offsets: the font is proportional, so padding with spaces would not line up.
 		Vec3 color = selected ? kHudInk : kHudDim;

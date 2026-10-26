@@ -977,7 +977,7 @@ void Game::DrawVillageHud()
 	hudRightBottom = 18.0f + 38.0f;
 	if (!UnderMemoMap((float)(w - tw - 46), 18.0f, (float)(tw + 28), 38.0f))
 	{
-		renderer->DrawRectPx((float)(w - tw - 46), 18.0f, (float)(tw + 28), 38.0f, kHudPanel, 0.38f);
+		renderer->DrawPanelPx((float)(w - tw - 46), 18.0f, (float)(tw + 28), 38.0f, UI_MIST, kHudPanel, 0.38f);
 		renderer->DrawTexts(w - tw - 32, 42, buf, fragments >= fragmentGoal ? kHudAccent : kHudInk, false);
 	}
 
@@ -1023,8 +1023,8 @@ void Game::DrawDialog()
 
 	float px, py, pw, ph;
 	DialogRect(px, py, pw, ph);
-	renderer->DrawRectPx(px, py, pw, ph, Vec3(0.08f, 0.09f, 0.08f), 0.88f);
-	renderer->DrawRectPx(px, py, 4.0f, ph, Vec3(0.85f, 0.70f, 0.45f), 0.9f);
+	renderer->DrawPanelPx(px, py, pw, ph, UI_DIALOG, Vec3(0.08f, 0.09f, 0.08f), 0.88f);
+	renderer->DrawPanelPx(px, py, 4.0f, ph, UI_LANTERN, Vec3(0.85f, 0.70f, 0.45f), 0.9f);
 
 	renderer->DrawTexts((int)px + 24, (int)py + 28, dialogSpeaker.c_str(), Vec3(0.92f, 0.80f, 0.58f), false);
 	renderer->DrawTexts((int)px + 24, (int)py + 58, dialogLines[dialogIndex].c_str(), kHudInk, false);
@@ -1046,8 +1046,9 @@ void Game::DrawLetterPanel()
 	float pw = 620.0f, ph = 350.0f;
 	float px = (float)w * 0.5f - pw * 0.5f;
 	float py = (float)h * 0.5f - ph * 0.5f;
-	renderer->DrawRectPx(px, py, pw, ph, Vec3(0.10f, 0.11f, 0.10f), 0.94f);
-	renderer->DrawRectPx(px, py, pw, 3.0f, Vec3(0.45f, 0.60f, 0.50f), 0.8f);
+	// On the same old paper as her map, in her pencil.
+	renderer->DrawPanelPx(px, py, pw, ph, UI_PAPER, Vec3(0.91f, 0.86f, 0.73f), 1.0f);
+	const Vec3 pencil(0.24f, 0.22f, 0.20f);
 
 	const char* lines[] =
 	{
@@ -1064,12 +1065,12 @@ void Game::DrawLetterPanel()
 	int y = (int)py + 52;
 	for (int i = 0; i < 8; ++i)
 	{
-		renderer->DrawTexts((int)px + 40, y, lines[i], Vec3(0.88f, 0.90f, 0.86f), false);
+		renderer->DrawTexts((int)px + 40, y, lines[i], pencil, false);
 		y += 26;
 	}
-	renderer->DrawTexts((int)(px + pw) - 130, y + 12, "- 순임", Vec3(0.70f, 0.76f, 0.72f), false);
-	renderer->DrawTexts((int)px + 40, y + 40, "추신. 솥에 밥 있다. 꼭 먹고 가거라.", Vec3(0.78f, 0.74f, 0.62f), false);
-	renderer->DrawTexts((int)px + 40, (int)(py + ph) - 18, "[E]  닫기", kHudAccent, false);
+	renderer->DrawTexts((int)(px + pw) - 130, y + 12, "- 순임", Vec3(0.34f, 0.31f, 0.28f), false);
+	renderer->DrawTexts((int)px + 40, y + 40, "추신. 솥에 밥 있다. 꼭 먹고 가거라.", Vec3(0.44f, 0.33f, 0.22f), false);
+	renderer->DrawTexts((int)px + 40, (int)(py + ph) - 18, "[E]  닫기", Vec3(0.16f, 0.40f, 0.34f), false);
 }
 
 void Game::DrawPackPanel()
@@ -1084,8 +1085,8 @@ void Game::DrawPackPanel()
 	float pw = 600.0f, ph = 340.0f;
 	float px = (float)w * 0.5f - pw * 0.5f;
 	float py = (float)h * 0.5f - ph * 0.5f;
-	renderer->DrawRectPx(px, py, pw, ph, Vec3(0.10f, 0.11f, 0.10f), 0.94f);
-	renderer->DrawRectPx(px, py, pw, 3.0f, Vec3(0.45f, 0.60f, 0.50f), 0.8f);
+	renderer->DrawPanelPx(px, py, pw, ph, UI_WINDOW, Vec3(0.10f, 0.11f, 0.10f), 0.94f);
+	renderer->DrawPanelPx(px, py, pw, 3.0f, UI_RULE, Vec3(0.45f, 0.60f, 0.50f), 0.8f);
 
 	int used = packTorch ? 1 : 0;
 	for (int r = 0; r < kPackItemRows; ++r) used += packTake[kPackRows[r]];
@@ -1104,7 +1105,7 @@ void Game::DrawPackPanel()
 	{
 		bool selected = (r == packCursor);
 		if (selected)
-			renderer->DrawRectPx((float)x - 14.0f, (float)y - 18.0f, pw - 44.0f, 26.0f, Vec3(0.25f, 0.40f, 0.34f), 0.45f);
+			renderer->DrawPanelPx((float)x - 14.0f, (float)y - 18.0f, pw - 44.0f, 26.0f, UI_SELECT, Vec3(0.25f, 0.40f, 0.34f), 0.45f);
 
 		const char* name = "손전등";
 		if (r < kPackItemRows)

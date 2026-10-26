@@ -899,7 +899,7 @@ void Game::DrawRouteHud()
 	hudRightBottom = 18.0f + 116.0f;
 	if (!UnderMemoMap((float)(w - boxW - 46), 18.0f, (float)(boxW + 28), 116.0f))
 	{
-		renderer->DrawRectPx((float)(w - boxW - 46), 18.0f, (float)(boxW + 28), 116.0f, kHudPanel, 0.38f);
+		renderer->DrawPanelPx((float)(w - boxW - 46), 18.0f, (float)(boxW + 28), 116.0f, UI_MIST, kHudPanel, 0.38f);
 		for (int i = 0; i < 5; ++i)
 			renderer->DrawTexts(w - boxW - 32, 40 + i * 20, lines[i], i == 0 ? kHudInk : kHudDim, false);
 	}
@@ -949,7 +949,7 @@ void Game::DrawGuideCard()
 	float boxH = 24.0f + 20.0f * (float)lineCount;
 	hudRightBottom = y + boxH;
 	if (UnderMemoMap(x, y, (float)(boxW + 28), boxH)) return;
-	renderer->DrawRectPx(x, y, (float)(boxW + 28), boxH, kHudPanel, 0.45f);
+	renderer->DrawPanelPx(x, y, (float)(boxW + 28), boxH, UI_MIST, kHudPanel, 0.45f);
 	for (int i = 0; i < lineCount; ++i)
 		renderer->DrawTexts((int)x + 14, (int)y + 26 + i * 20, lines[i], i == 0 ? kHudAccent : kHudInk, false);
 }

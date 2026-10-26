@@ -272,8 +272,8 @@ void Game::DrawBagPanel()
 	float pw = 560.0f, ph = 390.0f;
 	float px = (float)w * 0.5f - pw * 0.5f;
 	float py = (float)h * 0.5f - ph * 0.5f;
-	renderer->DrawRectPx(px, py, pw, ph, Vec3(0.10f, 0.11f, 0.10f), 0.94f);
-	renderer->DrawRectPx(px, py, pw, 3.0f, Vec3(0.45f, 0.60f, 0.50f), 0.8f);
+	renderer->DrawPanelPx(px, py, pw, ph, UI_WINDOW, Vec3(0.10f, 0.11f, 0.10f), 0.94f);
+	renderer->DrawPanelPx(px, py, pw, 3.0f, UI_RULE, Vec3(0.45f, 0.60f, 0.50f), 0.8f);
 
 	int x = (int)px + 36;
 	int y = (int)py + 44;
@@ -326,8 +326,8 @@ void Game::DrawJournalPanel()
 	float pw = 760.0f, ph = 470.0f;
 	float px = (float)w * 0.5f - pw * 0.5f;
 	float py = (float)h * 0.5f - ph * 0.5f;
-	renderer->DrawRectPx(px, py, pw, ph, Vec3(0.11f, 0.10f, 0.09f), 0.95f);
-	renderer->DrawRectPx(px, py, pw, 3.0f, Vec3(0.70f, 0.60f, 0.40f), 0.8f);
+	renderer->DrawPanelPx(px, py, pw, ph, UI_WINDOW, Vec3(0.11f, 0.10f, 0.09f), 0.95f);
+	renderer->DrawPanelPx(px, py, pw, 3.0f, UI_RULE, Vec3(0.70f, 0.60f, 0.40f), 0.8f);
 
 	int x = (int)px + 36;
 	int y = (int)py + 44;

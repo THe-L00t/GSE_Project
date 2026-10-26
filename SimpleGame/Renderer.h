@@ -35,6 +35,22 @@ struct GroundParams
 	float city = 0.0f;                                       // 1 where the old town's streets may show (Route 32)
 };
 
+// How Overlay.fs draws a UI panel: a slate the old world made, its frame sagged and broken, moss grown in over a
+// corner with spores in it. The order matches the STYLE_ constants there.
+enum UiStyle
+{
+	UI_MIST,       // a HUD panel
+	UI_WINDOW,     // a window over the paused game
+	UI_DIALOG,
+	UI_LANTERN,    // the lamp along the dialog's edge
+	UI_BAND,       // shade under a line of words
+	UI_TAG,        // a key prompt
+	UI_SELECT,     // the chosen row in a window
+	UI_SHADOW,
+	UI_PAPER,      // her letter, on the paper of her map
+	UI_RULE,       // the stroke along a window's top
+};
+
 // Season weights and live weather, read by Env.glsl as u_Season and u_Weather.
 struct WeatherParams
 {
@@ -205,6 +221,7 @@ public:
 	void BeginUI();
 	void EndUI();
 	void DrawRectPx(float x, float y, float w, float h, const Vec3& color, float alpha);
+	void DrawPanelPx(float x, float y, float w, float h, int style, const Vec3& color, float alpha);   // style: UiStyle
 	void DrawBarPx(float x, float y, float w, float h, float fill, const Vec3& low, const Vec3& high);
 	void DrawAtmosphere(float vignette, float haze, const Vec3& hazeColor);
 	void DrawFade(const Vec3& color, float alpha);

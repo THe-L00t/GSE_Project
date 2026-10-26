@@ -1922,6 +1922,16 @@ void Renderer::DrawRectPx(float x, float y, float w, float h, const Vec3& color,
 	DrawPixelQuad(x, y, w, h, params);
 }
 
+void Renderer::DrawPanelPx(float x, float y, float w, float h, int style, const Vec3& color, float alpha)
+{
+	// The styles follow the bar in Overlay.fs's modes.
+	OverlayParams params;
+	params.mode = 3 + style;
+	params.color = color;
+	params.alpha = alpha;
+	DrawPixelQuad(x, y, w, h, params);
+}
+
 void Renderer::DrawBarPx(float x, float y, float w, float h, float fill, const Vec3& low, const Vec3& high)
 {
 	OverlayParams params;

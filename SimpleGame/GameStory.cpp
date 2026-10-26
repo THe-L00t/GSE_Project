@@ -284,7 +284,7 @@ void Game::DrawNarration()
 	int tw = renderer->TextWidth(line.text.c_str(), false);
 	int sw = renderer->TextWidth(line.speaker.c_str(), false);
 	int y = h - 236;
-	renderer->DrawRectPx((float)(w / 2 - tw / 2 - 26), (float)(y - 46), (float)(tw + 52), 60.0f, Vec3(0.02f, 0.03f, 0.03f), 0.42f * alpha);
+	renderer->DrawPanelPx((float)(w / 2 - tw / 2 - 26), (float)(y - 46), (float)(tw + 52), 60.0f, UI_BAND, Vec3(0.02f, 0.03f, 0.03f), 0.42f * alpha);
 	renderer->DrawTexts(w / 2 - sw / 2, y - 24, line.speaker.c_str(), SpeakerColor(line.speaker) * (0.85f * alpha), false);
 	renderer->DrawTexts(w / 2 - tw / 2, y, line.text.c_str(), kHudInk * alpha, false);
 }
@@ -606,7 +606,7 @@ void Game::DrawMemoMap()
 	float shown = SmoothStep(0.0f, 1.0f, screenFx.memo);
 	float away = (1.0f - shown) * (w + 60.0f);
 	x += memoMapLeft ? -away : away;
-	renderer->DrawRectPx(x + 7.0f, y + 9.0f, w, h, Vec3(0.0f, 0.0f, 0.0f), 0.35f * shown);
+	renderer->DrawPanelPx(x + 7.0f, y + 9.0f, w, h, UI_SHADOW, Vec3(0.0f, 0.0f, 0.0f), 0.35f * shown);
 	DrawGrandmaMap(x, y, w, h, true, memoMap);
 }
 
@@ -704,7 +704,7 @@ void Game::DrawMapPanel()
 	float pw = ph * 0.62f;
 	float px = (float)w * 0.5f - pw * 0.5f;
 	float py = top + ((float)h - top - bottom - ph) * 0.5f;
-	renderer->DrawRectPx(px + 7.0f, py + 9.0f, pw, ph, Vec3(0.0f, 0.0f, 0.0f), 0.35f);
+	renderer->DrawPanelPx(px + 7.0f, py + 9.0f, pw, ph, UI_SHADOW, Vec3(0.0f, 0.0f, 0.0f), 0.35f);
 	DrawGrandmaMap(px, py, pw, ph, true);
 
 	int read = 0;

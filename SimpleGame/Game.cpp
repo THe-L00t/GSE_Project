@@ -494,7 +494,7 @@ void Game::GatherLights(const Vec3& view)
 void Game::DrawObjective(const char* text)
 {
 	float boxW = Maxf(430.0f, (float)renderer->TextWidth(text, false) + 40.0f);
-	renderer->DrawRectPx(18.0f, 18.0f, boxW, 62.0f, kHudPanel, 0.38f);
+	renderer->DrawPanelPx(18.0f, 18.0f, boxW, 62.0f, UI_MIST, kHudPanel, 0.38f);
 	renderer->DrawTexts(32, 40, "목표", kHudDim, false);
 	renderer->DrawTexts(32, 64, text, kHudInk, false);
 	hudLeftBottom = 18.0f + 62.0f;
@@ -541,7 +541,7 @@ void Game::DrawCommonHud(const char* help)
 			cx = (int)(dx + dw * 0.5f);
 		}
 		int tw = renderer->TextWidth(prompt.c_str(), true);
-		renderer->DrawRectPx((float)(cx - tw / 2 - 18), (float)(h - 150), (float)(tw + 36), 40.0f, kHudPanel, 0.45f);
+		renderer->DrawPanelPx((float)(cx - tw / 2 - 18), (float)(h - 150), (float)(tw + 36), 40.0f, UI_TAG, kHudPanel, 0.45f);
 		renderer->DrawTexts(cx - tw / 2, h - 123, prompt.c_str(), kHudAccent, true);
 	}
 
@@ -549,7 +549,7 @@ void Game::DrawCommonHud(const char* help)
 	{
 		float alpha = Saturatef(messageTimer);
 		int tw = renderer->TextWidth(message.c_str(), false);
-		renderer->DrawRectPx((float)(w / 2 - tw / 2 - 20), (float)(h - 100), (float)(tw + 40), 36.0f,
+		renderer->DrawPanelPx((float)(w / 2 - tw / 2 - 20), (float)(h - 100), (float)(tw + 40), 36.0f, UI_BAND,
 							 Vec3(0.02f, 0.04f, 0.04f), 0.55f * alpha);
 		renderer->DrawTexts(w / 2 - tw / 2, h - 77, message.c_str(), kHudInk, false);
 	}
