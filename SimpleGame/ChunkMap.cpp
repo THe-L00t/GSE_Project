@@ -906,7 +906,7 @@ namespace
 		// The great tree, and round it a clearing where nothing else takes root but a ring of bushes at its rim.
 		// The ring is the same for every chunk it crosses: each places only the bushes that fall inside it.
 		if (c.cx == s.rootX && c.cz == s.rootZ)
-			AddFixedProp(c, footprints, MODEL_TREE, s.root, 0.9f, kGreatTreeScale, 1.7f);
+			AddFixedProp(c, footprints, MODEL_GREAT_TREE, s.root, 0.9f, 1.0f, 2.8f);
 		if (DistXZ(middle, s.root) < kSanctuaryRadius + kChunkSize * 0.75f)
 		{
 			Rng rim(MixSeed(0x5A2C7A11ULL ^ ((uint64_t)(uint32_t)s.rootX << 32) ^ (uint64_t)(uint32_t)s.rootZ));

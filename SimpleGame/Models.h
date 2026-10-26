@@ -78,6 +78,9 @@ enum ModelId
 	MODEL_WATER,          // a pond's surface: the oval with its wandering shore, scaled to each pond
 	MODEL_REEDS,          // a clump of reeds at the water's edge
 	MODEL_PYLON,          // the transmission tower on the ridge, from where the great tree shows
+	MODEL_GREAT_TREE,     // the tree at the root, drawn at full size
+	MODEL_DOHYEON,        // the collector of Ginkgo Town
+	MODEL_YEOUL,          // the child who grew up in the spores
 	MODEL_COUNT
 };
 

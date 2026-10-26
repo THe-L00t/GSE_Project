@@ -69,7 +69,6 @@ inline Vec3 TownWallPos() { return Vec3(RoadCenter(kTownGateZ) + 8.6f, 0.0f, kTo
 // ridge from where it first shows, and the two who lie at the city's near edge.
 const float kSanctuaryRadius = 30.0f;    // under the great tree the spores are all drawn in and the air is clear
 const int   kCityChunks = 7;             // how far the sleeping city spreads round the tree
-const float kGreatTreeScale = 3.6f;
 
 struct StorySites
 {

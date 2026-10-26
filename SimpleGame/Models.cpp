@@ -20,7 +20,7 @@ namespace
 		"relic_torch", "relic_peaches", "relic_watch", "relic_radio", "relic_ticket", "relic_photo", "relic_phone", "relic_badge",
 		"office_4f", "villa_3f", "shop_2f", "store_1f", "collapsed_building",
 		"empty_house", "house_site", "block_wall", "guardrail", "streetlamp", "traffic_light", "road_sign",
-		"water", "reeds", "pylon",
+		"water", "reeds", "pylon", "great_tree", "dohyeon", "yeoul",
 	};
 
 	const Vec3 kMoss(0.24f, 0.38f, 0.24f);
@@ -143,6 +143,7 @@ OccluderSize ModelOccluder(int id)
 	case MODEL_ROAD_SIGN: return { 1.4f, 3.4f };
 	case MODEL_REEDS:    return { 0.9f, 1.9f };
 	case MODEL_PYLON:    return { 6.6f, 13.0f };   // its fallen line runs out along the ground
+	case MODEL_GREAT_TREE: return { 10.0f, 17.5f };
 	default:             return { 0.0f, 0.0f };
 	}
 }
@@ -917,6 +918,62 @@ ModelRecipe BuildRecipe(int id)
 			r.Add(SHAPE_BOX, Vec3(0.0f, 9.0f + 1.4f * (float)k, 0.0f), Vec3(4.2f - 0.6f * (float)k, 0.12f, 0.16f), steel);
 		r.Add(SHAPE_ELLIPSOID, Vec3(0.9f, 3.0f, 0.9f), Vec3(0.7f, 6.0f, 0.7f), kDarkMoss, ANIM_SWAY);
 		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 0.2f, 0.0f), Vec3(3.6f, 0.5f, 3.6f), moss);
+		break;
+	}
+
+	case MODEL_GREAT_TREE:
+		// Stand-in for the Blender tree: flared trunk, a broad bluish dome in three tiers, glowing blossoms at its rim.
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 0.05f, 0.0f), Vec3(13.0f, 0.2f, 13.0f), moss);
+		r.Add(SHAPE_CONE, Vec3(0.0f, 0.9f, 0.0f), Vec3(6.0f, 1.8f, 6.0f), bark * 0.9f);
+		r.Add(SHAPE_CYLINDER, Vec3(0.0f, 5.0f, 0.0f), Vec3(2.6f, 10.0f, 2.6f), bark);
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 12.2f, 0.0f), Vec3(18.0f, 6.0f, 18.0f), Vec3(0.11f, 0.21f, 0.18f));
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 14.6f, 0.0f), Vec3(12.0f, 4.6f, 12.0f), Vec3(0.16f, 0.29f, 0.24f));
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 16.3f, 0.0f), Vec3(5.0f, 2.2f, 5.0f), Vec3(0.24f, 0.39f, 0.30f));
+		for (int i = 0; i < 10; ++i)
+		{
+			float a = (float)i / 10.0f * 2.0f * kPi;
+			r.Add(SHAPE_ELLIPSOID, Vec3(cosf(a) * 8.6f, 11.4f + 0.6f * (float)(i % 3), sinf(a) * 8.6f), Vec3(0.4f, 0.4f, 0.4f), sporeGlow, ANIM_PULSE);
+		}
+		break;
+
+	case MODEL_DOHYEON:
+	{
+		const Vec3 coat(0.37f, 0.36f, 0.25f);
+		const Vec3 leather(0.40f, 0.27f, 0.17f);
+		for (int i = 0; i < 2; ++i)
+		{
+			float side = (i == 0) ? -1.0f : 1.0f;
+			r.Add(SHAPE_BOX, Vec3(side * 0.10f, 0.06f, 0.03f), Vec3(0.12f, 0.12f, 0.26f), Vec3(0.27f, 0.20f, 0.15f));
+			r.Add(SHAPE_CYLINDER, Vec3(side * 0.10f, 0.32f, 0.0f), Vec3(0.13f, 0.44f, 0.13f), Vec3(0.22f, 0.22f, 0.23f));
+			r.Add(SHAPE_CYLINDER, Vec3(side * 0.25f, 1.12f, 0.0f), Vec3(0.11f, 0.52f, 0.11f), coat, ANIM_BREATHE);
+			r.Add(SHAPE_ELLIPSOID, Vec3(side * 0.265f, 0.82f, 0.02f), Vec3(0.08f, 0.10f, 0.07f), skin, ANIM_BREATHE);
+		}
+		r.Add(SHAPE_CONE, Vec3(0.0f, 0.75f, 0.0f), Vec3(0.50f, 0.55f, 0.38f), coat, ANIM_BREATHE);
+		r.Add(SHAPE_CYLINDER, Vec3(0.0f, 1.18f, 0.0f), Vec3(0.42f, 0.50f, 0.30f), coat, ANIM_BREATHE);
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 1.45f, 0.0f), Vec3(0.22f, 0.08f, 0.20f), Vec3(0.52f, 0.30f, 0.22f), ANIM_BREATHE);
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 1.615f, 0.03f), Vec3(0.23f, 0.27f, 0.24f), skin, ANIM_BREATHE);
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 1.74f, 0.02f), Vec3(0.27f, 0.10f, 0.28f), Vec3(0.33f, 0.30f, 0.25f), ANIM_BREATHE);
+		r.Add(SHAPE_BOX, Vec3(0.0f, 1.63f, 0.155f), Vec3(0.17f, 0.03f, 0.01f), Vec3(0.12f, 0.10f, 0.09f), ANIM_BREATHE);
+		r.Add(SHAPE_BOX, Vec3(0.14f, 0.83f, 0.18f), Vec3(0.22f, 0.18f, 0.07f), leather, ANIM_BREATHE);
+		break;
+	}
+
+	case MODEL_YEOUL:
+	{
+		const Vec3 raincoat(0.30f, 0.45f, 0.40f);
+		for (int i = 0; i < 2; ++i)
+		{
+			float side = (i == 0) ? -1.0f : 1.0f;
+			r.Add(SHAPE_CYLINDER, Vec3(side * 0.065f, 0.15f, 0.0f), Vec3(0.10f, 0.30f, 0.10f), Vec3(0.72f, 0.57f, 0.24f));
+			r.Add(SHAPE_CYLINDER, Vec3(side * 0.065f, 0.47f, 0.0f), Vec3(0.12f, 0.26f, 0.12f), Vec3(0.37f, 0.28f, 0.20f));
+			r.Add(SHAPE_CYLINDER, Vec3(side * 0.17f, 0.74f, 0.0f), Vec3(0.08f, 0.34f, 0.08f), raincoat, ANIM_BREATHE);
+		}
+		r.Add(SHAPE_CONE, Vec3(0.0f, 0.75f, 0.0f), Vec3(0.32f, 0.42f, 0.27f), raincoat, ANIM_BREATHE);
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 1.10f, 0.025f), Vec3(0.23f, 0.24f, 0.22f), skin, ANIM_BREATHE);
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 1.14f, -0.02f), Vec3(0.26f, 0.22f, 0.25f), Vec3(0.13f, 0.11f, 0.10f), ANIM_BREATHE);
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 1.19f, 0.0f), Vec3(0.27f, 0.04f, 0.26f), Vec3(0.30f, 0.45f, 0.23f), ANIM_BREATHE);
+		r.Add(SHAPE_CYLINDER, Vec3(0.225f, 0.42f, 0.014f), Vec3(0.16f, 0.10f, 0.16f), Vec3(0.57f, 0.45f, 0.28f));
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.17f, 1.30f, -0.03f), Vec3(0.04f, 0.04f, 0.04f), sporeGlow, ANIM_PULSE);
 		break;
 	}
 
