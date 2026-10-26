@@ -644,15 +644,16 @@ void Game::DrawGrandmaMap(float x, float y, float w, float h, bool notes, int fo
 		float dy;
 		int   align;     // 1 starts there, -1 ends there, 0 centred
 	};
-	// The water is drawn to the paper's across-scale both ways, out to where it used to reach; its name sits
-	// under its southern edge.
-	Vec3 waterSouth = PondEdge(kReservoirCenter, kReservoirSizeX * 0.5f, kReservoirSizeZ * 0.5f, kReservoirYaw, kPi * 0.5f, kReservoirDry);
-	float underWater = 18.0f + (waterSouth.z - kReservoirCenter.z) * w / (kMapX1 - kMapX0);
+	// The water is drawn to the paper's across-scale both ways, out to where it used to reach; its name and note
+	// sit over its northern edge, since the town's name lies just south of it.
+	Vec3 waterNorth = PondEdge(kReservoirCenter, kReservoirSizeX * 0.5f, kReservoirSizeZ * 0.5f, kReservoirYaw, -kPi * 0.5f, kReservoirDry);
+	float overWater = (waterNorth.z - kReservoirCenter.z) * w / (kMapX1 - kMapX0) - 10.0f
+					- (notes && memoSeen[MEMO_RESERVOIR] ? 19.0f : 0.0f);
 	const Word words[MEMO_COUNT] =
 	{
 		{ Vec3(RoadCenter(-34.0f), 0.0f, -34.0f), 12.0f, 4.0f, 1 },
 		{ BusStopPos(), -20.0f, 5.0f, -1 },
-		{ kReservoirCenter, 0.0f, underWater, 0 },
+		{ kReservoirCenter, 0.0f, overWater, 0 },
 		{ TownGatePos() + Vec3(6.5f, 0.0f, 0.0f), 14.0f, -2.0f, 1 },
 		{ OldTreePos(), 0.0f, 0.0f, 1 },
 	};
@@ -695,11 +696,14 @@ void Game::DrawMapPanel()
 	const int h = renderer->GetHeight();
 	renderer->DrawFade(Vec3(0.02f, 0.03f, 0.03f), 0.30f);
 
-	// Taller than wide, like the folded sheet she kept; its shadow falls a little down and to the right.
-	float ph = Minf((float)h * 0.84f, 820.0f);
+	// Taller than wide, like the folded sheet she kept; its shadow falls a little down and to the right. Its
+	// title clears the objective box above and its close key the key help below, at any window height.
+	const float top = 118.0f;
+	const float bottom = 72.0f;
+	float ph = Minf(Minf((float)h * 0.84f, 820.0f), (float)h - top - bottom);
 	float pw = ph * 0.62f;
 	float px = (float)w * 0.5f - pw * 0.5f;
-	float py = (float)h * 0.5f - ph * 0.5f + 10.0f;
+	float py = top + ((float)h - top - bottom - ph) * 0.5f;
 	renderer->DrawRectPx(px + 7.0f, py + 9.0f, pw, ph, Vec3(0.0f, 0.0f, 0.0f), 0.35f);
 	DrawGrandmaMap(px, py, pw, ph, true);
 
