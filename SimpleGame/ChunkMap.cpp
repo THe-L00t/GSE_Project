@@ -287,7 +287,11 @@ namespace
 			float road = RoadCenter(kTownGateZ);
 			AddFixedProp(c, footprints, MODEL_GINKGO, Vec3(road - 6.5f, 0.0f, kTownGateZ), 0.0f, 1.0f, 0.35f);
 			AddFixedProp(c, footprints, MODEL_GINKGO, Vec3(road + 6.5f, 0.0f, kTownGateZ + 1.0f), 1.2f, 1.1f, 0.35f);
-			AddFixedProp(c, footprints, MODEL_RUIN, Vec3(road + 10.5f, 0.0f, kTownGateZ + 6.0f), halfPi, 1.1f, 1.0f);
+			// The school wall stands just behind where it is read from, its chalk toward the camera, with the
+			// ground before it kept clear so nothing grows up over it.
+			Vec3 wall = TownWallPos() + Vec3(0.0f, 0.0f, -1.3f);
+			AddBoxProp(c, footprints, MODEL_SCHOOL_WALL, wall, 0.0f, 1.0f, 3.0f, 0.2f);
+			footprints.push_back(Box(wall + Vec3(0.5f, 0.0f, 3.6f), 0.0f, 4.5f, 3.4f));
 			AddFixedProp(c, footprints, MODEL_SIGN, Vec3(road + 4.2f, 0.0f, kTownGateZ - 3.0f), 0.0f, 1.0f, 0.0f);
 			AddFixedProp(c, footprints, MODEL_POLE, Vec3(road - 4.2f, 0.0f, kTownGateZ - 6.0f), 0.0f, 1.0f, 0.25f);
 		}

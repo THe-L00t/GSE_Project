@@ -20,7 +20,7 @@ namespace
 		"relic_torch", "relic_peaches", "relic_watch", "relic_radio", "relic_ticket", "relic_photo", "relic_phone", "relic_badge",
 		"office_4f", "villa_3f", "shop_2f", "store_1f", "collapsed_building",
 		"empty_house", "house_site", "block_wall", "guardrail", "streetlamp", "traffic_light", "road_sign",
-		"water", "reeds", "pylon", "great_tree", "dohyeon", "yeoul",
+		"water", "reeds", "pylon", "great_tree", "dohyeon", "yeoul", "school_wall",
 	};
 
 	const Vec3 kMoss(0.24f, 0.38f, 0.24f);
@@ -144,6 +144,7 @@ OccluderSize ModelOccluder(int id)
 	case MODEL_REEDS:    return { 0.9f, 1.9f };
 	case MODEL_PYLON:    return { 6.6f, 13.0f };   // its fallen line runs out along the ground
 	case MODEL_GREAT_TREE: return { 10.0f, 17.5f };
+	case MODEL_SCHOOL_WALL: return { 3.2f, 1.8f };
 	default:             return { 0.0f, 0.0f };
 	}
 }
@@ -976,6 +977,15 @@ ModelRecipe BuildRecipe(int id)
 		r.Add(SHAPE_ELLIPSOID, Vec3(0.17f, 1.30f, -0.03f), Vec3(0.04f, 0.04f, 0.04f), sporeGlow, ANIM_PULSE);
 		break;
 	}
+
+	case MODEL_SCHOOL_WALL:
+		// Stand-in for the Blender wall: a block wall on its footing, the chalk a pale patch on the front.
+		r.Add(SHAPE_BOX, Vec3(0.0f, 0.07f, 0.0f), Vec3(6.0f, 0.14f, 0.30f), Vec3(0.40f, 0.40f, 0.38f));
+		r.Add(SHAPE_BOX, Vec3(-0.4f, 0.94f, 0.0f), Vec3(5.2f, 1.60f, 0.20f), Vec3(0.50f, 0.50f, 0.47f));
+		r.Add(SHAPE_BOX, Vec3(2.6f, 0.54f, 0.0f), Vec3(0.8f, 0.80f, 0.20f), Vec3(0.50f, 0.50f, 0.47f));
+		r.Add(SHAPE_BOX, Vec3(-0.9f, 0.75f, 0.105f), Vec3(2.4f, 0.80f, 0.01f), Vec3(0.80f, 0.80f, 0.76f));
+		r.Add(SHAPE_ELLIPSOID, Vec3(-2.5f, 1.78f, 0.0f), Vec3(0.7f, 0.10f, 0.24f), moss);
+		break;
 
 	default:
 		r.Add(SHAPE_BOX, Vec3(0.0f, 0.5f, 0.0f), Vec3(1.0f, 1.0f, 1.0f), Vec3(1.0f, 0.0f, 1.0f));

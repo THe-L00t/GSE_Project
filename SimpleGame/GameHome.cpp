@@ -787,7 +787,7 @@ void Game::SkipToNextSite()
 	// whether or not the wall was read or the pylon climbed, so pressing alone reaches the tree.
 	const StorySites& s = routeMap.Sites();
 	const Vec3& pos = player->Position();
-	const Vec3 wallSpot = TownWallPos() + Vec3(-1.0f, 0.0f, 0.0f);
+	const Vec3 wallSpot = TownWallPos() + Vec3(1.4f, 0.0f, 0.2f);   // east of the chalk, so Hayul does not stand over it
 	const Vec3 ridgeSpot = s.ridge + kFront * 3.0f;
 	const Vec3 parentsSpot = s.parents + s.toTown * 6.0f;
 	if (townReached && DistXZ(pos, wallSpot) < 4.0f) townWallRead = true;

@@ -621,6 +621,7 @@ private:
 	float shake = 0.0f;           // [0,1] camera shake from the last blow
 	float cutaway = 0.0f;         // [0,1] how open the view through occluders is
 	float viewHeight = 20.0f;     // world height of the screen the camera eases toward
+	float treeView = 0.0f;        // [0,1] how far the view has drawn back to take in the great tree
 	std::vector<Footprint> footprints;
 	Vec3  lastPrintPos;
 	bool  printLeft = false;

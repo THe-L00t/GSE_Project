@@ -81,6 +81,7 @@ enum ModelId
 	MODEL_GREAT_TREE,     // the tree at the root, drawn at full size
 	MODEL_DOHYEON,        // the collector of Ginkgo Town
 	MODEL_YEOUL,          // the child who grew up in the spores
+	MODEL_SCHOOL_WALL,    // the old school wall at the town gate, with the mother's chalk on it
 	MODEL_COUNT
 };
 

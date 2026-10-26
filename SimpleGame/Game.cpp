@@ -5,6 +5,8 @@
 #include <cstdio>
 #include <ctime>
 
+#include "Models.h"
+
 // On-screen text stays ASCII: the bitmap fonts freeglut ships cannot draw Hangul.
 
 namespace
@@ -15,6 +17,7 @@ namespace
 	const float kTitleDuration = 8.0f;
 	const float kFarView = 20.0f;      // the usual quarter view, and the furthest out
 	const float kNearView = 8.0f;
+	const float kTreeView = 30.0f;     // the furthest the view draws back to take in the great tree
 }
 
 Game::Game(Renderer* r)
@@ -170,9 +173,34 @@ void Game::UpdateCamera(float dt)
 	if (placePan <= 0.0f) panMemo = -1;
 
 	Vec3 target = player->Position();
+	float height = viewHeight;
+
+	// The great tree stands far taller than the quarter view. Near it the view draws back and up until it takes
+	// in the tree from its roots to its crown, with Hayul kept near the bottom; zoomed in close, it stays on Hayul.
+	const Vec3& at = player->Position();
+	bool nearTree = level == LEVEL_ROUTE && DistXZ(at, routeMap.Sites().root) < kSanctuaryRadius + 12.0f;
+	treeView = Saturatef(treeView + (nearTree ? dt : -dt) * 0.6f);
+	float pull = SmoothStep(0.0f, 1.0f, treeView) * SmoothStep(kNearView + 4.0f, kFarView, viewHeight);
+	if (pull > 0.0f)
+	{
+		// Heights on screen, measured up from the tree's foot: the ground rises half a metre for each metre
+		// away from the eye, and anything standing up by cos(elevation) per metre of its height.
+		float yaw = camera->Yaw();
+		Vec3 away(-sinf(yaw), 0.0f, -cosf(yaw));
+		float sinEl = sinf(camera->elevation);
+		Vec3 fromRoot = at - routeMap.Sites().root;
+		float feet = sinEl * (fromRoot.x * away.x + fromRoot.z * away.z);
+		float low = Minf(feet - 3.5f, -4.5f);
+		float high = Maxf(feet + 3.0f, ModelOccluder(MODEL_GREAT_TREE).height * cosf(camera->elevation) + 1.0f);
+		float span = Clampf(high - low, viewHeight, kTreeView);
+		float middle = Minf((low + high) * 0.5f, low + span * 0.5f);
+		target = LerpV(target, at + away * ((middle - feet) / sinEl), pull);
+		height = Lerpf(viewHeight, span, pull);
+	}
+
 	if (panMemo >= 0) target = LerpV(target, MemoViewPoint(panMemo), SmoothStep(0.0f, 1.0f, placePan));
 	camera->SetPosition(LerpV(camera->Position(), target, 1.0f - expf(-6.0f * dt)));
-	camera->orthoHeight += (viewHeight - camera->orthoHeight) * (1.0f - expf(-10.0f * dt));
+	camera->orthoHeight += (height - camera->orthoHeight) * (1.0f - expf(-10.0f * dt));
 }
 
 void Game::OnKeyDown(unsigned char key)
