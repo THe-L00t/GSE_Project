@@ -783,20 +783,33 @@ void Game::SkipToNextSite()
 {
 	if (level != LEVEL_ROUTE || DialogOpen() || MenuOpen() || deathTimer >= 0.0f) return;
 
+	// Every press goes on to the next place. A place this left Hayul at counts as passed when it is pressed again,
+	// whether or not the wall was read or the pylon climbed, so pressing alone reaches the tree.
 	const StorySites& s = routeMap.Sites();
-	Vec3 to;
-	if (!townReached) to = TownGatePos() + Vec3(0.0f, 0.0f, 4.0f);
-	else if (!townWallRead) to = TownWallPos() + Vec3(-1.0f, 0.0f, 0.0f);
-	else if (!ridgeClimbed) to = s.ridge + kFront * 3.0f;
-	else if (!parentsFound) to = s.parents + s.toTown * 6.0f;
-	else if (!rootReached) to = s.root + s.toTown * (kSanctuaryRadius + 3.0f);
-	else
+	const Vec3& pos = player->Position();
+	const Vec3 wallSpot = TownWallPos() + Vec3(-1.0f, 0.0f, 0.0f);
+	const Vec3 ridgeSpot = s.ridge + kFront * 3.0f;
+	const Vec3 parentsSpot = s.parents + s.toTown * 6.0f;
+	if (townReached && DistXZ(pos, wallSpot) < 4.0f) townWallRead = true;
+	if (DistXZ(pos, ridgeSpot) < 4.0f) ridgeClimbed = true;
+	if (DistXZ(pos, parentsSpot) < 4.0f) parentsFound = true;
+
+	// The tree is reached inside its clear air, in front of the home, where the long sleep will end from then on.
+	const Vec3 spots[5] = { TownGatePos() + Vec3(0.0f, 0.0f, 4.0f), wallSpot, ridgeSpot, parentsSpot, HomeSpotFront(HOME_SHELTER) + kFront * 0.8f };
+	const char* names[5] = { "은행나무 읍내 입구로", "학교 담벼락으로", "송전탑 능선으로", "부모님 자리로", "큰 나무 밑, 부모님이 짓다 만 집 앞으로" };
+	int next = !townReached ? 0 : !townWallRead ? 1 : !ridgeClimbed ? 2 : !parentsFound ? 3 : !rootReached ? 4 : 5;
+	if (next >= 5)
 	{
 		ShowMessage("(시연용) 더 건너뛸 이야기 장소가 없다.", 2.0f);
 		return;
 	}
 
-	player->SetPosition(to);
-	camera->SetPosition(to);
-	ShowMessage("(시연용) 다음 이야기 장소로 건너뛰었다.", 2.5f);
+	// The road's own lessons are skipped with it, so the goal shown follows the places from here on.
+	if (guide < GUIDE_REACH_TOWN) SetGuide(GUIDE_REACH_TOWN);
+
+	player->SetPosition(spots[next]);
+	camera->SetPosition(spots[next]);
+	char buf[160];
+	sprintf_s(buf, sizeof(buf), "(시연용) %s 건너뛰었다. F5 로 다음 장소.", names[next]);
+	ShowMessage(buf, 3.0f);
 }
