@@ -26,6 +26,8 @@ namespace
 		{ "복숭아 통조림", MODEL_CANNED_FOOD, "개화 전에 밀봉된 복숭아 통조림. F로 먹는다." },
 		{ "멧돼지 고기",  MODEL_MEAT,        "멧돼지 고기 한 덩이. 석등 불에 구우면 훨씬 든든하다." },
 		{ "구운 고기",    MODEL_COOKED_MEAT, "석등 불에 구운 고기. F로 먹는다." },
+		{ "자재",         MODEL_PIPE_PICKUP, "쓸 만한 판자와 쇠붙이. 큰 나무 밑 집을 짓는 데 쓴다." },
+		{ "씨앗 봉투",    MODEL_LETTER,      "누군가 받아 둔 씨앗. 밭에 뿌릴 수 있다." },
 	};
 
 	// name, model, health, damage, speed, radius, aggro, attack range, windup, recover, lunge, xp, herb, water, relic, lore

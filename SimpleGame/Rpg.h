@@ -46,6 +46,8 @@ enum ItemType
 	ITEM_CANNED_FOOD,
 	ITEM_MEAT,           // from a moss boar; better roasted at a lantern
 	ITEM_COOKED_MEAT,
+	ITEM_SCRAP,          // what the old world left to build with: boards, sheet metal, wire
+	ITEM_SEED,           // a packet of seed someone put by
 	ITEM_TYPE_COUNT
 };
 

@@ -20,7 +20,7 @@ namespace
 		"relic_torch", "relic_peaches", "relic_watch", "relic_radio", "relic_ticket", "relic_photo", "relic_phone", "relic_badge",
 		"office_4f", "villa_3f", "shop_2f", "store_1f", "collapsed_building",
 		"empty_house", "house_site", "block_wall", "guardrail", "streetlamp", "traffic_light", "road_sign",
-		"water", "reeds",
+		"water", "reeds", "pylon",
 	};
 
 	const Vec3 kMoss(0.24f, 0.38f, 0.24f);
@@ -142,6 +142,7 @@ OccluderSize ModelOccluder(int id)
 	case MODEL_BLOCK_WALL: return { 2.0f, 1.6f };
 	case MODEL_ROAD_SIGN: return { 1.4f, 3.4f };
 	case MODEL_REEDS:    return { 0.9f, 1.9f };
+	case MODEL_PYLON:    return { 6.6f, 13.0f };   // its fallen line runs out along the ground
 	default:             return { 0.0f, 0.0f };
 	}
 }
@@ -897,6 +898,25 @@ ModelRecipe BuildRecipe(int id)
 			if (i % 3 != 2)
 				r.Add(SHAPE_ELLIPSOID, Vec3(lean.x, h + 0.08f, lean.z), Vec3(0.07f, 0.24f, 0.07f), plume, ANIM_SWAY);
 		}
+		break;
+	}
+
+	case MODEL_PYLON:
+	{
+		// Stand-in for the Blender tower: four legs leaning in to a mast, three cross arms, vines up one side.
+		const Vec3 steel(0.36f, 0.37f, 0.36f);
+		for (int i = 0; i < 4; ++i)
+		{
+			float sx = (i & 1) ? 1.0f : -1.0f;
+			float sz = (i & 2) ? 1.0f : -1.0f;
+			r.Add(SHAPE_BOX, Vec3(sx * 1.0f, 5.5f, sz * 1.0f), Vec3(0.14f, 11.1f, 0.14f), steel)
+				.Rotated(Vec3(-sz * 0.104f, 0.0f, sx * 0.104f));
+		}
+		r.Add(SHAPE_BOX, Vec3(0.0f, 12.0f, 0.0f), Vec3(0.5f, 2.2f, 0.5f), steel);
+		for (int k = 0; k < 3; ++k)
+			r.Add(SHAPE_BOX, Vec3(0.0f, 9.0f + 1.4f * (float)k, 0.0f), Vec3(4.2f - 0.6f * (float)k, 0.12f, 0.16f), steel);
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.9f, 3.0f, 0.9f), Vec3(0.7f, 6.0f, 0.7f), kDarkMoss, ANIM_SWAY);
+		r.Add(SHAPE_ELLIPSOID, Vec3(0.0f, 0.2f, 0.0f), Vec3(3.6f, 0.5f, 3.6f), moss);
 		break;
 	}
 

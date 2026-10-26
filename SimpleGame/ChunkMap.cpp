@@ -198,6 +198,13 @@ namespace
 		return abs(cx) > abs(cz) ? abs(cx) : abs(cz);
 	}
 
+	// Creatures grow stronger with distance from the village, but no more past the lone tree's rings: the great
+	// tree lies far beyond, and the way there should stay walkable.
+	int LevelForRing(int ring)
+	{
+		return 1 + (ring < 14 ? ring : 14) / 2;
+	}
+
 	// Every third chunk on a lattice is left to rest: no creature nests there. Each of the others touches one
 	// along an edge, so a quiet stretch is never more than a chunk away. The world seed shifts the lattice.
 	bool IsRestChunk(int cx, int cz, uint64_t worldSeed)
@@ -425,7 +432,7 @@ namespace
 				float angle = (float)k * 2.1f + rng.Range(0.0f, 1.0f);
 				ChunkSpawn spawn;
 				spawn.enemyType = ENEMY_SPORE_MITE;
-				spawn.level = 1 + ring / 2;
+				spawn.level = LevelForRing(ring);
 				spawn.pos = at + Vec3(sinf(angle) * 2.2f, 0.0f, cosf(angle) * 2.2f);
 				spawn.swarm = swarm;
 				c.spawns.push_back(spawn);
@@ -449,7 +456,7 @@ namespace
 			ChunkSpawn spawn;
 			if (!FindSpotNear(rng, c, footprints, nest, 4.5f, 0.8f, spawn.pos)) continue;
 			spawn.enemyType = type;
-			spawn.level = 1 + ring / 2 + (rng.Chance(0.3f) ? 1 : 0);
+			spawn.level = LevelForRing(ring) + (rng.Chance(0.3f) ? 1 : 0);
 			c.spawns.push_back(spawn);
 		}
 	}
@@ -854,6 +861,228 @@ namespace
 		}
 	}
 
+	// Where the story's far places lie in this world. They have their own generator, so placing them never shifts
+	// what the chunks roll. The tree is 28 to 34 chunks out, within 50 degrees of due south; the ridge a little
+	// past halfway there from the town gate, off to one side; the parents three chunks short of the tree on the
+	// way from the town.
+	StorySites PlaceSites(uint64_t worldSeed)
+	{
+		Rng rng(MixSeed(worldSeed ^ 0x7EE5A7E5C17DULL));
+		StorySites s;
+
+		float angle = rng.Range(-0.85f, 0.85f);
+		float reach = rng.Range(28.0f, 34.0f);
+		s.rootX = (int)floorf(sinf(angle) * reach + 0.5f);
+		s.rootZ = (int)floorf(cosf(angle) * reach + 0.5f);
+		s.root = ChunkMap::ChunkCenter(s.rootX, s.rootZ);
+
+		Vec3 gate = ChunkMap::ChunkCenter(0, kTownChunkZ);
+		Vec3 way = s.root - gate;
+		Vec3 dir = Normalize(way);
+		s.toTown = dir * -1.0f;
+
+		float along = rng.Range(0.42f, 0.52f);
+		float aside = rng.Range(2.0f, 4.0f) * kChunkSize;
+		if (rng.Chance(0.5f)) aside = -aside;
+		Vec3 side(dir.z, 0.0f, -dir.x);
+		ChunkMap::ChunkCoords(gate + way * along + side * aside, s.ridgeX, s.ridgeZ);
+		s.ridge = ChunkMap::ChunkCenter(s.ridgeX, s.ridgeZ);
+
+		ChunkMap::ChunkCoords(s.root + s.toTown * (3.0f * kChunkSize), s.parentsX, s.parentsZ);
+		s.parents = ChunkMap::ChunkCenter(s.parentsX, s.parentsZ);
+		return s;
+	}
+
+	bool IsParentsChunk(const Chunk& c, const StorySites& s)
+	{
+		return c.cx == s.parentsX && c.cz == s.parentsZ;
+	}
+
+	// The story's own places, laid before anything random so the rest grows round them.
+	void AddStorySites(Chunk& c, std::vector<Footprint>& footprints, const StorySites& s)
+	{
+		Vec3 middle = ChunkMap::ChunkCenter(c.cx, c.cz);
+
+		// The great tree, and round it a clearing where nothing else takes root but a ring of bushes at its rim.
+		// The ring is the same for every chunk it crosses: each places only the bushes that fall inside it.
+		if (c.cx == s.rootX && c.cz == s.rootZ)
+			AddFixedProp(c, footprints, MODEL_TREE, s.root, 0.9f, kGreatTreeScale, 1.7f);
+		if (DistXZ(middle, s.root) < kSanctuaryRadius + kChunkSize * 0.75f)
+		{
+			Rng rim(MixSeed(0x5A2C7A11ULL ^ ((uint64_t)(uint32_t)s.rootX << 32) ^ (uint64_t)(uint32_t)s.rootZ));
+			const int kRimBushes = 30;
+			for (int k = 0; k < kRimBushes; ++k)
+			{
+				float a = (float)k / (float)kRimBushes * 2.0f * kPi + rim.Range(-0.08f, 0.08f);
+				float r = kSanctuaryRadius - rim.Range(1.0f, 4.0f);
+				float scale = rim.Range(0.9f, 1.4f);
+				float yaw = rim.Range(0.0f, 2.0f * kPi);
+				Vec3 at(s.root.x + cosf(a) * r, 0.0f, s.root.z + sinf(a) * r);
+				int ax, az;
+				ChunkMap::ChunkCoords(at, ax, az);
+				if (ax == c.cx && az == c.cz) AddFixedProp(c, footprints, MODEL_BUSH, at, yaw, scale, 0.0f);
+			}
+			footprints.push_back(Circle(s.root, kSanctuaryRadius));
+		}
+
+		// The pylon on the ridge, on a heap of stones that leaves its foot open toward the camera, where it is
+		// climbed; a few pines hold on round it.
+		if (c.cx == s.ridgeX && c.cz == s.ridgeZ)
+		{
+			AddFixedProp(c, footprints, MODEL_PYLON, s.ridge, 0.4f, 1.0f, 1.3f);
+			Rng heap(MixSeed(c.seed ^ 0x9177E5ULL));
+			for (int i = 0; i < 12; ++i)
+			{
+				float a = heap.Range(0.0f, 2.0f * kPi);
+				float r = heap.Range(3.4f, 7.0f);
+				float scale = heap.Range(1.1f, 2.2f);
+				float yaw = heap.Range(0.0f, 2.0f * kPi);
+				bool pine = i >= 9;
+				if (cosf(a - kPi * 0.25f) > 0.55f) continue;
+				Vec3 at(s.ridge.x + cosf(a) * r, 0.0f, s.ridge.z + sinf(a) * r);
+				if (pine)
+					AddFixedProp(c, footprints, MODEL_PINE, at + Vec3(cosf(a), 0.0f, sinf(a)) * 2.0f, yaw, scale * 0.8f, 0.2f * scale);
+				else
+					AddFixedProp(c, footprints, MODEL_ROCK, at, yaw, scale, 0.6f * scale);
+			}
+			footprints.push_back(Circle(s.ridge, 7.5f));
+		}
+
+		// Hayul's parents, side by side where they lay down, heads toward the tree they nearly reached, and what
+		// each of them carried beside them.
+		if (IsParentsChunk(c, s))
+		{
+			float yaw = atan2f(-s.toTown.x, -s.toTown.z);
+			Vec3 across(cosf(yaw), 0.0f, -sinf(yaw));
+			for (int i = 0; i < 2; ++i)
+			{
+				ChunkSleeper sleeper;
+				sleeper.pos = s.parents + across * (i == 0 ? -0.55f : 0.55f);
+				sleeper.yaw = yaw;
+				c.sleepers.push_back(sleeper);
+				AddFixedProp(c, footprints, MODEL_SLEEPER, sleeper.pos, sleeper.yaw, 1.0f, 0.0f);
+			}
+
+			ChunkItem watch;
+			watch.itemType = ITEM_RELIC;
+			watch.relicId = RELIC_WATCH;
+			watch.pos = s.parents - across * 1.7f;
+			c.items.push_back(watch);
+
+			ChunkItem phone;
+			phone.itemType = ITEM_RELIC;
+			phone.relicId = RELIC_PHONE;
+			phone.pos = s.parents + across * 1.7f;
+			c.items.push_back(phone);
+
+			footprints.push_back(Circle(s.parents, 4.5f));
+		}
+	}
+
+	// The sleeping city round the great tree: blocks of the old city gone under trees, its streets lost under moss
+	// except where the old road ran. Its people lie where they stopped and the spores are thickest here, drawn in
+	// toward the tree. Nothing but the rim's bushes grows in the clearing, and no creature nests near it.
+	void BuildSleepingCity(Chunk& c, std::vector<Footprint>& footprints, Rng& rng, int ring, const StorySites& s)
+	{
+		Vec3 middle = ChunkMap::ChunkCenter(c.cx, c.cz);
+		float toRoot = DistXZ(middle, s.root);
+		bool clearing = toRoot < kSanctuaryRadius + kChunkSize * 0.5f;
+		bool parents = IsParentsChunk(c, s);
+		c.stage = clearing ? 2 : 3;
+		c.modernity = 0.0f;
+		c.urban = 0.0f;
+
+		// Buildings on one diagonal of the chunk, so the other always leaves a way through.
+		bool flip = rng.Chance(0.5f);
+		for (int q = 0; q < 2; ++q)
+		{
+			float sx = q == 0 ? -1.0f : 1.0f;
+			float sz = flip ? -sx : sx;
+			if (clearing || !rng.Chance(0.85f)) continue;
+
+			float roll = rng.Unit();
+			int use = roll < 0.35f ? LOT_COLLAPSED : (roll < 0.55f ? LOT_VILLA : (roll < 0.75f ? LOT_SHOP : (roll < 0.88f ? LOT_OFFICE : LOT_STORE)));
+			const LotKind& kind = kLotKinds[use];
+			float yaw = (float)rng.RangeInt(0, 3) * kPi * 0.5f;
+			yaw += rng.Range(-0.06f, 0.06f);
+			float jx = rng.Range(-1.0f, 1.0f);
+			float jz = rng.Range(-1.0f, 1.0f);
+			Vec3 at(middle.x + sx * 6.0f + jx, 0.0f, middle.z + sz * 6.0f + jz);
+			if (!Fits(c, footprints, Box(at, yaw, kind.width * 0.5f, kind.depth * 0.5f), 0.5f)) continue;
+			AddBoxProp(c, footprints, kind.model, at, yaw, 1.0f, kind.width * 0.5f, kind.depth * 0.5f);
+		}
+
+		// Trees grown up through it all, bushes in the cracks, and what fell from the buildings.
+		int trees = clearing ? 0 : rng.RangeInt(3, 6);
+		for (int i = 0; i < trees; ++i)
+		{
+			float scale = rng.Range(1.0f, 1.5f);
+			bool pine = rng.Chance(0.35f);
+			float yaw = rng.Range(0.0f, 2.0f * kPi);
+			Vec3 at;
+			if (!FindOpenSpot(rng, c, footprints, 1.6f * scale, true, false, at)) continue;
+			AddFixedProp(c, footprints, pine ? MODEL_PINE : MODEL_TREE, at, yaw, scale, 0.25f * scale);
+		}
+		int litter = clearing ? 0 : rng.RangeInt(2, 5);
+		for (int i = 0; i < litter; ++i)
+		{
+			float roll = rng.Unit();
+			float scale = rng.Range(0.8f, 1.2f);
+			float yaw = rng.Range(0.0f, 2.0f * kPi);
+			Vec3 at;
+			if (!FindOpenSpot(rng, c, footprints, 1.4f * scale, true, false, at)) continue;
+			if (roll < 0.45f) AddFixedProp(c, footprints, MODEL_BUSH, at, yaw, scale, 0.0f);
+			else if (roll < 0.7f) AddFixedProp(c, footprints, MODEL_RUIN, at, yaw, scale, 1.0f * scale);
+			else if (roll < 0.85f) AddFixedProp(c, footprints, MODEL_ROCK, at, yaw, scale, 0.6f * scale);
+			else AddFixedProp(c, footprints, MODEL_CAR, at, yaw, 1.0f, 1.3f);
+		}
+
+		if (c.rest && rng.Chance(0.4f)) AddRestLantern(c, footprints, rng);
+		if (clearing) return;
+
+		// The parents lie in a quiet spot: nothing nests or watches there.
+		if (!c.rest && !parents && toRoot > kSanctuaryRadius + 14.0f) AddNest(c, footprints, rng, ring);
+
+		// The city sleeps: one or two in most chunks, a boar beside some of them.
+		int sleepers = parents ? 0 : (rng.Chance(0.75f) ? (rng.Chance(0.4f) ? 2 : 1) : 0);
+		for (int i = 0; i < sleepers; ++i)
+		{
+			ChunkSleeper sleeper;
+			if (!FindOpenSpot(rng, c, footprints, 1.6f, true, false, sleeper.pos)) continue;
+			sleeper.yaw = rng.Range(0.0f, 2.0f * kPi);
+			int index = (int)c.sleepers.size();
+			c.sleepers.push_back(sleeper);
+			AddFixedProp(c, footprints, MODEL_SLEEPER, sleeper.pos, sleeper.yaw, 1.0f, 0.0f);
+			if (c.rest || !rng.Chance(0.5f)) continue;
+
+			ChunkSpawn guard;
+			guard.enemyType = ENEMY_MOSS_BOAR;
+			guard.level = LevelForRing(ring);
+			guard.pos = sleeper.pos + Vec3(sinf(sleeper.yaw + 1.6f) * 1.8f, 0.0f, cosf(sleeper.yaw + 1.6f) * 1.8f);
+			guard.guardOf = index;
+			c.spawns.push_back(guard);
+		}
+
+		// What the city left: things to build with, more than anywhere else, and now and then something of someone's.
+		int finds = rng.RangeInt(1, 2);
+		for (int i = 0; i < finds; ++i)
+		{
+			float roll = rng.Unit();
+			ChunkItem item;
+			item.itemType = roll < 0.55f ? ITEM_SCRAP : (roll < 0.72f ? ITEM_HERB : (roll < 0.86f ? ITEM_CLEAN_WATER : (roll < 0.94f ? ITEM_SEED : ITEM_RELIC)));
+			if (FindOpenSpot(rng, c, footprints, 0.6f, false, false, item.pos)) c.items.push_back(item);
+		}
+
+		ChunkBush bush;
+		if (rng.Chance(0.5f) && FindOpenSpot(rng, c, footprints, 0.9f, true, false, bush.pos))
+		{
+			bush.yaw = rng.Range(0.0f, 2.0f * kPi);
+			bush.pale = rng.Chance(0.25f);
+			bush.bearing = rng.Unit();
+			c.bushes.push_back(bush);
+		}
+	}
+
 	int32_t Quantise(float v)
 	{
 		return (int32_t)floorf(v * 100.0f);
@@ -890,6 +1119,7 @@ namespace
 		{
 			const ChunkItem& item = c.items[i];
 			h = HashInt(h, item.itemType);
+			h = HashInt(h, item.relicId);
 			h = HashInt(h, Quantise(item.pos.x));
 			h = HashInt(h, Quantise(item.pos.z));
 		}
@@ -967,6 +1197,7 @@ void ShoreDressing(const Vec3& center, float halfX, float halfZ, float yaw, floa
 void ChunkMap::Reset(uint64_t seed)
 {
 	worldSeed = seed;
+	sites = PlaceSites(seed);
 	chunks.clear();
 }
 
@@ -1086,6 +1317,16 @@ Chunk ChunkMap::Generate(int cx, int cz, uint64_t seed, int parentDir) const
 
 	std::vector<Footprint> footprints;
 	AddLandmarks(c, footprints);
+	AddStorySites(c, footprints, sites);
+
+	// Round the great tree the sleeping city takes the place of everything else.
+	if (!origin && DistXZ(middle, sites.root) < (float)kCityChunks * kChunkSize)
+	{
+		c.rest = IsRestChunk(cx, cz, worldSeed);
+		BuildSleepingCity(c, footprints, rng, ring, sites);
+		c.hash = HashChunk(c);
+		return c;
+	}
 
 	// The town stands around the start of the road; past it, now and then, what is left of a homestead.
 	BuildTown(c, footprints, rng, origin);
@@ -1146,7 +1387,7 @@ Chunk ChunkMap::Generate(int cx, int cz, uint64_t seed, int parentDir) const
 				{
 					ChunkSpawn guard;
 					guard.enemyType = ENEMY_MOSS_BOAR;
-					guard.level = 1 + ring / 2;
+					guard.level = LevelForRing(ring);
 					guard.pos = sleeper.pos + Vec3(sinf(sleeper.yaw + 1.6f) * 1.8f, 0.0f, cosf(sleeper.yaw + 1.6f) * 1.8f);
 					guard.guardOf = index;
 					c.spawns.push_back(guard);
@@ -1160,6 +1401,8 @@ Chunk ChunkMap::Generate(int cx, int cz, uint64_t seed, int parentDir) const
 			float roll = rng.Unit();
 			ChunkItem item;
 			item.itemType = roll < 0.6f ? ITEM_HERB : (roll < 1.0f - 0.1f * c.modernity ? ITEM_CLEAN_WATER : ITEM_RELIC);
+			// Out past the lone tree the land also gives what a home is built and sown with.
+			if (ring >= 8 && rng.Chance(0.35f)) item.itemType = rng.Chance(0.6f) ? ITEM_SCRAP : ITEM_SEED;
 			if (FindOpenSpot(rng, c, footprints, 0.6f, false, false, item.pos))
 				c.items.push_back(item);
 		}

@@ -61,6 +61,52 @@ const int   kOldTreeChunkZ = 10;
 const float kOldTreeZ = 240.0f;
 inline Vec3 OldTreePos() { return Vec3(RoadCenter(kOldTreeZ) - 6.5f, 0.0f, kOldTreeZ); }
 
+// The school wall at the town gate, where Hayul's mother left a few words in chalk; read from the road side.
+inline Vec3 TownWallPos() { return Vec3(RoadCenter(kTownGateZ) + 8.6f, 0.0f, kTownGateZ + 6.0f); }
+
+// Past Ginkgo Town (ContentDesign.md 6). Where these lie changes with the world seed, but every world has them,
+// all beyond the lone tree: the great tree with the clear air under it, the sleeping city round it, the pylon
+// ridge from where it first shows, and the two who lie at the city's near edge.
+const float kSanctuaryRadius = 30.0f;    // under the great tree the spores are all drawn in and the air is clear
+const int   kCityChunks = 7;             // how far the sleeping city spreads round the tree
+const float kGreatTreeScale = 3.6f;
+
+struct StorySites
+{
+	int  rootX = 0;
+	int  rootZ = 0;
+	int  ridgeX = 0;
+	int  ridgeZ = 0;
+	int  parentsX = 0;
+	int  parentsZ = 0;
+	Vec3 root;        // the great tree, at the centre of its chunk
+	Vec3 ridge;       // the pylon
+	Vec3 parents;     // where the two lie side by side
+	Vec3 toTown;      // from the tree back toward Ginkgo Town, one unit long
+};
+
+// The home the parents began under the tree, on the side the camera looks from: four things to build, and the
+// jars they left, which keep from the start.
+enum HomeSpot
+{
+	HOME_SHELTER,
+	HOME_WELL,
+	HOME_GARDEN,
+	HOME_LANTERN,
+	HOME_STORE,
+	HOME_SPOT_COUNT
+};
+const int kHomeProjects = HOME_STORE;
+
+inline Vec3 HomeSpotPos(const StorySites& s, int spot)
+{
+	// Out from the trunk toward the camera (front), and across that (side).
+	const float front[HOME_SPOT_COUNT] = { 13.0f, 9.0f, 16.0f, 14.0f, 10.0f };
+	const float side[HOME_SPOT_COUNT] = { -6.0f, 9.0f, 10.0f, 4.0f, 1.0f };
+	const float k = 0.70710678f;
+	return s.root + Vec3((front[spot] + side[spot]) * k, 0.0f, (front[spot] - side[spot]) * k);
+}
+
 struct ChunkProp
 {
 	int   model = 0;
@@ -108,6 +154,7 @@ struct ChunkItem
 {
 	int  itemType = 0;
 	Vec3 pos;
+	int  relicId = -1;    // a relic kept for one place; -1 lets the game pick
 };
 
 struct Chunk
@@ -142,6 +189,7 @@ public:
 
 	uint64_t WorldSeed() const { return worldSeed; }
 	int      GeneratedCount() const { return (int)chunks.size(); }
+	const StorySites& Sites() const { return sites; }
 
 	static uint64_t Key(int cx, int cz);
 	static void ChunkCoords(const Vec3& pos, int& cx, int& cz);
@@ -152,5 +200,6 @@ private:
 	Chunk Generate(int cx, int cz, uint64_t seed, int parentDir) const;
 
 	uint64_t worldSeed = 0;
+	StorySites sites;
 	std::unordered_map<uint64_t, Chunk> chunks;
 };

@@ -77,6 +77,7 @@ enum ModelId
 	MODEL_ROAD_SIGN,
 	MODEL_WATER,          // a pond's surface: the oval with its wandering shore, scaled to each pond
 	MODEL_REEDS,          // a clump of reeds at the water's edge
+	MODEL_PYLON,          // the transmission tower on the ridge, from where the great tree shows
 	MODEL_COUNT
 };
 
