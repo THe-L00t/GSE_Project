@@ -189,6 +189,7 @@
     <ClCompile Include="GameActors.cpp" />
     <ClCompile Include="GameAnim.cpp" />
     <ClCompile Include="GameCombat.cpp" />
+    <ClCompile Include="GameHome.cpp" />
     <ClCompile Include="GameMonitor.cpp" />
     <ClCompile Include="GameRoute.cpp" />
     <ClCompile Include="GameSurvival.cpp" />

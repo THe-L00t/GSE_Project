@@ -66,7 +66,8 @@ enum LevelId
 };
 
 // Route 32, the first outside: fight and grow, keep the body going, let nature show the way,
-// carry the old world, and reach Ginkgo Town (ContentDesign.md 3).
+// carry the old world, and reach Ginkgo Town (ContentDesign.md 3). Then, on the same growing map, the way
+// to the great tree and the home under it (ContentDesign.md 6).
 enum RouteGuide
 {
 	GUIDE_TAKE_PIPE,
@@ -77,7 +78,12 @@ enum RouteGuide
 	GUIDE_BUS_STOP,
 	GUIDE_FIND_WATER,
 	GUIDE_REACH_TOWN,
-	GUIDE_EXPLORE
+	GUIDE_EXPLORE,        // the story told: the world goes on
+	GUIDE_TOWN_WALL,      // the empty town, and the mother's words on the school wall
+	GUIDE_RIDGE,          // up the pylon on the ridge, to see the great tree
+	GUIDE_ROOT,           // through the sleeping city to the tree
+	GUIDE_HOME,           // finish the home the parents began under it
+	GUIDE_STOCK           // fill its jars: a life that is enough
 };
 
 // Notes grandmother left in the margins of the map, each read on reaching its place (ContentDesign.md 5).
@@ -229,6 +235,8 @@ public:
 
 	// Demo aid: jump straight to the level after the tutorial.
 	void SkipToRoute();
+	// Demo aid: on the road, jump to the next place the story waits at.
+	void SkipToNextSite();
 
 	bool WantsQuit() const { return quit; }
 
@@ -309,6 +317,28 @@ private:
 	void PickRouteBush(ForageActor& bush);
 	void DrawRouteHud();
 	void DrawGuideCard();
+
+	// GameHome.cpp: past Ginkgo Town, on the same growing map: the way to the great tree and the home under it
+	void BuildHome();
+	void UpdateHome(float dt);
+	float SporeField(const Vec3& pos) const;   // 1 on the road, up to about 2 in the sleeping city, below 0 under the tree
+	bool InSanctuary(const Vec3& pos) const;
+	bool AtHome() const;                       // under the tree once the home has been found
+	void WayTo(const Vec3& to, char* buf, size_t size) const;   // which way and how far, in words
+	Vec3 HomeSpotFront(int spot) const;        // where to stand to use a part of the home
+	bool FindLateSpot();                       // the school wall, the pylon or a part of the home close by
+	void UseLateSpot();
+	void ReadTownWall();
+	void ClimbPylon();
+	void UseHomeSpot(int spot);
+	void BuildHomePart(int spot);
+	void RefreshHomeLooks();
+	void PackAtHome();
+	int  StoredFood() const;
+	int  HaveForHome(int type) const { return inventory[type] + store[type]; }
+	void SpendForHome(int type, int count);
+	bool HomeComplete() const;
+	void QueueBeat(StoryBeat beat);            // opens now, or as soon as the dialog on screen closes
 
 	// GameCombat.cpp: attacks, creatures, items and growth
 	std::vector<EnemyActor*> LiveEnemies() const;
@@ -489,6 +519,29 @@ private:
 	std::unordered_map<uint64_t, ChunkState> chunkStates;
 	int   guide = GUIDE_TAKE_PIPE;
 	int   guideBaseline = 0;      // counter value when the current guide step began
+
+	// Past Ginkgo Town (GameHome.cpp). The jars hold a life that is enough at this much.
+	static const int kStockFood = 15;
+	static const int kStockWater = 10;
+	static const int kStockHerb = 5;
+	bool  townWallRead = false;
+	bool  ridgeClimbed = false;
+	bool  cityEntered = false;
+	bool  parentsFound = false;
+	bool  rootReached = false;
+	bool  homeBuilt[kHomeProjects] = {};
+	int   store[ITEM_TYPE_COUNT] = {};    // what is kept in the jars at home
+	int   gardenReady = 0;                // radishes up and waiting to be pulled
+	float gardenTimer = 0.0f;
+	float wellTimer = 0.0f;
+	bool  settled = false;                // the ending has been seen
+	float settleCardTimer = -1.0f;        // >= 0 while the closing title shows; -2 while it waits for the words
+	int   lateSpot = -1;                  // what the interaction key would use past the town
+	bool  deerLate = false;               // the deer walking ahead is bound for the tree, not the water
+	float treeMoteTimer = 0.0f;
+	PropActor*    homeProps[HOME_SPOT_COUNT] = {};
+	PropActor*    gardenCrops[6] = {};
+	LanternActor* homeLantern = nullptr;
 
 	CharacterStats stats;
 	float health = 76.0f;

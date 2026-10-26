@@ -111,6 +111,23 @@ void Game::StartRoute()
 
 	uint64_t seed = kRouteSeed != 0 ? kRouteSeed : MixSeed((uint64_t)std::time(nullptr));
 	routeMap.Reset(seed);
+
+	// Past the town, on the same map: the story's far places, and the home waiting under the great tree.
+	townWallRead = false;
+	ridgeClimbed = false;
+	cityEntered = false;
+	parentsFound = false;
+	rootReached = false;
+	for (int i = 0; i < kHomeProjects; ++i) homeBuilt[i] = false;
+	for (int i = 0; i < ITEM_TYPE_COUNT; ++i) store[i] = 0;
+	gardenReady = 0;
+	gardenTimer = 0.0f;
+	wellTimer = 0.0f;
+	settled = false;
+	settleCardTimer = -1.0f;
+	lateSpot = -1;
+	deerLate = false;
+	BuildHome();
 	chunkActors.clear();
 	chunkStates.clear();
 	popups.clear();
@@ -158,12 +175,15 @@ void Game::UpdateRoute(float dt, const bool* keys)
 	UpdateLandmarks(dt);
 	UpdateRouteForage();
 	UpdateRouteDeer(dt);
+	UpdateHome(dt);
 	UpdateGuide();
 	UpdateStory(dt);
 
-	// Deeper, more overgrown chunks carry thicker spores. Nature Insight slows it; thirst speeds it up.
+	// Deeper, more overgrown chunks carry thicker spores, and the sleeping city most, drawn toward the great tree.
+	// Nature Insight slows it; thirst speeds it up.
 	const ChunkActor* here = EnsureChunk(playerChunkX, playerChunkZ);
-	float rate = 0.0084f * (float)here->stage * NatureGuard(natureInsight) * (waterMeter <= 0.0f ? 1.6f : 1.0f);
+	float field = SporeField(player->Position());
+	float rate = 0.0084f * (float)here->stage * Maxf(field, 0.0f) * NatureGuard(natureInsight) * (waterMeter <= 0.0f ? 1.6f : 1.0f);
 	if (player->rollTimer > 0.0f) rate = 0.0f;
 
 	// Rain washes the spores out of the air, and a gale scatters them.
@@ -184,6 +204,13 @@ void Game::UpdateRoute(float dt, const bool* keys)
 			restLanternSeen = true;
 			ShowMessage("길가 석등에 아직 불이 남아 있다. 짐승들은 이 불빛 안으로 들어오지 않는다.", 5.5f);
 		}
+	}
+
+	// Under the great tree the spores are all drawn in: the air clears and wounds mend, as by a lantern.
+	if (field < 0.0f && deathTimer < 0.0f)
+	{
+		rate = -0.10f;
+		health = Minf(health + 2.0f * dt, MaxHealth(stats));
 	}
 
 	sporeExposure = Saturatef(sporeExposure + rate * dt);
@@ -243,8 +270,28 @@ void Game::SetGuide(int next)
 		ShowMessage("은행나무 읍내는 더 남쪽에 있다. 남은 길을 따라가라.", 5.0f);
 		break;
 
+	case GUIDE_TOWN_WALL:
+		ShowMessage("읍내는 텅 비었다. 학교 담벼락에 뭔가 적혀 있다.", 5.0f);
+		break;
+
+	case GUIDE_RIDGE:
+		ShowMessage("엄마 글씨를 따라, 남쪽 송전탑 능선으로.", 5.0f);
+		break;
+
+	case GUIDE_ROOT:
+		ShowMessage("포자가 흘러가는 쪽, 큰 나무를 향해. 잠든 도시는 포자가 짙다. 물을 넉넉히.", 6.0f);
+		break;
+
+	case GUIDE_HOME:
+		ShowMessage("여기서 살자. 엄마 아빠가 시작한 집을 마저 짓는다.", 5.0f);
+		break;
+
+	case GUIDE_STOCK:
+		ShowMessage("집이 다 됐다. 이제 장독을 채울 차례다.", 5.0f);
+		break;
+
 	case GUIDE_EXPLORE:
-		ShowMessage("길은 계속된다. 멀리 걸을수록 옛 세상은 덜 남아 있다.", 6.0f);
+		ShowMessage("뿌리를 내렸다. 길은 여전히 사방으로 자란다. 원하는 만큼 걷고, 돌아와 살면 된다.", 6.0f);
 		break;
 
 	default:
@@ -288,7 +335,27 @@ void Game::UpdateGuide()
 		break;
 
 	case GUIDE_REACH_TOWN:
-		if (townReached) SetGuide(GUIDE_EXPLORE);
+		if (townReached) SetGuide(GUIDE_TOWN_WALL);
+		break;
+
+	case GUIDE_TOWN_WALL:
+		if (townWallRead || ridgeClimbed || rootReached) SetGuide(GUIDE_RIDGE);
+		break;
+
+	case GUIDE_RIDGE:
+		if (ridgeClimbed || rootReached) SetGuide(GUIDE_ROOT);
+		break;
+
+	case GUIDE_ROOT:
+		if (rootReached) SetGuide(GUIDE_HOME);
+		break;
+
+	case GUIDE_HOME:
+		if (HomeComplete()) SetGuide(GUIDE_STOCK);
+		break;
+
+	case GUIDE_STOCK:
+		if (settled && settleCardTimer < 0.0f && !DialogOpen()) SetGuide(GUIDE_EXPLORE);
 		break;
 
 	default:
@@ -328,8 +395,37 @@ void Game::GuideText(char* buf, size_t size) const
 	case GUIDE_REACH_TOWN:
 		sprintf_s(buf, size, "길을 따라 남쪽의 은행나무 읍내에 닿아라.");
 		break;
+	case GUIDE_TOWN_WALL:
+		sprintf_s(buf, size, "읍내 입구 동쪽, 무너진 학교 담벼락을 살펴라.");
+		break;
+	case GUIDE_RIDGE:
+	{
+		char way[64];
+		WayTo(routeMap.Sites().ridge, way, sizeof(way));
+		sprintf_s(buf, size, "송전탑 능선에 올라 큰 나무를 찾아라  (%s)", way);
+		break;
+	}
+	case GUIDE_ROOT:
+	{
+		char way[64];
+		WayTo(routeMap.Sites().root, way, sizeof(way));
+		sprintf_s(buf, size, "잠든 도시를 지나 큰 나무 밑으로  (%s)", way);
+		break;
+	}
+	case GUIDE_HOME:
+	{
+		int built = 0;
+		for (int i = 0; i < kHomeProjects; ++i) built += homeBuilt[i] ? 1 : 0;
+		sprintf_s(buf, size, "부모님이 짓다 만 집을 마저 지어라 (%d/%d)  쉼터·우물·텃밭·석등.  자재 %d · 씨앗 %d",
+				  built, kHomeProjects, HaveForHome(ITEM_SCRAP), HaveForHome(ITEM_SEED));
+		break;
+	}
+	case GUIDE_STOCK:
+		sprintf_s(buf, size, "장독을 채워라  음식 %d/%d · 물 %d/%d · 약초 %d/%d", StoredFood(), kStockFood,
+				  store[ITEM_CLEAN_WATER], kStockWater, store[ITEM_HERB], kStockHerb);
+		break;
 	default:
-		sprintf_s(buf, size, "계속 걸어라. 땅은 사방으로 자라며 옛 세상을 잊어 간다.");
+		sprintf_s(buf, size, "뿌리내린 곳. 원하는 만큼 더 걸어도, 머물러도 된다.");
 		break;
 	}
 }
@@ -440,7 +536,8 @@ void Game::ActivateChunk(int cx, int cz)
 	for (size_t i = 0; i < chunk.items.size(); ++i)
 	{
 		if (state.itemTaken[i]) continue;
-		DropItem(chunk.items[i].itemType, chunk.items[i].pos, cx, cz, (int)i);
+		ItemActor* item = DropItem(chunk.items[i].itemType, chunk.items[i].pos, cx, cz, (int)i);
+		if (chunk.items[i].relicId >= 0) item->relicId = chunk.items[i].relicId;
 	}
 }
 
@@ -588,6 +685,17 @@ void Game::ResolveRouteCollisions(Vec3& pos, float radius)
 
 	PushOutOfCircle(pos, radius, lantern->WorldPosition(), lantern->collider.radius);
 	reservoir->PushOut(pos, radius);
+
+	// The home under the great tree, as far as it stands.
+	for (int i = 0; i < HOME_SPOT_COUNT; ++i)
+	{
+		const PropActor* part = homeProps[i];
+		if (!part || !part->visible || part->collider.shape != COLLIDER_BOX) continue;
+		if (DistXZ(pos, part->WorldPosition()) > 6.0f) continue;
+		PushOutOfTurnedBox(pos, radius, part->WorldPosition(), part->Yaw(), part->collider.halfX, part->collider.halfZ);
+	}
+	if (homeLantern && homeLantern->visible)
+		PushOutOfCircle(pos, radius, homeLantern->WorldPosition(), homeLantern->collider.radius);
 }
 
 void Game::UpdateLandmarks(float dt)
@@ -633,6 +741,7 @@ void Game::UpdateLandmarks(float dt)
 	prompt.clear();
 	restIndex = -1;
 	if (deathTimer >= 0.0f) return;
+	if (FindLateSpot()) return;
 	if (NearLanternFire())
 	{
 		char buf[128];
@@ -704,8 +813,12 @@ void Game::PickRouteBush(ForageActor& bush)
 	ChunkState& state = chunkStates[ChunkMap::Key(bush.chunkX, bush.chunkZ)];
 	if (bush.spawnIndex < (int)state.bushRegrowAt.size()) state.bushRegrowAt[bush.spawnIndex] = time + kBushRegrow;
 
+	// Past the town, some of what is picked is kept back as seed for a garden.
+	bool seed = townReached && room > take && combatRng.Chance(0.25f);
+	if (seed) ++inventory[ITEM_SEED];
+
 	char buf[256];
-	sprintf_s(buf, sizeof(buf), "빨간 열매를 %d줌 땄다. 덤불은 몇 분 지나면 다시 열린다.", take);
+	sprintf_s(buf, sizeof(buf), seed ? "빨간 열매를 %d줌 땄다. 씨앗도 한 봉투 받아 둔다." : "빨간 열매를 %d줌 땄다. 덤불은 몇 분 지나면 다시 열린다.", take);
 	ShowMessage(buf, 3.0f);
 }
 
@@ -719,6 +832,11 @@ bool Game::NearLantern(const Vec3& pos, float range, Vec3* at) const
 	if (lantern && DistXZ(pos, lantern->WorldPosition()) < range)
 	{
 		if (at) *at = lantern->WorldPosition();
+		return true;
+	}
+	if (homeLantern && homeLantern->visible && DistXZ(pos, homeLantern->WorldPosition()) < range)
+	{
+		if (at) *at = homeLantern->WorldPosition();
 		return true;
 	}
 
@@ -746,33 +864,50 @@ void Game::UpdateRouteDeer(float dt)
 {
 	bool night = timeOfDay < 0.22f || timeOfDay > 0.78f;
 
+	// The deer carry their lights to the great tree. Past the town, one that comes at night leads that way, a
+	// stretch at a time: to the ridge first, then to the tree itself.
+	bool late = guide == GUIDE_RIDGE || guide == GUIDE_ROOT;
+	Vec3 lateTarget = guide == GUIDE_RIDGE ? routeMap.Sites().ridge : routeMap.Sites().root;
+
 	if (!deer)
 	{
-		// Only while it is needed: after dark, with the water still unfound.
-		if (guide != GUIDE_FIND_WATER || !night || reservoirFound || deathTimer >= 0.0f) return;
+		// Only while it is needed: after dark, with the water still unfound or the tree still to reach.
+		bool water = guide == GUIDE_FIND_WATER && !reservoirFound;
+		if (!(water || late) || !night || deathTimer >= 0.0f) return;
 
-		Vec3 toWater(kReservoirCenter.x - player->Position().x, 0.0f, kReservoirCenter.z - player->Position().z);
-		float len = Length(toWater);
-		Vec3 dir = len > 0.01f ? toWater * (1.0f / len) : Vec3(0.0f, 0.0f, 1.0f);
+		Vec3 target = water ? kReservoirCenter : lateTarget;
+		Vec3 toTarget(target.x - player->Position().x, 0.0f, target.z - player->Position().z);
+		float len = Length(toTarget);
+		Vec3 dir = len > 0.01f ? toTarget * (1.0f / len) : Vec3(0.0f, 0.0f, 1.0f);
 
 		deer = levelNode->AddChild(new DeerActor());
 		deer->SetPosition(player->Position() + dir * 6.0f);
 		deer->SetYaw(atan2f(dir.x, dir.z));
-		deer->goal = reservoir->EdgePoint(kPi, 1.5f);
 		deer->speed = 2.4f;
 		deer->leading = true;
 		deer->carriesGrandma = true;
-		ShowMessage("등불 사슴이 어둠 속에서 걸어 나와 너를 기다린다. 뿔에 못 보던 따뜻한 불빛이 하나 늘어 있다.", 6.0f);
+		deerLate = !water;
+		if (water)
+		{
+			deer->goal = reservoir->EdgePoint(kPi, 1.5f);
+			ShowMessage("등불 사슴이 어둠 속에서 걸어 나와 너를 기다린다. 뿔에 못 보던 따뜻한 불빛이 하나 늘어 있다.", 6.0f);
+		}
+		else
+		{
+			deer->goal = deer->Position() + dir * Minf(36.0f, Maxf(len - 12.0f, 0.5f));
+			ShowMessage("등불 사슴이 나타나 앞장선다. 사슴들은 모두 같은 쪽, 큰 나무 쪽으로 걷는다.", 6.0f);
+		}
 		return;
 	}
 
 	Vec3 pos = deer->Position();
 
 	// Its work done, or the night over, it walks off and is gone.
-	if (deerLeaveTimer < 0.0f && (reservoirFound || (!night && !deer->arrived)))
+	bool done = deerLate ? !late : reservoirFound;
+	if (deerLeaveTimer < 0.0f && (done || (!night && !deer->arrived)))
 	{
 		deerLeaveTimer = 0.0f;
-		if (!reservoirFound) ShowMessage("날이 밝자 사슴은 사라졌다.", 3.0f);
+		if (!done) ShowMessage("날이 밝자 사슴은 사라졌다.", 3.0f);
 	}
 	if (deerLeaveTimer >= 0.0f)
 	{
@@ -795,6 +930,14 @@ void Game::UpdateRouteDeer(float dt)
 
 	if (goalDist < 0.5f)
 	{
+		// Leading to the tree, it walks on another stretch until the place is close.
+		Vec3 onward(lateTarget.x - pos.x, 0.0f, lateTarget.z - pos.z);
+		float left = Length(onward);
+		if (deerLate && left > 14.0f)
+		{
+			deer->goal = pos + onward * (Minf(36.0f, left - 12.0f) / left);
+			return;
+		}
 		deer->arrived = true;
 		return;
 	}
@@ -829,6 +972,12 @@ void Game::TryRouteInteract()
 	if (targetForage)
 	{
 		PickRouteBush(*targetForage);
+		return;
+	}
+
+	if (lateSpot >= 0)
+	{
+		UseLateSpot();
 		return;
 	}
 
@@ -910,6 +1059,7 @@ void Game::DrawRouteHud()
 	DrawCommonHud("WASD 이동  SPACE 구르기  J 공격  Q 약초  R 마시기  F 먹기  L 손전등  I 배낭  B 도감  M 지도  C 능력치  E 사용  F4 옵션");
 	DrawTitleCard("32번 국도", "처음 나선 바깥");
 	DrawTitleCardAt("은행나무 읍내", "첫 길의 끝", townCardTimer);
+	DrawTitleCardAt("뿌리", "네가 살 곳", settleCardTimer);
 	DrawNarration();
 	DrawMemoMap();
 	DrawDialog();

@@ -93,10 +93,20 @@ void Game::EatFood()
 {
 	if (deathTimer >= 0.0f) return;
 
+	// At home, with the bag empty, a meal comes out of the jars.
+	int* source = inventory;
 	int pick = -1;
 	for (int i = 0; i < kEatOrderCount && pick < 0; ++i)
 	{
 		if (inventory[kEatOrder[i]] > 0) pick = kEatOrder[i];
+	}
+	if (pick < 0 && AtHome())
+	{
+		source = store;
+		for (int i = 0; i < kEatOrderCount && pick < 0; ++i)
+		{
+			if (store[kEatOrder[i]] > 0) pick = kEatOrder[i];
+		}
 	}
 
 	if (pick < 0)
@@ -110,7 +120,7 @@ void Game::EatFood()
 		return;
 	}
 
-	--inventory[pick];
+	--source[pick];
 	foodMeter = Minf(foodMeter + FoodValue(pick), 100.0f);
 	PlayPlayerAction("eat");
 	++mealsEaten;
@@ -124,13 +134,16 @@ void Game::DrinkWater()
 {
 	if (deathTimer >= 0.0f) return;
 
-	if (inventory[ITEM_CLEAN_WATER] <= 0)
+	// At home, with no flask in the bag, a cup comes out of the jars.
+	int* source = inventory;
+	if (inventory[ITEM_CLEAN_WATER] <= 0 && AtHome() && store[ITEM_CLEAN_WATER] > 0) source = store;
+	if (source[ITEM_CLEAN_WATER] <= 0)
 	{
 		ShowMessage("남은 물병이 없다.", 2.0f);
 		return;
 	}
 
-	--inventory[ITEM_CLEAN_WATER];
+	--source[ITEM_CLEAN_WATER];
 	waterMeter = Minf(waterMeter + kFlaskWater, 100.0f);
 	sporeExposure = Maxf(sporeExposure - kFlaskClear, 0.0f);
 	ShowMessage("물을 마신다. 물이 포자를 씻어 낸다.", 2.5f);
@@ -165,6 +178,8 @@ int Game::UnfoundRelic()
 	int count = 0;
 	for (int i = RELIC_WATCH; i <= RELIC_PHONE; ++i)
 	{
+		// The watch and the phone wait beside the two who carried them.
+		if (i == RELIC_WATCH || i == RELIC_PHONE) continue;
 		if (!relicFound[i]) open[count++] = i;
 	}
 	return count > 0 ? open[combatRng.RangeInt(0, count - 1)] : -1;
@@ -302,6 +317,17 @@ void Game::DrawBagPanel()
 		renderer->DrawTexts(x, y, "손전등", kHudInk, false);
 		renderer->DrawTexts(x + 150, y, buf, kHudInk, false);
 		renderer->DrawTexts(x + 260, y, torchOn ? "[L] 켜짐" : "[L] 꺼짐", kHudDim, false);
+		y += 26;
+	}
+
+	// Past the town: what the home under the great tree is built and sown with.
+	if (townReached || inventory[ITEM_SCRAP] > 0 || inventory[ITEM_SEED] > 0)
+	{
+		Vec3 color = inventory[ITEM_SCRAP] + inventory[ITEM_SEED] > 0 ? kHudInk : kHudDim;
+		sprintf_s(buf, sizeof(buf), "x%d · x%d", inventory[ITEM_SCRAP], inventory[ITEM_SEED]);
+		renderer->DrawTexts(x, y, "자재 · 씨앗", color, false);
+		renderer->DrawTexts(x + 150, y, buf, color, false);
+		renderer->DrawTexts(x + 260, y, "큰 나무 밑 집 짓기", kHudDim, false);
 		y += 26;
 	}
 

@@ -240,6 +240,11 @@ void SpecialKeyInput(int key, int x, int y)
 		if (g_Game) g_Game->ToggleOptions();
 		return;
 	}
+	if (key == GLUT_KEY_F5)
+	{
+		if (g_Game) g_Game->SkipToNextSite();
+		return;
+	}
 
 	unsigned char k = SpecialToKey(key);
 	if (k) g_Keys[k] = true;
@@ -286,6 +291,7 @@ int main(int argc, char **argv)
 	std::cout << " E             : interact\n";
 	std::cout << " T             : toggle fast time of day\n";
 	std::cout << " F2            : skip to Route 32\n";
+	std::cout << " F5            : on the road, jump to the next story place (demo)\n";
 	std::cout << " F3            : toggle state monitor (browser)\n";
 	std::cout << " F4            : graphics options\n";
 	std::cout << " wheel drag    : zoom toward the player\n";

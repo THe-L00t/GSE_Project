@@ -184,6 +184,10 @@ void Game::KillEnemy(EnemyActor& e)
 	bool relic = combatRng.Chance(info.relicChance * find);
 	if (relic) DropItem(ITEM_RELIC, e.Position() + Vec3(0.0f, 0.0f, -0.4f), 0, 0, -1);
 
+	// Past the town what they held is worth keeping for a home: boards, wire, a sheet of tin.
+	if (townReached && combatRng.Chance((e.type == ENEMY_HUSK ? 0.35f : 0.15f) * find))
+		DropItem(ITEM_SCRAP, e.Position() + Vec3(0.4f, 0.0f, -0.3f), 0, 0, -1);
+
 	// Striking one down does not kill anything: it lets go of what the spores were holding.
 	AddPopup(e.Position() + Vec3(0.0f, 1.6f + info.radius, 0.0f), "풀려났다", kXpColor);
 	if (messageTimer <= 0.5f)
@@ -246,12 +250,16 @@ void Game::WakeAtSafePoint()
 		enemies[i]->stateTimer = 0.0f;
 	}
 
-	ShowMessage("석등 곁에서 눈을 뜬다. 잃은 것은 시간뿐이다.", 4.0f);
+	// Where the long sleep ends moves on with the story.
+	if (rootReached) ShowMessage("큰 나무 그늘, 집 앞에서 눈을 뜬다. 잃은 것은 시간뿐이다.", 4.0f);
+	else if (ridgeClimbed) ShowMessage("송전탑 밑에서 눈을 뜬다. 잃은 것은 시간뿐이다.", 4.0f);
+	else if (townWallRead) ShowMessage("학교 담벼락 밑에서 눈을 뜬다. 잃은 것은 시간뿐이다.", 4.0f);
+	else ShowMessage("석등 곁에서 눈을 뜬다. 잃은 것은 시간뿐이다.", 4.0f);
 }
 
 void Game::UpdateEnemies(float dt)
 {
-	sheltered = lantern && NearLantern(player->Position(), lantern->zoneRadius);
+	sheltered = (lantern && NearLantern(player->Position(), lantern->zoneRadius)) || InSanctuary(player->Position());
 
 	std::vector<EnemyActor*> enemies = LiveEnemies();
 	for (size_t i = 0; i < enemies.size(); ++i)
@@ -430,6 +438,10 @@ void Game::KeepOutOfLight(Vec3& pos, float radius) const
 	Vec3 lanternAt;
 	if (lantern && NearLantern(pos, lantern->zoneRadius + radius, &lanternAt))
 		PushOutOfCircle(pos, radius, lanternAt, lantern->zoneRadius);
+
+	// So does the clear air under the great tree.
+	if (level == LEVEL_ROUTE && DistXZ(pos, routeMap.Sites().root) < kSanctuaryRadius + radius)
+		PushOutOfCircle(pos, radius, routeMap.Sites().root, kSanctuaryRadius);
 }
 
 void Game::UpdateItems()
@@ -449,6 +461,8 @@ void Game::UpdateItems()
 		}
 		for (int r = RELIC_WATCH; r <= RELIC_PHONE && item.relicId < 0; ++r)
 		{
+			// The watch and the phone wait beside the two who carried them.
+			if (r == RELIC_WATCH || r == RELIC_PHONE) continue;
 			if (!relicFound[r] && !shown[r]) item.relicId = r;
 		}
 	}

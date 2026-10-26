@@ -14,7 +14,8 @@ namespace
 
 	const char* kGuideNames[] =
 	{
-		"TAKE_PIPE", "FIGHT_MITES", "ASSIGN_STATS", "FIGHT_BOAR", "ASSIGN_AGAIN", "BUS_STOP", "FIND_WATER", "REACH_TOWN", "EXPLORE"
+		"TAKE_PIPE", "FIGHT_MITES", "ASSIGN_STATS", "FIGHT_BOAR", "ASSIGN_AGAIN", "BUS_STOP", "FIND_WATER", "REACH_TOWN", "EXPLORE",
+		"TOWN_WALL", "RIDGE", "ROOT", "HOME", "STOCK"
 	};
 
 	const char* kEnemyStateNames[] =
@@ -62,6 +63,15 @@ std::string Game::MonitorJson() const
 				"\"rain\":%.2f,\"snow\":%.2f,\"wind\":%.2f,\"snowCover\":%.2f,\"wetness\":%.2f},",
 		   kSeasonIds[season], seasonDay + 1, kWeatherIds[weather], weatherTimer,
 		   rainLevel, snowLevel, windLevel, snowCover, wetness);
+
+	const StorySites& sites = routeMap.Sites();
+	int built = 0;
+	for (int i = 0; i < kHomeProjects; ++i) built += homeBuilt[i] ? 1 : 0;
+	Append(out, "\"story\":{\"root\":[%.0f,%.0f],\"ridge\":[%.0f,%.0f],\"parents\":[%.0f,%.0f],\"wallRead\":%s,\"ridgeClimbed\":%s,"
+				"\"cityEntered\":%s,\"parentsFound\":%s,\"rootReached\":%s,\"homeBuilt\":%d,\"settled\":%s},",
+		   sites.root.x, sites.root.z, sites.ridge.x, sites.ridge.z, sites.parents.x, sites.parents.z,
+		   townWallRead ? "true" : "false", ridgeClimbed ? "true" : "false", cityEntered ? "true" : "false",
+		   parentsFound ? "true" : "false", rootReached ? "true" : "false", built, settled ? "true" : "false");
 
 	Append(out, "\"perf\":{\"fps\":%.1f,\"lowFps\":%.1f,\"worstMs\":%.1f,\"updateMs\":%.2f,\"renderMs\":%.2f,"
 				"\"gpuShadow\":%.2f,\"gpuScene\":%.2f,\"gpuPost\":%.2f,\"gpuUi\":%.2f,\"drawCalls\":%d,\"spikes\":%d},",
