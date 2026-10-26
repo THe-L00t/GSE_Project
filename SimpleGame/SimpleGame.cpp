@@ -65,6 +65,11 @@ void RenderScene(void)
 	if (g_Renderer) g_Renderer->EndFrame();
 	double renderMs = NowMs() - start;
 	glutSwapBuffers();
+	// Wait until the frame has really gone out. Left alone, the driver queues frames ahead and hands control
+	// back at uneven moments (frames 26 to 35 ms apart while one takes about 2 ms to make): the world moved in
+	// uneven steps and the counter filled with spikes that no work of ours caused.
+	glFinish();
+	double swapMs = NowMs() - start - renderMs;
 
 	if (g_Renderer == NULL) return;
 
@@ -79,7 +84,7 @@ void RenderScene(void)
 	{
 		// Only the first few each second, so a bad patch does not flood the console.
 		if (++g_Spikes <= 3)
-			printf("Spike %.1f ms (update %.1f, draw %.1f)\n", frameMs, g_UpdateMs, renderMs);
+			printf("Spike %.1f ms (update %.1f, draw %.1f, swap %.1f)\n", frameMs, g_UpdateMs, renderMs, swapMs);
 	}
 
 	// One line per second; drawing to the console every frame would cost frames itself.
