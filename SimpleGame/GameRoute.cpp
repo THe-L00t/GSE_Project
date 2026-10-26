@@ -871,12 +871,14 @@ void Game::DrawRouteHud()
 	char objective[256];
 	GuideText(objective, sizeof(objective));
 	DrawObjective(objective);
+	DrawCombatHud();
+	DrawWeatherHud();
 
 	// A note has come up on her map since it was last opened.
 	if (mapUnread)
 	{
 		float pulse = 0.75f + 0.25f * sinf(time * 3.0f);
-		renderer->DrawTexts(32, 104, "[M] 할머니의 지도에 새 글씨", Vec3(0.93f, 0.86f, 0.66f) * pulse, false);
+		DrawHudLine("[M] 할머니의 지도에 새 글씨", Vec3(0.93f, 0.86f, 0.66f) * pulse);
 	}
 
 	const ChunkActor* here = EnsureChunk(playerChunkX, playerChunkZ);
@@ -894,12 +896,15 @@ void Game::DrawRouteHud()
 		if (tw > boxW) boxW = tw;
 	}
 
-	renderer->DrawRectPx((float)(w - boxW - 46), 18.0f, (float)(boxW + 28), 116.0f, kHudPanel, 0.38f);
-	for (int i = 0; i < 5; ++i)
-		renderer->DrawTexts(w - boxW - 32, 40 + i * 20, lines[i], i == 0 ? kHudInk : kHudDim, false);
+	hudRightBottom = 18.0f + 116.0f;
+	if (!UnderMemoMap((float)(w - boxW - 46), 18.0f, (float)(boxW + 28), 116.0f))
+	{
+		renderer->DrawRectPx((float)(w - boxW - 46), 18.0f, (float)(boxW + 28), 116.0f, kHudPanel, 0.38f);
+		for (int i = 0; i < 5; ++i)
+			renderer->DrawTexts(w - boxW - 32, 40 + i * 20, lines[i], i == 0 ? kHudInk : kHudDim, false);
+	}
 
 	DrawGuideCard();
-	DrawCombatHud();
 	DrawPopups();
 	DrawSurvivalHud();
 	DrawCommonHud("WASD 이동  SPACE 구르기  J 공격  Q 약초  R 마시기  F 먹기  L 손전등  I 배낭  B 도감  M 지도  C 능력치  E 사용  F4 옵션");
@@ -938,9 +943,13 @@ void Game::DrawGuideCard()
 		if (tw > boxW) boxW = tw;
 	}
 
+	// Under the chunk box, not over its last line.
 	float x = (float)(w - boxW - 46);
-	float y = 128.0f;
-	renderer->DrawRectPx(x, y, (float)(boxW + 28), 24.0f + 20.0f * (float)lineCount, kHudPanel, 0.45f);
+	float y = hudRightBottom + 10.0f;
+	float boxH = 24.0f + 20.0f * (float)lineCount;
+	hudRightBottom = y + boxH;
+	if (UnderMemoMap(x, y, (float)(boxW + 28), boxH)) return;
+	renderer->DrawRectPx(x, y, (float)(boxW + 28), boxH, kHudPanel, 0.45f);
 	for (int i = 0; i < lineCount; ++i)
 		renderer->DrawTexts((int)x + 14, (int)y + 26 + i * 20, lines[i], i == 0 ? kHudAccent : kHudInk, false);
 }

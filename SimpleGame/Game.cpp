@@ -393,6 +393,9 @@ void Game::Render()
 	float vignette = 0.28f + sporeExposure * 0.42f;
 	renderer->DrawAtmosphere(vignette, haze, Vec3(0.42f, 0.70f, 0.62f));
 
+	hudLeftBottom = 0.0f;
+	hudRightBottom = 0.0f;
+	hudObjectiveRight = 0.0f;
 	if (level == LEVEL_VILLAGE)
 		DrawVillageHud();
 	else
@@ -494,6 +497,22 @@ void Game::DrawObjective(const char* text)
 	renderer->DrawRectPx(18.0f, 18.0f, boxW, 62.0f, kHudPanel, 0.38f);
 	renderer->DrawTexts(32, 40, "목표", kHudDim, false);
 	renderer->DrawTexts(32, 64, text, kHudInk, false);
+	hudLeftBottom = 18.0f + 62.0f;
+	hudObjectiveRight = 18.0f + boxW;
+}
+
+void Game::DrawHudLine(const char* text, const Vec3& color)
+{
+	hudLeftBottom += 24.0f;
+	if (UnderMemoMap(24.0f, hudLeftBottom - 18.0f, 360.0f, 24.0f)) return;
+	renderer->DrawTexts(32, (int)hudLeftBottom, text, color, false);
+}
+
+bool Game::UnderMemoMap(float x, float y, float w, float h) const
+{
+	float mx, my, mw, mh;
+	if (!MemoMapRect(mx, my, mw, mh)) return false;
+	return x < mx + mw && mx < x + w && y < my + mh && my < y + h;
 }
 
 void Game::DrawCommonHud(const char* help)
@@ -501,20 +520,29 @@ void Game::DrawCommonHud(const char* help)
 	const int w = renderer->GetWidth();
 	const int h = renderer->GetHeight();
 
-	renderer->DrawTexts(24, h - 62, "포자 노출", kHudDim, false);
-	renderer->DrawBarPx(24.0f, (float)h - 54.0f, 220.0f, 12.0f, sporeExposure,
-						Vec3(0.35f, 0.70f, 0.60f), Vec3(0.75f, 0.95f, 0.55f));
+	if (!UnderMemoMap(24.0f, (float)h - 78.0f, 220.0f, 38.0f))
+	{
+		renderer->DrawTexts(24, h - 62, "포자 노출", kHudDim, false);
+		renderer->DrawBarPx(24.0f, (float)h - 54.0f, 220.0f, 12.0f, sporeExposure,
+							Vec3(0.35f, 0.70f, 0.60f), Vec3(0.75f, 0.95f, 0.55f));
+	}
 
 	int helpWidth = renderer->TextWidth(help, false);
 	renderer->DrawTexts(w - helpWidth - 24, h - 24, help, kHudDim, false);
 
-	DrawWeatherHud();
-
 	if (!prompt.empty())
 	{
+		// Under the dialog box, which moves aside for her map.
+		int cx = w / 2;
+		if (DialogOpen())
+		{
+			float dx, dy, dw, dh;
+			DialogRect(dx, dy, dw, dh);
+			cx = (int)(dx + dw * 0.5f);
+		}
 		int tw = renderer->TextWidth(prompt.c_str(), true);
-		renderer->DrawRectPx((float)(w / 2 - tw / 2 - 18), (float)(h - 150), (float)(tw + 36), 40.0f, kHudPanel, 0.45f);
-		renderer->DrawTexts(w / 2 - tw / 2, h - 123, prompt.c_str(), kHudAccent, true);
+		renderer->DrawRectPx((float)(cx - tw / 2 - 18), (float)(h - 150), (float)(tw + 36), 40.0f, kHudPanel, 0.45f);
+		renderer->DrawTexts(cx - tw / 2, h - 123, prompt.c_str(), kHudAccent, true);
 	}
 
 	if (messageTimer > 0.0f && !message.empty())

@@ -125,5 +125,5 @@ void Game::DrawWeatherHud()
 {
 	char buf[128];
 	sprintf_s(buf, sizeof(buf), "%s %d일째  ·  %s", kSeasonNames[season], seasonDay + 1, kWeatherNames[weather]);
-	renderer->DrawTexts(32, 104, buf, kHudDim, false);
+	DrawHudLine(buf, kHudDim);
 }

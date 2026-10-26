@@ -249,6 +249,7 @@ void Game::DrawSurvivalHud()
 	int rowCount = warmthActive ? 3 : 2;
 
 	int y = h - 92 - 30 * (rowCount - 1);
+	if (UnderMemoMap(24.0f, (float)y - 16.0f, 220.0f, 30.0f * (float)rowCount)) return;
 	for (int i = 0; i < rowCount; ++i)
 	{
 		bool low = rows[i].value < kLowMark;

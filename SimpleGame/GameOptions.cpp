@@ -186,6 +186,9 @@ void Game::DrawFpsOverlay()
 	char buf[128];
 	float gpu = perf.gpu.shadow + perf.gpu.scene + perf.gpu.post + perf.gpu.ui;
 	sprintf_s(buf, sizeof(buf), "FPS %.0f  (1%% %.0f)   GPU %.1f ms   CPU %.1f ms", perf.fps, perf.lowFps, gpu, perf.updateMs + perf.renderMs);
+	// Top middle, moved right of a long objective rather than over it.
 	int tw = renderer->TextWidth(buf, false);
-	renderer->DrawTexts(renderer->GetWidth() / 2 - tw / 2, 22, buf, kHudDim, false);
+	int x = renderer->GetWidth() / 2 - tw / 2;
+	if (x < (int)hudObjectiveRight + 16) x = (int)hudObjectiveRight + 16;
+	renderer->DrawTexts(x, 22, buf, kHudDim, false);
 }

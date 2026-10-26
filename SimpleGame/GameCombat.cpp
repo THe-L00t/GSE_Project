@@ -778,33 +778,41 @@ void Game::DrawCombatHud()
 	int need = XpToNextLevel(stats.level);
 	char buf[128];
 
-	renderer->DrawRectPx(18.0f, 88.0f, 330.0f, 100.0f, kHudPanel, 0.38f);
-
-	sprintf_s(buf, sizeof(buf), "Lv %d", stats.level);
-	renderer->DrawTexts(32, 120, buf, kHudAccent, true);
-
-	sprintf_s(buf, sizeof(buf), "체력  %d / %d", (int)(health + 0.5f), (int)(maxHealth + 0.5f));
-	renderer->DrawTexts(104, 108, buf, kHudInk, false);
-	renderer->DrawBarPx(104.0f, 114.0f, 228.0f, 10.0f, health / maxHealth,
-						Vec3(0.75f, 0.28f, 0.25f), Vec3(0.45f, 0.85f, 0.55f));
-
-	sprintf_s(buf, sizeof(buf), "경험치  %d / %d", stats.xp, need);
-	renderer->DrawTexts(104, 142, buf, kHudDim, false);
-	renderer->DrawBarPx(104.0f, 148.0f, 228.0f, 8.0f, (float)stats.xp / (float)need,
-						Vec3(0.40f, 0.55f, 0.75f), Vec3(0.60f, 0.85f, 0.95f));
-
-	int meals = inventory[ITEM_BERRIES] + inventory[ITEM_VEGETABLE] + inventory[ITEM_CANNED_FOOD]
-			  + inventory[ITEM_MEAT] + inventory[ITEM_COOKED_MEAT];
-	sprintf_s(buf, sizeof(buf), "%s   약초 %d [Q]  물 %d [R]  음식 %d [F]",
-			  player->weapon ? "파이프" : "맨손", inventory[ITEM_HERB], inventory[ITEM_CLEAN_WATER], meals);
-	renderer->DrawTexts(32, 176, buf, kHudDim, false);
-
-	if (stats.unspentPoints > 0)
+	// Under the objective box, and whatever comes after goes under it in turn.
+	float top = hudLeftBottom + 8.0f;
+	float panelH = stats.unspentPoints > 0 ? 134.0f : 100.0f;
+	hudLeftBottom = top + panelH;
+	if (!UnderMemoMap(18.0f, top, 330.0f, panelH))
 	{
-		float pulse = 0.65f + 0.35f * sinf(time * 5.0f);
-		sprintf_s(buf, sizeof(buf), "분배할 능력치 %d점  [C]", stats.unspentPoints);
-		renderer->DrawRectPx(18.0f, 194.0f, 330.0f, 28.0f, kHudPanel, 0.38f);
-		renderer->DrawTexts(32, 213, buf, kHudAccent * pulse, false);
+		int y = (int)top;
+		renderer->DrawRectPx(18.0f, top, 330.0f, 100.0f, kHudPanel, 0.38f);
+
+		sprintf_s(buf, sizeof(buf), "Lv %d", stats.level);
+		renderer->DrawTexts(32, y + 32, buf, kHudAccent, true);
+
+		sprintf_s(buf, sizeof(buf), "체력  %d / %d", (int)(health + 0.5f), (int)(maxHealth + 0.5f));
+		renderer->DrawTexts(104, y + 20, buf, kHudInk, false);
+		renderer->DrawBarPx(104.0f, top + 26.0f, 228.0f, 10.0f, health / maxHealth,
+							Vec3(0.75f, 0.28f, 0.25f), Vec3(0.45f, 0.85f, 0.55f));
+
+		sprintf_s(buf, sizeof(buf), "경험치  %d / %d", stats.xp, need);
+		renderer->DrawTexts(104, y + 54, buf, kHudDim, false);
+		renderer->DrawBarPx(104.0f, top + 60.0f, 228.0f, 8.0f, (float)stats.xp / (float)need,
+							Vec3(0.40f, 0.55f, 0.75f), Vec3(0.60f, 0.85f, 0.95f));
+
+		int meals = inventory[ITEM_BERRIES] + inventory[ITEM_VEGETABLE] + inventory[ITEM_CANNED_FOOD]
+				  + inventory[ITEM_MEAT] + inventory[ITEM_COOKED_MEAT];
+		sprintf_s(buf, sizeof(buf), "%s   약초 %d [Q]  물 %d [R]  음식 %d [F]",
+				  player->weapon ? "파이프" : "맨손", inventory[ITEM_HERB], inventory[ITEM_CLEAN_WATER], meals);
+		renderer->DrawTexts(32, y + 88, buf, kHudDim, false);
+
+		if (stats.unspentPoints > 0)
+		{
+			float pulse = 0.65f + 0.35f * sinf(time * 5.0f);
+			sprintf_s(buf, sizeof(buf), "분배할 능력치 %d점  [C]", stats.unspentPoints);
+			renderer->DrawRectPx(18.0f, top + 106.0f, 330.0f, 28.0f, kHudPanel, 0.38f);
+			renderer->DrawTexts(32, y + 125, buf, kHudAccent * pulse, false);
+		}
 	}
 
 	if (levelUpTimer > 0.0f)

@@ -244,6 +244,9 @@ private:
 	void UpdatePlayer(float dt, const bool* keys);
 	void UpdateCamera(float dt);
 	void DrawObjective(const char* text);
+	void DrawHudLine(const char* text, const Vec3& color);     // the next line down the top-left column
+	bool UnderMemoMap(float x, float y, float w, float h) const;   // her map, held beside a note, covers it
+	void DialogRect(float& x, float& y, float& w, float& h) const;
 	void DrawCommonHud(const char* help);
 	void DrawTitleCard(const char* title, const char* subtitle);
 	void DrawTitleCardAt(const char* title, const char* subtitle, float t);
@@ -594,4 +597,9 @@ private:
 	float messageTimer = 0.0f;
 	std::string prompt;
 	bool  quit = false;
+
+	// Where this frame's HUD columns end, so each piece goes under the last one instead of on top of it.
+	float hudLeftBottom = 0.0f;
+	float hudRightBottom = 0.0f;
+	float hudObjectiveRight = 0.0f;
 };

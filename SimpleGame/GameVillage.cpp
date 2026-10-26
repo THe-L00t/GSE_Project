@@ -974,9 +974,14 @@ void Game::DrawVillageHud()
 
 	sprintf_s(buf, sizeof(buf), "꿈 조각  %d / %d", fragments, fragmentGoal);
 	int tw = renderer->TextWidth(buf, false);
-	renderer->DrawRectPx((float)(w - tw - 46), 18.0f, (float)(tw + 28), 38.0f, kHudPanel, 0.38f);
-	renderer->DrawTexts(w - tw - 32, 42, buf, fragments >= fragmentGoal ? kHudAccent : kHudInk, false);
+	hudRightBottom = 18.0f + 38.0f;
+	if (!UnderMemoMap((float)(w - tw - 46), 18.0f, (float)(tw + 28), 38.0f))
+	{
+		renderer->DrawRectPx((float)(w - tw - 46), 18.0f, (float)(tw + 28), 38.0f, kHudPanel, 0.38f);
+		renderer->DrawTexts(w - tw - 32, 42, buf, fragments >= fragmentGoal ? kHudAccent : kHudInk, false);
+	}
 
+	DrawWeatherHud();
 	DrawSurvivalHud();
 
 	char help[256];
@@ -993,26 +998,31 @@ void Game::DrawVillageHud()
 	DrawVillageFades();
 }
 
+void Game::DialogRect(float& x, float& y, float& w, float& h) const
+{
+	const float sw = (float)renderer->GetWidth();
+	w = 900.0f;
+	h = 96.0f;
+	x = sw * 0.5f - w * 0.5f;
+	y = (float)renderer->GetHeight() - 290.0f;
+
+	// Beside her map, a note keeps to the rest of the screen.
+	float mx, my, mw, mh;
+	if (ReadingMemo() && MemoMapRect(mx, my, mw, mh))
+	{
+		float from = memoMapLeft ? mx + mw + 24.0f : 24.0f;
+		float to = memoMapLeft ? sw - 24.0f : mx - 24.0f;
+		w = Minf(w, to - from);
+		x = (from + to) * 0.5f - w * 0.5f;
+	}
+}
+
 void Game::DrawDialog()
 {
 	if (!DialogOpen()) return;
 
-	const int w = renderer->GetWidth();
-	const int h = renderer->GetHeight();
-
-	float pw = 900.0f, ph = 96.0f;
-	float px = (float)w * 0.5f - pw * 0.5f;
-	float py = (float)h - 290.0f;
-
-	// Beside her map, a note keeps to the rest of the screen.
-	float mx, my, mw, mh;
-	if (dialogSpeaker == "할머니의 지도 메모" && MemoMapRect(mx, my, mw, mh))
-	{
-		float from = memoMapLeft ? mx + mw + 24.0f : 24.0f;
-		float to = memoMapLeft ? (float)w - 24.0f : mx - 24.0f;
-		pw = Minf(pw, to - from);
-		px = (from + to) * 0.5f - pw * 0.5f;
-	}
+	float px, py, pw, ph;
+	DialogRect(px, py, pw, ph);
 	renderer->DrawRectPx(px, py, pw, ph, Vec3(0.08f, 0.09f, 0.08f), 0.88f);
 	renderer->DrawRectPx(px, py, 4.0f, ph, Vec3(0.85f, 0.70f, 0.45f), 0.9f);
 
