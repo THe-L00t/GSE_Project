@@ -132,7 +132,8 @@ void main()
 	// three cross products instead of a matrix inverse at every vertex. Scales here are never negative.
 	mat3 m3 = mat3(model);
 	mat3 cofactor = mat3(cross(m3[1], m3[2]), cross(m3[2], m3[0]), cross(m3[0], m3[1]));
-	v_Normal = normalize(cofactor * n);
+	// A zero normal would make NaN, which the bloom spreads into black squares; it faces up instead.
+	v_Normal = normalize(cofactor * n + vec3(0.0, 1e-6, 0.0));
 	v_Tangent = vec4(normalize(mat3(model) * t + vec3(1e-6)), a_Tangent.w < 0.0 ? -1.0 : 1.0);
 	v_Color = a_Color.rgb;
 	v_MossMask = a_Color.a;

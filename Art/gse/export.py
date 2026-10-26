@@ -100,9 +100,15 @@ def write_mesh(name, obj, arm_obj=None, textures=None, specular=0.25, emissive=1
 			vi = loop.vertex_index
 			p = C @ mesh.vertices[vi].co
 			n = (C @ normals[li].vector)
+			if n.length < 1e-6:
+				# Faces folded back onto each other, like the two sides of a thin leaf, cancel a smooth normal
+				# out. A zero normal turns into NaN in the shader, and the bloom spreads it into black squares.
+				n = C @ poly.normal
 			t = (C @ loop.tangent)
 			p = Vector((p.x / sx, p.y / sy, p.z / sz))
 			n = Vector((n.x * sx, n.y * sy, n.z * sz)).normalized()
+			if n.length < 0.5:
+				n = Vector((0.0, 1.0, 0.0))
 			t = Vector((t.x / sx, t.y / sy, t.z / sz)).normalized()
 			sign = loop.bitangent_sign
 			uv = uvs[li].uv
