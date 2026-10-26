@@ -14,6 +14,7 @@ namespace
 {
 	const int   kLateWall = HOME_SPOT_COUNT;
 	const int   kLatePylon = HOME_SPOT_COUNT + 1;
+	const int   kLateNeighbor = HOME_SPOT_COUNT + 2;   // and the one after it: Dohyeon, Yeoul
 	const float kLateReach = 2.2f;      // from the spot one stands at to use it
 	const float kSettleCard = 8.0f;     // how long the closing title shows
 
@@ -85,8 +86,71 @@ namespace
 	{
 		"(그날 밤, 등불 사슴들이 나무 밑으로 모여들었다.)",
 		"(뿔마다 실린 불빛이 하나씩 가지 끝으로 올라가 꽃이 된다. 유난히 따뜻한 빛이 하나 있다.)",
+		"(도현 아저씨와 여울이도 나와, 나란히 나무를 올려다본다.)",
 		"할머니, 여기서 살기로 했어요. 밥은 잘 먹고 있어요.",
 	};
+
+	// The two who came to the tree first (GameConcept.md 2026-10-26, the models): where they stand, out from the
+	// trunk toward the camera (front) and across that (side), as the parts of the home are.
+	const float kNeighborFront[2] = { 11.0f, 18.0f };
+	const float kNeighborSide[2] = { -14.0f, 15.0f };
+
+	const char* kNeighborSeenLines[] =
+	{
+		"(나무 밑에 사람이 있다. 할머니 말고는 처음 보는, 깨어 있는 사람이.)",
+	};
+
+	// The dialog box draws each line as one row, so none is longer than the widest the village already has.
+	const char* kDohyeonMeet[] =
+	{
+		"(안경을 밀어 올리고 한참을 본다.) ...깨어 있는 사람이 또 있었군.",
+		"도현이다. 은행나무 읍내에 살았지. 아내가 저 도시 어딘가에 잠들어 있다.",
+		"깨어나면 제일 먼저 보이는 데 있고 싶어서, 여기 와 있다.",
+		"그동안 옛 세상 물건을 모은다. 시계, 사진, 차표 한 장까지.",
+		"아내가 깨어났을 때 돌아올 세상이 남아 있어야 하니까.",
+		"저 집 말이다. 젊은 내외가 짓다가, 아이를 데리러 간다며 떠났지. 돌아오지 않더구나.",
+	};
+	// Hayul's answer is told, not given its own dialog: under Hayul's name the screen turns to an old photograph.
+	const char* kHayulAnswer[] =
+	{
+		"(하율이 겨우 말한다. ...우리 엄마, 아빠예요.)",
+		"(도시 가장자리에서, 손을 잡고 잠들어 있었어요.)",
+	};
+	const char* kDohyeonMeetEnd[] =
+	{
+		"(도현이 한동안 말이 없다.) ...그랬구나. 그럼 저 집은 네 몫이다.",
+		"모자란 건 잠든 도시에 있다. 건물 사이에도, 허물이 지닌 것 중에도.",
+		"옛 사람들 물건이지만, 이제 쓸 사람이 써야지.",
+	};
+	const char* kDohyeonMore[] =
+	{
+		"여울이는 포자 속에서 뛰어논다. 나는 그게 무섭다. 돌아갈 데가 없다는 뜻 같아서.",
+		"(도현이 수첩을 펼쳐 무언가를 적는다.) 오늘 바람, 오늘 하늘. 이것도 기록이지.",
+	};
+
+	const char* kYeoulMeet[] =
+	{
+		"(화관을 쓴 아이가 포자 사이를 뛰어와 하율을 빤히 올려다본다.)",
+		"처음 보는 얼굴! 너도 안 졸려?",
+		"나는 여울이야. 엄마 아빠는 내가 태어날 때부터 자고 있었어.",
+		"그래서 난 포자가 하나도 안 졸려.",
+		"(손바닥에 내려앉은 포자를 후 불어 날린다.)",
+		"얘네는 나무한테 가는 길이야. 길만 안 막으면 괜찮아.",
+	};
+	// What she knows of living in the spores, each of it true of the world: water, rain, a held breath, a lantern.
+	const char* kYeoulTips[] =
+	{
+		"도시에서 졸리면 물을 마셔. 포자가 씻겨 내려가.",
+		"비 오는 날엔 포자가 덜 날려. 멀리 갈 거면 그런 날 가.",
+		"구를 땐 숨 참는 거야! 그동안엔 포자가 안 들어와.",
+		"석등 불빛 안은 나무 밑처럼 맑아. 짐승도 못 들어오고.",
+	};
+
+	template <int N>
+	int LineCount(const char* (&)[N])
+	{
+		return N;
+	}
 
 	StoryBeat MakeBeat(const char* speaker, const char* const* lines, int count)
 	{
@@ -126,6 +190,92 @@ void Game::BuildHome()
 	homeLantern = levelNode->AddChild(new LanternActor());
 	homeLantern->SetPosition(HomeSpotPos(s, HOME_LANTERN));
 	RefreshHomeLooks();
+	PlaceNeighbors();
+}
+
+void Game::PlaceNeighbors()
+{
+	// They were under the tree before Hayul came, on either side of the home, half turned toward it.
+	const StorySites& s = routeMap.Sites();
+	const int models[kNeighborCount] = { MODEL_DOHYEON, MODEL_YEOUL };
+	const float turn[kNeighborCount] = { 0.35f, -0.5f };
+	const float k = 0.70710678f;
+	for (int i = 0; i < kNeighborCount; ++i)
+	{
+		NpcActor* n = levelNode->AddChild(new NpcActor());
+		n->model = models[i];
+		n->phase = 1.3f * (float)(i + 1);
+		n->collider.radius = i == 0 ? 0.4f : 0.32f;
+		n->SetPosition(s.root + Vec3((kNeighborFront[i] + kNeighborSide[i]) * k, 0.0f, (kNeighborFront[i] - kNeighborSide[i]) * k));
+		n->SetYaw(kPi * 0.25f + turn[i]);
+		neighborNpc[i] = n;
+	}
+}
+
+const char* Game::NeighborName(int who)
+{
+	return who == 0 ? "도현" : "여울";
+}
+
+void Game::TalkToNeighbor(int who)
+{
+	NpcActor* n = neighborNpc[who];
+	if (n == nullptr) return;
+	Vec3 d = player->Position() - n->Position();
+	n->SetYaw(atan2f(d.x, d.z));
+	neighborsSeen = true;
+
+	if (!neighborMet[who])
+	{
+		neighborMet[who] = true;
+		if (who == 1)
+		{
+			OpenBeat(MakeBeat("여울", kYeoulMeet, LineCount(kYeoulMeet)));
+			return;
+		}
+
+		// He saw Hayul's parents begin the home, and leave it to fetch their child.
+		StoryBeat meet = MakeBeat("도현", kDohyeonMeet, LineCount(kDohyeonMeet));
+		meet.lines.insert(meet.lines.end(), kHayulAnswer, kHayulAnswer + (parentsFound ? 2 : 1));
+		meet.lines.insert(meet.lines.end(), kDohyeonMeetEnd, kDohyeonMeetEnd + LineCount(kDohyeonMeetEnd));
+		OpenBeat(meet);
+		return;
+	}
+
+	// After the first time: how the home stands, then one more thing, a different one each time.
+	int turnIndex = neighborTalks[who]++;
+	StoryBeat beat;
+	beat.speaker = NeighborName(who);
+	if (who == 0)
+	{
+		if (settled) beat.lines.push_back("아내가 깨어나면 여기로 데려와야겠다. 이웃이 있다고, 무가 난다고.");
+		else if (HomeComplete()) beat.lines.push_back("집이 제법 집 같구나. 이제 장독만 채우면 겨울도 나겠다.");
+		else beat.lines.push_back("집은 좀 되어 가냐? 자재는 잠든 도시에 있다. 건물 사이에도, 허물이 지닌 것 중에도.");
+
+		if (turnIndex % 3 == 0)
+		{
+			int found = 0;
+			for (int r = 0; r < kRelicCount; ++r) found += relicFound[r] ? 1 : 0;
+			char buf[256];
+			if (found >= kRelicCount)
+				sprintf_s(buf, sizeof(buf), "옛 물건 여덟 개를 다 모았구나. 도감 한 권에 옛 세상이 다 들었다. ...고맙다.");
+			else
+				sprintf_s(buf, sizeof(buf), "옛 물건은 %d개 찾았구나. 나머지도 길 어딘가에 있을 거다. 도감(B)에 적어 두렴.", found);
+			beat.lines.push_back(buf);
+		}
+		else
+		{
+			beat.lines.push_back(kDohyeonMore[turnIndex % 3 - 1]);
+		}
+	}
+	else
+	{
+		beat.lines.push_back(kYeoulTips[turnIndex % LineCount(kYeoulTips)]);
+		if (settled) beat.lines.push_back("이제 여기 우리 동네야. 도현 아저씨랑, 너랑, 나랑.");
+		else if (homeBuilt[HOME_GARDEN]) beat.lines.push_back("(밭 쪽을 기웃거린다.) 무 나면 하나만 줘!");
+		else beat.lines.push_back("밭 만들면 나도 무 하나 줘! 약속!");
+	}
+	OpenBeat(beat);
 }
 
 void Game::RefreshHomeLooks()
@@ -169,6 +319,12 @@ void Game::UpdateHome(float dt)
 	const Vec3& pos = player->Position();
 	float toRoot = DistXZ(pos, s.root);
 	float gameDt = dt * timeScale;
+
+	// The two under the tree are drawn and moved only within sight of it.
+	for (int i = 0; i < kNeighborCount; ++i)
+	{
+		if (neighborNpc[i]) neighborNpc[i]->visible = toRoot < kSanctuaryRadius + 80.0f;
+	}
 
 	// The spores drift thicker the nearer the tree, and are gone under it.
 	float field = SporeField(pos);
@@ -225,6 +381,19 @@ void Game::UpdateHome(float dt)
 			safePoint->SetPosition(HomeSpotFront(HOME_SHELTER) + kFront * 0.8f);
 			AddInsight(2, "큰 나무는 포자를 들이쉰다. 그 그늘 아래는 맑다.");
 		}
+
+		// Once the tree's own words are said, the first sight of someone awake under it.
+		if (rootReached && !neighborsSeen && !DialogOpen() && storyQueue.empty())
+		{
+			for (int i = 0; i < kNeighborCount; ++i)
+			{
+				NpcActor* n = neighborNpc[i];
+				if (n == nullptr || DistXZ(pos, n->Position()) > 18.0f || !PlaceInSight(n->Position(), 1.6f)) continue;
+				neighborsSeen = true;
+				Narrate("하율", kNeighborSeenLines, 1);
+				break;
+			}
+		}
 	}
 
 	// The home keeps going while you are away: radishes come up, and the well fills the jars.
@@ -255,7 +424,7 @@ void Game::UpdateHome(float dt)
 		settled = true;
 		if (!IsNight(timeOfDay)) timeOfDay = 0.86f;
 		QueueBeat(MakeBeat("하율", kSettleLines, 2));
-		StoryBeat night = MakeBeat("하율", kNightLines, 3);
+		StoryBeat night = MakeBeat("하율", kNightLines, LineCount(kNightLines));
 		night.follows = true;
 		storyQueue.push_back(night);
 		settleCardTimer = -2.0f;
@@ -353,6 +522,15 @@ bool Game::FindLateSpot()
 
 	if (!rootReached) return false;
 
+	for (int i = 0; i < kNeighborCount; ++i)
+	{
+		NpcActor* n = neighborNpc[i];
+		if (n == nullptr || DistXZ(pos, n->Position()) >= kInteractRange) continue;
+		lateSpot = kLateNeighbor + i;
+		prompt = i == 0 ? "[E]  도현과 이야기하기" : "[E]  여울과 이야기하기";
+		return true;
+	}
+
 	char buf[192];
 	for (int spot = 0; spot < HOME_SPOT_COUNT; ++spot)
 	{
@@ -397,6 +575,7 @@ void Game::UseLateSpot()
 {
 	if (lateSpot == kLateWall) ReadTownWall();
 	else if (lateSpot == kLatePylon) ClimbPylon();
+	else if (lateSpot >= kLateNeighbor && lateSpot < kLateNeighbor + kNeighborCount) TalkToNeighbor(lateSpot - kLateNeighbor);
 	else if (lateSpot >= 0 && lateSpot < HOME_SPOT_COUNT) UseHomeSpot(lateSpot);
 }
 

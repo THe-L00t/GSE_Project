@@ -339,6 +339,9 @@ private:
 	void SpendForHome(int type, int count);
 	bool HomeComplete() const;
 	void QueueBeat(StoryBeat beat);            // opens now, or as soon as the dialog on screen closes
+	void PlaceNeighbors();                     // Dohyeon and Yeoul, who came to the tree before Hayul
+	void TalkToNeighbor(int who);
+	static const char* NeighborName(int who);
 
 	// GameCombat.cpp: attacks, creatures, items and growth
 	std::vector<EnemyActor*> LiveEnemies() const;
@@ -418,6 +421,7 @@ private:
 	void AnimateGrandmother(float dt);
 	void AnimateSleepers(float dt);
 	void AnimateDeer(float dt);
+	void AnimateNeighbors(float dt);
 	void PlayPlayerAction(const char* clip);   // eat, pickup: a one-shot over whatever the body was doing
 	void ShareSleeperPose(ChunkActor& chunk);  // the road's sleepers breathe with one shared pose
 
@@ -542,6 +546,11 @@ private:
 	PropActor*    homeProps[HOME_SPOT_COUNT] = {};
 	PropActor*    gardenCrops[6] = {};
 	LanternActor* homeLantern = nullptr;
+	static const int kNeighborCount = 2;           // Dohyeon, Yeoul
+	NpcActor* neighborNpc[kNeighborCount] = {};
+	bool  neighborMet[kNeighborCount] = {};
+	int   neighborTalks[kNeighborCount] = {};      // talks since the first, to turn through what they say
+	bool  neighborsSeen = false;
 
 	CharacterStats stats;
 	float health = 76.0f;

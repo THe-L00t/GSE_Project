@@ -67,6 +67,7 @@ void Game::UpdateAnimations(float dt)
 		AnimateEnemy(*enemies[i], dt);
 
 	AnimateGrandmother(dt);
+	AnimateNeighbors(dt);
 	AnimateSleepers(dt);
 	AnimateDeer(dt);
 
@@ -259,6 +260,27 @@ void Game::AnimateGrandmother(float dt)
 		return;
 	}
 	Loop(a, "idle", 0.35f, 1.0f, dt);
+}
+
+void Game::AnimateNeighbors(float dt)
+{
+	// Dohyeon and Yeoul under the great tree: they stand and breathe, and talk while it is them speaking.
+	if (level != LEVEL_ROUTE) return;
+	for (int i = 0; i < kNeighborCount; ++i)
+	{
+		NpcActor* n = neighborNpc[i];
+		if (n == nullptr || n->IsDestroyed() || !n->visible) continue;
+		Animator& a = n->anim;
+		if (!a.Bound())
+		{
+			a.Bind(renderer->ModelSkeleton(n->model));
+			if (!a.Bound()) continue;
+			a.Play("idle", 0.0f);
+			a.SetTime(n->phase);
+		}
+		bool talking = DialogOpen() && dialogSpeaker == NeighborName(i) && HasClip(a, "talk");
+		Loop(a, talking ? "talk" : "idle", 0.3f, 1.0f, dt);
+	}
 }
 
 void Game::AnimateSleepers(float dt)

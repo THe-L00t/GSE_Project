@@ -127,6 +127,12 @@ void Game::StartRoute()
 	settleCardTimer = -1.0f;
 	lateSpot = -1;
 	deerLate = false;
+	for (int i = 0; i < kNeighborCount; ++i)
+	{
+		neighborMet[i] = false;
+		neighborTalks[i] = 0;
+	}
+	neighborsSeen = false;
 	BuildHome();
 	chunkActors.clear();
 	chunkStates.clear();
@@ -696,6 +702,12 @@ void Game::ResolveRouteCollisions(Vec3& pos, float radius)
 	}
 	if (homeLantern && homeLantern->visible)
 		PushOutOfCircle(pos, radius, homeLantern->WorldPosition(), homeLantern->collider.radius);
+	for (int i = 0; i < kNeighborCount; ++i)
+	{
+		const NpcActor* n = neighborNpc[i];
+		if (n && DistXZ(pos, n->WorldPosition()) < 3.0f)
+			PushOutOfCircle(pos, radius, n->WorldPosition(), n->collider.radius);
+	}
 }
 
 void Game::UpdateLandmarks(float dt)
